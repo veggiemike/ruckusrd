@@ -2,47 +2,69 @@ AC_PREREQ([2.65])
 AC_INIT([ruckusrd], [0.9.0], [michael.d.labriola@gmail.com])
 
 AM_INIT_AUTOMAKE(dist-bzip2 no-dist-gzip)
-#AC_CONFIG_HEADERS([config.h])
-
-# Checks for programs.
-# bash
-# switch_root
-# all the other binaries explicitly copied into initramfs
-# mksquashfs
 
 AC_PROG_INSTALL
-AC_PATH_PROG(MKSQUASHFS, mksquashfs)
+AC_PROG_MKDIR_P
 
-#AC_PATH_PROG(FOO, foo)
-#AS_IF([test "$FOO" = ""],
-#      [AC_MSG_ERROR([could not find FOO])])
-#AC_ARG_VAR(FOO, The FOO)
+AC_DEFUN([NEEDED_PROGS],
+	 [dnl progs copied into the initramfs
+	  basename
+	  bash
+	  blockdev
+	  cat
+	  chmod
+	  cut
+	  dd
+	  dirname
+	  dmesg
+	  dmsetup
+	  echo
+	  env
+	  grep
+	  insmod
+	  kill
+	  killall5
+	  less
+	  ln
+	  losetup
+	  ls
+	  lsmod
+	  lvm
+	  mdadm
+	  mkdir
+	  mknod
+	  modprobe
+	  mount
+	  pidof
+	  readlink
+	  rm
+	  sed
+	  sleep
+	  tree
+	  udevd
+	  umount
+	  vol_id
+	  switch_root
+	  dnl other progs needed for ruckusrd script
+	  ldd
+	  sed
+	  modprobe
+	  depmod
+	  find
+	  bash
+	  cpio
+	  mksquashfs
+	 ])
 
+m4_foreach_w([P], NEEDED_PROGS,
+		  [AC_PATH_PROG(m4_toupper(P), P, [], $PATH:/lib/udev)
+		   AS_IF([test "$m4_toupper(P)" = ""], [AC_MSG_ERROR([Could not find P])])
+		   AC_ARG_VAR(m4_toupper(P), Path to P)])
 
-## I am not sure why I need to do this... but apparently I do.
-#if test "$exec_prefix" = "NONE"; then
-#    exec_prefix=$prefix
-#fi
-#
-## I am not sure why I need to do this... but apparently I do.
-#if test "$exec_prefix" = "NONE"; then
-#    exec_prefix=$prefix
-#fi
-#
-#pkglibexecdir=`eval echo "$libexecdir/$PACKAGE"`
-#pkglocalstatedir=`eval echo "$localstatedir/$PACKAGE"`
-#pkgsharedir=`eval echo "$datarootdir/$PACKAGE"`
-#pkglibdir=`eval echo "$libdir/$PACKAGE"`
-#
-#
-#AC_DEFINE_UNQUOTED([LIBEXECDIR], "$pkglibexecdir", [Directory where scripts and binaries live])
-#AC_DEFINE_UNQUOTED([LOCALSTATEDIR], "$pkglocalstatedir", [Directory where localstate data lives.])
-#AC_DEFINE_UNQUOTED([PKGSHAREDIR], "$pkgsharedir", [Directory where auxiliary files live])
-#AC_DEFINE_UNQUOTED([PKGLIBDIR], "$pkglibdir", [Directory where libraries live])
-#
-
-#AC_SUBST
-
+# we need either udevadm or udevstart
+AC_PATH_PROGS(UDEVADM, [udevadm udevstart])
+AS_IF([test "UDEVADM" = ""], [AC_MSG_ERROR([Either udevadm or udevstart are required])])
+AC_ARG_VAR(UDEVADM, Path to either udevadm or udevstart)
 
 AC_CONFIG_FILES([Makefile \
 		 src/Makefile])

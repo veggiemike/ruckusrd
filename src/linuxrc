@@ -291,8 +291,8 @@ echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
 
 decho "starting udevd"
 /sbin/udevd --daemon
-if [ -x /sbin/udevtrigger ]; then
-    /sbin/udevtrigger
+if [ -x /sbin/udevadm ]; then
+    /sbin/udevadm trigger
 else
     # using an old version of udev, FC5-ish
     /sbin/udevstart

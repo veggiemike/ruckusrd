@@ -163,6 +163,8 @@ PROGS+=" sleep"
 PROGS+=" tree"
 PROGS+=" udevd"
 PROGS+=" udevstart"
+# or udevadm
+# are udevtrigger and udevsettle synonymous with 'udavadm trigger' and 'udevadm settle'?
 PROGS+=" umount"
 PROGS+=" vol_id"
 PROGS+=" switch_root"

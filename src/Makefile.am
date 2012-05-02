@@ -2,8 +2,9 @@ dist_bin_SCRIPTS = ruckusrd
 
 dist_pkgdata_DATA = linuxrc
 
+# FIXME: need to make sure path substitutions happen.  might only need it for ruckusrd.
 
-# FIXME: need to make sure path substitutions happen
+# FIXME: i want to also install a symlink mkinintrd->ruckusrd
 
 
 
