@@ -1,0 +1,11 @@
+ruckusrd - a super awesome, yet simple, mkinitrd replacement
+
+Copyright 2012 Michael D Labriola <michael.d.labriola@gmail.com>
+
+Licensed under the GPLv3. See the file COPYING for details. 
+
+This script is a derivative of fedora's livecd-creator's mayflower script,
+written by David Zeuthen <davidz@redhat.com>.
+
+It's been largely rewritten to be a mkinitrd replacement that can be used on
+embedded systems, flash drives, live CDs, and normal desktop Linux systems.
