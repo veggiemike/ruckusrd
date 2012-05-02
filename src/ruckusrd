@@ -1,0 +1,278 @@
+#!/bin/bash
+#
+# mkinitrd - a super awesome, yet simple, mkinitrd replacement
+#
+# Copyright 2012 Michael D Labriola <mlabriol@gdeb.com>
+#
+# Licensed under the GPLv2. See the file COPYING for details. 
+#
+# This script is a derivative of fedora's livecd-creator's mayflower script,
+# written by David Zeuthen <davidz@redhat.com>.
+#
+# It's been largely rewritten to be a mkinitrd replacement that can be used on
+# embedded systems, flash drives, live CDs, and normal desktop Linux systems.
+#
+#
+# This mkinitrd script (and the resulting initramfs) assumes the following:
+#
+# 1. All kernel bits needed for booting are built in except for DEVICE DRIVERS
+#    (e.g., scsi_mod, sg, sd_mod, libata, usb_storage, ext2, uhci_hcd, ehci_hcd,
+#    ohci_hcd, sr_mod, cdrom, dm_snapshot, dm_zero, dm_mirror, dm_region_hash,
+#    dm_log, dm_mod, raid1).  Drivers for individual SATA or PATA controllers
+#    need to get added to the initrd, but everything needed to boot from CD-ROM
+#    or USB flash drive should be compiled into the kernel.
+
+
+# so we can run out of the dev area
+if [ -n "__DEV__" ]; then
+    SHAREDIR=$PWD/lib
+else
+    SHAREDIR=__SS_INSTALL_SHAREDIR__
+fi
+LINUXRC=$SHAREDIR/linuxrc
+
+
+decho()
+{
+    if [ "$opt_verbose" != "0" ]; then
+        echo "$*"
+    fi
+}
+
+
+usage() {
+    echo "$0 [--help] [--verbose] [-f] <out-initrd-image> <kernel-version>"
+    echo
+    echo "example: $0 /boot/myinitramfs.img \`uname -r\`"
+}
+
+
+opt_allow_overwrite=0
+opt_verbose=0
+INITRAMFS_TARGET=""
+KERNEL=""
+while [ $# -gt 0 ] ; do
+    case $1 in
+        --help)
+            usage
+            exit 0
+            ;;
+        -f)
+            opt_allow_overwrite=1
+            ;;
+        -v|--verbose)
+            opt_verbose=1
+            ;;
+        *)
+            if [ -z "$INITRAMFS_TARGET" ] ; then
+                INITRAMFS_TARGET=$1
+            elif [ -z "$KERNEL" ] ; then
+                KERNEL=$1
+            else
+                echo "Unknown option or parameter \"$1\""
+                echo
+                usage
+                exit 1
+            fi
+            ;;
+        *)
+            ;;
+    esac
+
+    shift
+done
+
+if [ -z "$INITRAMFS_TARGET" -o -z "$KERNEL" ] ; then
+    usage
+    exit 1
+fi
+
+if [  "$opt_allow_overwrite" == "0" ] ; then
+    if [ -e $INITRAMFS_TARGET ] ; then
+	echo "Image $INITRAMFS_TARGET already exists. Use -f to overwrite"
+	exit 1
+    fi
+fi
+
+echo "Building an initramfs at $INITRAMFS_TARGET for kernel $KERNEL"
+
+HOSTMODDIR=/lib/modules/$KERNEL/kernel
+DESTMODDIR=lib/modules/$KERNEL
+
+original_pwd=$PWD
+
+TEMPDIR=`mktemp -d` || exit 1
+decho TEMPDIR: $TEMPDIR
+pushd $TEMPDIR > /dev/null
+mkdir initramfs_dir
+cd initramfs_dir
+
+# Make directory structure 
+#
+# NOTE: We're just going to copy all our binaries into bin and ceate sbin as a
+#       compatability symlink incase something explicitly calls somethings from
+#       /sbin (e.g., /sbin/modprobe).
+mkdir -p bin dev sys proc $DESTMODDIR sysroot etc/udev/rules.d lib/udev
+
+# Generate a list of binaries to copy into our filesystem
+#
+# NOTE: We don't specify absolute paths here.  Each of these will get copied
+#       from wherever our PATH variable finds them.
+#
+# NOTE: We're just going to copy all of these into bin.  There's really no point
+#       in differentiating between /bin and /sbin in the initramfs.
+#
+# FIXME: at this point, we're working with an FC5-ish version of udev... so we
+#        have udevstart and vol_id (in /sbin not /lib/udev) but not udevsettle
+#        or udevtrigger.  this is a very bad thing for us to be assuming (is
+#        anyone on Earth still using this version of udev other than us?), but
+#        we still need it for now.
+PROGS=""
+PROGS+=" basename"
+PROGS+=" bash"
+PROGS+=" blockdev"
+PROGS+=" cat"
+PROGS+=" chmod"
+PROGS+=" cut"
+PROGS+=" dd"
+PROGS+=" dirname"
+PROGS+=" dmesg"
+PROGS+=" dmsetup"
+PROGS+=" echo"
+PROGS+=" env"
+PROGS+=" grep"
+PROGS+=" insmod"
+PROGS+=" kill"
+PROGS+=" killall5"
+PROGS+=" less"
+PROGS+=" ln"
+PROGS+=" losetup"
+PROGS+=" ls"
+PROGS+=" lsmod"
+PROGS+=" lvm"
+PROGS+=" mdadm"
+PROGS+=" mkdir"
+PROGS+=" mknod"
+PROGS+=" modprobe"
+PROGS+=" mount"
+PROGS+=" pidof"
+PROGS+=" readlink"
+PROGS+=" rm"
+PROGS+=" sed"
+PROGS+=" sleep"
+PROGS+=" tree"
+PROGS+=" udevd"
+PROGS+=" udevstart"
+PROGS+=" umount"
+PROGS+=" vol_id"
+PROGS+=" switch_root"
+
+# Copy all the PROGS into the initramfs
+decho '********** COPYING PROGS TO INITRAMFS ******************************************'
+cp="cp"
+[ "$opt_verbose" != "0" ] && cp+=" -v"
+for x in $PROGS; do
+    $cp `which $x` bin/ || exit 1
+done
+
+# Make a couple symlinks
+decho '********** MAKING SYMLINKS *****************************************************'
+ln="ln"
+[ "%opt_verbose" != "0" ] && ln+=" -v"
+$ln -s bash bin/sh
+$ln -s bin sbin
+$ln -s ../../sbin/vol_id lib/udev/vol_id
+
+# Copy all required shared libs
+decho '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
+for i in bin/*; do 
+    ldd $i | sed 's|.*=>||g' | awk '/\// { print $1 }' >> libs 2>/dev/null
+done
+
+DEPLIBS=`cat libs | sort -u`
+rm -f libs
+
+for f in $DEPLIBS; do
+    $cp $f lib/ || exit 1
+done
+
+# FIXME: should probably allow users to add more modules somehow, maybe a
+#        command line arg or a conf file...
+
+# Copy over ATA drivers
+decho '********** COPYING ATA DRIVERS TO INITRAMFS ************************************'
+find $HOSTMODDIR/drivers/ata -name \*.ko -exec $cp {} $DESTMODDIR/ \;
+
+# NOTE: if we ever want to add DRM drivers as well (potentially for early KMS
+#       fbcon splash screen), just uncomment the following lines
+#
+#decho '********** COPYING DRM DRIVERS TO INITRAMFS ************************************'
+#find $HOSTMODDIR/drivers/gpu/drm -name \*.ko -exec $cp {} $DESTMODDIR/ \;
+
+# Make sure none of the MODS we've installed have unmet dependencies
+decho '********** COPYING MODULE DEPS TO INITRAMFS ************************************'
+for m in $DESTMODDIR/*.ko ; do
+    /sbin/modprobe --set-version $KERNEL --show-depends $m >> modules 2>/dev/null
+done
+
+DEPMODS=`cat modules | awk '{ print $2 }' | sort -u`
+rm -f modules
+
+for f in $DEPMODS; do
+    $cp $f $DESTMODDIR/ || exit 1
+done
+
+# Build module deps file so we can use modprobe
+decho '********** RUNNING DEPMOD ******************************************************'
+go="/sbin/depmod -b `pwd` -v $KERNEL"
+[ "$opt_verbose" != "1" ] && go+=" > /dev/null"
+decho $go
+eval $go || exit 1
+
+# Write fstab
+cat > etc/fstab <<EOF
+/dev/root  /         auto    defaults,noatime  0 0
+devpts     /dev/pts  devpts  gid=5,mode=620    0 0
+tmpfs      /dev/shm  tmpfs   defaults          0 0
+proc       /proc     proc    defaults          0 0
+sysfs      /sys      sysfs   defaults          0 0
+EOF
+
+# FIXME: Most mkinitrd scripts I've looked at copy /etc/modprobe.conf and
+#        /etc/modprobe.d from the host system to the initramfs...  My initial
+#        testing indicates that this is not necesary, so I'm not going to do it.
+#
+# Copy modprobe.conf and friends over
+#if [ -e /etc/modprobe.conf ] ; then
+#    cp /etc/modprobe.conf etc
+#fi
+#cp -R /etc/modprobe.d etc
+
+
+# Install our iniramfs' init script
+decho '********** COPYING LINUXRC TO INITRAMFS ****************************************'
+$cp $LINUXRC init || exit 1
+chmod a+x init
+
+[ "$opt_verbose" != "0" ] && tree -psugDFCa .
+
+# Strip debug info
+decho '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
+go="find bin lib -type f -exec strip --strip-unneeded {} \;"
+[ "$opt_verbose" != "1" ] && go+=" 2>/dev/null"
+decho $go
+eval $go
+
+# Create the compressed image
+decho '********** CREATING COMPRESSED CPIO IMAGE **************************************'
+cpio="cpio"
+[ "$opt_verbose" != "1" ] && cpio+=" --quiet"
+find . | $cpio -o -H newc | gzip -9 > ../initramfs || exit 1
+popd > /dev/null
+rm -f $INITRAMFS_TARGET
+$cp $TEMPDIR/initramfs $INITRAMFS_TARGET
+rm -rf $TEMPDIR
+
+echo "Done; initramfs is $(du -h $INITRAMFS_TARGET | awk '{print $1}')."
+echo
+exit 0

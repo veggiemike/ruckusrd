@@ -1,0 +1,485 @@
+#!/bin/bash
+#
+# Copyright 2012 Michael D Labriola <mlabriol@gdeb.com>
+#
+# Licensed under the GPLv2. See the file COPYING for details. 
+#
+# This initramfs /init script is a derivative of the one embedded in mayflower
+# (flexible mkinitrd replacement used originally by fedora's livecd-creator,
+# David Zeuthen <davidz@redhat.com>).
+#
+# It's been largely rewritten to be used as the initramfs /init script for a
+# mkinitrd replacement that can be used on embedded systems, flash drives, live
+# CDs, and normal desktop Linux systems.
+#
+#
+# This initramfs script assumes the following:
+#
+# 1. All kernel bits needed for booting are built in except for DEVICE DRIVERS
+#    (e.g., scsi_mod, sg, sd_mod, libata, usb_storage, ext2, uhci_hcd, ehci_hcd,
+#    ohci_hcd, sr_mod, cdrom, dm_snapshot, dm_zero, dm_mirror, dm_region_hash,
+#    dm_log, dm_mod, raid1).  Drivers for individual SATA or PATA controllers
+#    need to get added to the initrd, but everything needed to boot from CD-ROM
+#    or USB flash drive should be compiled into the kernel.
+#
+# 2. If a squashfs.img exists at / of the rootfs, the desired behavior is to
+#    load a compressed filesystem image (contained at / of the squashfs image)
+#    into RAM, overlay it with a certain ammount of RAM (so that it can be
+#    mounted read/write) via the device mapper, and use the resulting virtual
+#    block device as the root device for booting.  If the squashfs.img doesn't
+#    exist, system is booted normally.
+#
+#    /rootdevice/squashfs.img/rootfs.img
+#
+# 3. If LVM is used for rootfs, it MUST be specified using the /dev/mapper/VG-LV
+#    notation.  Using root=/dev/VG-LV notation WILL NOT work.
+#
+#
+# NOTE: At the moment, and this might change, we're not loading KMS video
+#       drivers in here.  I was planning on doing just that, but I couldn't
+#       quite get things working the way I wanted.
+#
+#       For example, using nouveau on one of our old dual-Xeons, even if the
+#       very fist line of the script is 'modprobe nouveau', you don't get
+#       penguin logos.  However, if nouveau is actually built into the kernel,
+#       you get penguins a split second after booting starts, but you also get a
+#       big white box that obscures some of the output.  So the best way to
+#       ensure you get the penguin logos appears to still be to set
+#       vga=something to initialize the vga framebuffer for a split seconds
+#       before the KMS video driver gets loaded.  And If we do that and then
+#       load the KMS driver in the initrd, you get two modesets within a 1-2
+#       second window... which just looks strange.
+#
+#       If we ever decide to play with plymouth or some other nice splash screen
+#       utility, we might want to revisit this and just ditch the penguin logos
+#       (although I kinda like being able to see right off the bat how many CPUs
+#       have been detected).
+#
+# NOTE: This initramfs script will ALWAYS mount the rootfs read-only.  It's the
+#       underlying rootfs' init scripts responsibility to remount read-write if
+#       desired.
+
+
+decho()
+{
+    if [ "$quiet" != "1" ]; then
+        echo "$*"
+    fi
+}
+
+
+do_raid_and_lvm()
+{
+    # wait for at least one harddisk to be handled by udev
+    #
+    # NOTE: this is needed because this method might be called before we can
+    #       guarantee that udev has finished loading modules.
+    x=$1
+    msg="waiting up to $x seconds for at least one hdd to appear..."
+    while [ ! -e /dev/sda -a "$x" != "0" ]; do
+        if [ -n "$msg" ]; then
+            echo -n $msg
+            msg=""
+        else
+            echo -n "."
+        fi
+        x=$(($x-1))
+        sleep 1
+    done
+    [ -z "$msg" ] && echo " done"
+
+    # if we were asked to wait, wait another second
+    #
+    # NOTE: this should make it almost impossible to fail to detect devices due
+    #       to concurrency problems.  the only way for it to happen now is if
+    #       /dev/sda *JUST* got created when the previous waitloop started (so
+    #       we don't wait at all), but we get to this 2nd conditional before
+    #       /dev/sdb has been created.
+    [ "$1" != "0" ] && sleep 1
+
+    # autogen mdadm.conf
+    echo 'DEVICE /dev/sd*[0-9]' > /etc/mdadm.conf
+    mdadm --examine --scan | sed 's|/dev/.tmp.|/dev/|' >> /etc/mdadm.conf
+    [ "$quiet" != "1" ] && cat /etc/mdadm.conf
+
+    grep ARRAY /etc/mdadm.conf >/dev/null && raid=1 || raid=0
+    if [ "$raid" != "0" ]; then
+        echo "initializing RAID devices..."
+        go="mdadm --assemble --scan"
+        [ "$quiet" != "1" ] && go="$go -v"
+        decho $go
+        eval $go
+    fi
+
+    echo "initializing LVM..."
+
+    go="lvm vgscan --mknodes"
+    [ "$quiet" != "1" ] && go="$go -v"
+    decho $go
+    eval $go
+
+    go="lvm vgchange -a y"
+    [ "$quiet" != "1" ] && go="$go -v"
+    decho $go
+    eval $go
+}
+
+
+emergency_shell()
+{
+    echo "Bug in initramfs /init detected. Dropping to a shell. Good luck!"
+    echo
+    bash
+}
+
+
+trap "emergency_shell" 0 2
+
+# exit immediately if a command fails
+set -e
+
+PATH=/sbin:/bin
+
+exec < /dev/console > /dev/console 2>&1
+
+# mount tmpfs for /dev
+mount -n -t tmpfs -o mode=0755 udev /dev
+
+# create initial device nodes
+mknod /dev/console c 5 1
+mknod /dev/null c 1 3
+mknod /dev/kmsg c 1 11
+mkdir /dev/pts
+mkdir -m 1777 /dev/shm
+ln -s /proc/self/fd /dev/fd
+ln -s fd/0 /dev/stdin
+ln -s fd/1 /dev/stdout
+ln -s fd/2 /dev/stderr
+
+# mount virtual filesystems
+mount -n -t proc proc /proc
+mount -n -t sysfs sysfs /sys
+
+# setup hotplug
+echo "" > /proc/sys/kernel/hotplug
+
+SQUASHED="/sysroot/squashfs.img"
+
+# Declare all variables here.. mostly for housekeeping
+init="/sbin/init"
+root=""
+rootflags=""
+rootfstype="auto"
+quiet=0
+overlay_size="512M"
+dmroot=0
+
+# Parse kernel commandline options
+#
+# NOTE: we ignore ro/rw requests on the commandline.  when this script hands off
+#       control the the underlying root filesystem's init process, the rootfs
+#       will be mounted ro.
+#
+# NOTE: rootfstype, rootflags are only applied when mounting the specified root
+#       device.  in other words, they are not used when mounting the derivitive
+#       devices created when we load rootfs into RAM.
+for o in `cat /proc/cmdline` ; do
+    case $o in 
+    init=*)
+        init=${o#init=}
+        ;;
+    quiet)
+        quiet=1
+        ;;
+    blacklist=*)
+        blacklist=${o#blacklist=}
+        echo "blacklist $blacklist" >> /etc/modprobe.conf
+        ;;
+    root=*)
+        root=${o#root=}
+        ;;
+    rootflags=*)
+        rootflags=${o#rootflags=}
+        ;;
+    rootfstype=*)
+        rootfstype=${o#rootfstype=}
+        ;;
+    overlay_size=*)
+        overlay_size=${o#overlay_size=}
+        ;;
+    *)
+        # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
+        #       max_loop=16" to get written in modprobe.conf...
+        m=$(echo $o |cut -s -d . -f 1)
+        opt=$(echo $o |cut -s -d . -f 2-)
+        if [ -z "$m" -o -z "$opt" ]; then
+          continue
+        fi
+        p=$(echo $opt |cut -s -d = -f 1)
+        v=$(echo $opt |cut -s -d = -f 2-)
+        if [ -z "$p" -o -z "$v" ]; then
+          continue
+        fi
+        echo "options $m $p=$v" >> /etc/modprobe.conf
+        ;;
+    esac
+done
+
+decho "kernel commandline: `cat /proc/cmdline`"
+decho "init=$init"
+decho "root=$root"
+decho "rootflags=$rootflags"
+decho "rootfstype=$rootfstype"
+decho "overlay_size=$overlay_size"
+
+echo -n "determining what to mount... "
+
+# NOTE: we try to depend on the hotplug implementation as little as possible in
+#        here (i.e., we're leaving the door open for mdev as much as possible).
+
+# generate udev rules to generate /dev/root symlink
+if [ -z $root ] ; then
+    root=/dev/something
+else
+    # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA, USB, and
+    #       SCSI should all be using them.
+    case $root in
+        CDLABEL=*)
+            CDLABEL=${root#CDLABEL=}
+            echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
+            echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
+            decho "Added udev rule for CDLABEL=='$CDLABEL'"
+            thingtomount=/dev/root
+            ;;
+        LABEL=*)
+            LABEL=${root#LABEL=}
+            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$LABEL\", SYMLINK+=\"root\"" > /etc/udev/rules.d/00-label.rules
+            decho "Added udev rule for LABEL=='$LABEL'"
+            thingtomount=/dev/root
+            dmroot=1
+            ;;
+        UUID=*)
+            UUID=${root#UUID=}
+            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"$UUID\", SYMLINK+=\"root\"" > /etc/udev/rules.d/01-uuid.rules
+            decho "Added udev rule for UUID=='$UUID'"
+            thingtomount=/dev/root
+            dmroot=1
+            ;;
+        /dev/md*|/dev/V*|/dev/mapper/*)
+            ln -s $root /dev/root
+            thingtomount=$root
+            dmroot=1
+            ;;
+        /dev/*)
+            ln -s $root /dev/root
+            thingtomount=$root
+            ;;
+        *)
+            thingtomount=$root
+            ;;
+    esac
+fi
+
+echo $thingtomount
+
+echo "udev_log=\"error\"" >> /etc/udev/udev.conf
+
+# rules for loading modules
+#
+echo -n "ACTION==\"add\", SUBSYSTEM==\"?*\", ENV{MODALIAS}==\"?*\", RUN+=\"/sbin/modprobe $" >> /etc/udev/rules.d/10-modprobe.rules
+echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
+
+decho "starting udevd"
+/sbin/udevd --daemon
+if [ -x /sbin/udevtrigger ]; then
+    /sbin/udevtrigger
+else
+    # using an old version of udev, FC5-ish
+    /sbin/udevstart
+fi
+
+# initialize LVM if needed now
+#
+# NOTE: We're asking the init method to wait up to 10 seconds for udev to load
+#       modules for drive controllers before we kick off initialization of LVM.
+#       Withouth the sleep, vgscan might run prior to the kernel noticing the
+#       existance of the harddrive that contains the volgroup...
+if [ "$dmroot" != "0" ]; then
+    do_raid_and_lvm 10
+fi
+
+# wait for root symlink
+#
+# NOTE: this loop waits up to 30 seconds for /dev/root symlink to get created.
+#       if it takes longer than that, something is wrong, but maybe the user can
+#       fix it.
+x=30
+msg="waiting up to $x seconds for /dev/root symlink..."
+while [ ! -e /dev/root -a "$x" != "0" ]; do
+    if [ -n "$msg" ]; then
+        echo -n $msg
+        msg=""
+    else
+        echo -n "."
+    fi
+    x=$(($x-1))
+    sleep 1
+done
+root_true=`readlink /dev/root`
+
+# NOTE: At this point, either /dev/root exists OR our waitloop timed out.  We'll
+#       give the user a chance to manually create the /dev/root symlink.
+if [ -b /dev/root ] ; then
+    [ -z "$msg" ] && echo " done"
+    decho "/dev/root symlink exists ($root_true)"
+else
+    echo
+    echo
+    echo "--------------------------------------"
+    echo "WARNING: Cannot find root file system!"
+    echo "--------------------------------------"
+    echo
+    echo "Create symlink /dev/root and then exit this shell to continue"
+    echo "the boot sequence."
+    echo
+    bash
+fi
+
+mountoptions=" -o ro"
+if [ -n "$rootflags" ]; then
+    mountoptions+=",$rootflags"
+fi
+
+go="mount -n -t $rootfstype $mountoptions $thingtomount /sysroot"
+decho $go
+eval $go
+RES=$?
+
+if [ "$RES" != "0" ] ; then
+    echo "---------------------------------"
+    echo "WARNING: Cannot mount rootfs!"
+    echo "---------------------------------"
+    echo
+    echo "Dropping to a shell. "
+    echo "Mount rootfs at /sysroot and exit shell to continue. Good luck!"
+    echo
+    bash
+fi
+
+# only pass kernel command line if we're launching /sbin/init
+if [ "$init" == "/sbin/init" ] ; then
+    initargs=$(cat /proc/cmdline)
+else
+    initargs=""
+fi
+
+# initialize device mapper and LVM
+#
+# NOTE: This was already done at the very beginning if root was specified as
+#       /dev/mapper/*.  We're going to do it now if it hasn't already been done,
+#       just so we can assume from here on out that the device mapper and LVM
+#       have been initialized.
+#
+# NOTE: We tell the init method to not wait for devices at this point, assuming
+#       that udev has had plenty of time to create device nodes.
+if [ "$dmroot" != "1" ]; then
+    do_raid_and_lvm 0
+fi
+
+
+# NOTE: if $SQUASHED exists, the system we're attempting to boot has been set up
+#       for loading rootfs into RAM via squashfs and device mapper voodoo
+if [ -f $SQUASHED ]; then
+    decho "setting up squashfs device mapper voodoo"
+
+    echo -n "Copying compressed rootfs image to RAM... "
+    dd if=$SQUASHED of=/squashed.img bs=512 2> /dev/null
+    umount -n /sysroot
+    echo "done"
+    SQUASHED="/squashed.img"
+
+    SQUASHED_LOOPDEV=$( losetup -f )
+    losetup $SQUASHED_LOOPDEV $SQUASHED
+    mkdir -p /squashfs
+    mount -n -t squashfs -o ro $SQUASHED_LOOPDEV /squashfs
+
+    BASE_LOOPDEV=$( losetup -f )
+    losetup $BASE_LOOPDEV /squashfs/rootfs.img
+
+    umount -l /squashfs
+
+    # create a sparse file for the overlay
+    #
+    # NOTE: this uses our overlay_size variable, which can be set on the command
+    #       line. we do no syntax checking here, just assuming that an invalid
+    #       argument will cause dd to bail.
+    decho "creating overlay image (size=$overlay_size)"
+    dd if=/dev/null of=/overlay bs=1 count=0 seek=$overlay_size 2> /dev/null
+    OVERLAY_LOOPDEV=$( losetup -f )
+    losetup $OVERLAY_LOOPDEV /overlay
+
+    # set up the snapshot
+    #
+    # NOTE: start_sector num_sectors target_type target_args
+    #
+    # NOTE: manpage doesn't describe snapshot's args...
+    echo 0 `blockdev --getsz $BASE_LOOPDEV` snapshot $BASE_LOOPDEV $OVERLAY_LOOPDEV p 8 | dmsetup create root-rw
+
+    # set up new /dev/root symlink
+    rm -f /dev/root
+    ln -s /dev/mapper/root-rw /dev/root
+
+    mount /dev/root /sysroot
+
+    # copy over module options
+    #
+    # NOTE: we really want to do this. without it there's no way to update
+    #       modeprobe.conf before modules get loaded... can't exactly edit
+    #       modprobe.conf and reboot, as our changes get lost.
+    [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
+
+    # create udev rules for /dev/root-* symlinks
+    #
+    # NOTE: these symlinks point to the corresponding loop devices we've created
+    #       in here as well as the "true" root device
+    echo "KERNEL==\"$root_true\", SYMLINK+=\"root-true\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-squash\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-rootfs\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-overlay\"" >> /sysroot/etc/udev/rules.d/50-udev*
+
+    # setup easy mounting of /dev/root-true
+    mkdir -p /sysroot/mnt/root-true
+    echo "" >> /sysroot/etc/fstab
+    echo "/dev/root-true /mnt/root-true auto noauto,ro 0 0" >> /sysroot/etc/fstab
+
+    mount -o ro,remount /sysroot
+fi
+
+
+if [ ! -x /sysroot$init ] ; then
+    echo "---------------------------------------------------------"
+    echo "WARNING: Requested $init binary does not exist on rootfs."
+    echo "---------------------------------------------------------"
+    echo
+    echo "Dropping to a shell. Good luck!"
+    echo
+    bash
+fi
+
+# Leave initramfs and transition to rootfs
+#
+kill `pidof udevd`
+
+decho "switching to real rootfs..."
+go="exec switch_root /sysroot $init $initargs"
+decho $go
+eval $go
+
+
+echo "---------------------------------"
+echo "WARNING: Error switching to real rootfs!"
+echo "---------------------------------"
+echo
+echo "Dropping to a shell. Good luck!"
+echo
+bash
