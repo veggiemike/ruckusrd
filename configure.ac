@@ -9,7 +9,6 @@ AC_PROG_MKDIR_P
 AC_DEFUN([NEEDED_PROGS],
 	 [dnl progs copied into the initramfs
 	  basename
-	  bash
 	  blockdev
 	  cat
 	  chmod
@@ -61,12 +60,19 @@ m4_foreach_w([P], NEEDED_PROGS,
 		   AS_IF([test "$m4_toupper(P)" = ""], [AC_MSG_ERROR([Could not find P])])
 		   AC_ARG_VAR(m4_toupper(P), Path to P)])
 
+# bash is a special case, because bash sets the variable BASH to $0, which
+# results in /bin/sh on tons of systems.
+AC_PATH_PROG(BASH_SHELL, bash)
+AS_IF([test "BASH" = ""], [AC_MSG_ERROR([Could not find bash])])
+AC_ARG_VAR(BASH_SHELL, Path to bash)
+
 # we need either udevadm or udevstart
 AC_PATH_PROGS(UDEVADM, [udevadm udevstart])
 AS_IF([test "UDEVADM" = ""], [AC_MSG_ERROR([Either udevadm or udevstart are required])])
 AC_ARG_VAR(UDEVADM, Path to either udevadm or udevstart)
 
 AC_CONFIG_FILES([Makefile \
-		 src/Makefile])
+		 src/Makefile \
+		 src/ruckusrd])
 
 AC_OUTPUT
