@@ -71,8 +71,29 @@ AC_PATH_PROGS(UDEVADM, [udevadm udevstart])
 AS_IF([test "UDEVADM" = ""], [AC_MSG_ERROR([Either udevadm or udevstart are required])])
 AC_ARG_VAR(UDEVADM, Path to either udevadm or udevstart)
 
+# In addition to the checked for binary paths, we need to also substitute
+# the path to our linuxrc file into the ruckusrd script.  Let's do that via
+# configure.
+#
+# NOTE: Doing this via configure doesn't guarantee that the resuling string
+#       has been fully expanded.  In fact, it almost definately guarantees
+#       that it won't be.
+#
+# NOTE: This might not be the best way to fully expand the variable, but it
+#       works for me.  It might be portable.  It might not.  Fingers
+#       crossed.
+pkgdatadir=$datadir/$PACKAGE/linuxrc
+while :; do
+    temp=`eval echo $pkgdatadir`
+    test "$temp" = "$pkgdatadir" && break
+    pkgdatadir=$temp
+done
+AC_SUBST(LINUXRC, $pkgdatadir)
+
 AC_CONFIG_FILES([Makefile \
-		 src/Makefile \
-		 src/ruckusrd])
+		 src/Makefile])
+
+# Do this one seperate, so we can add the chmod
+AC_CONFIG_FILES([src/ruckusrd], [chmod +x src/ruckusrd])
 
 AC_OUTPUT

@@ -23,13 +23,13 @@
 #    or USB flash drive should be compiled into the kernel.
 
 
-# so we can run out of the dev area
-if [ -n "__DEV__" ]; then
-    SHAREDIR=$PWD/lib
+# check cwd so we don't accidentally use an installed version while we're
+# developing
+if [ -f linuxrc ]; then
+    LINUXRC=$PWD/linuxrc
 else
-    SHAREDIR=__SS_INSTALL_SHAREDIR__
+    LINUXRC=@LINUXRC@
 fi
-LINUXRC=$SHAREDIR/linuxrc
 
 
 decho()
