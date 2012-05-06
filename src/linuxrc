@@ -447,12 +447,11 @@ if [ -f $SQUASHED ]; then
     #
     # NOTE: these symlinks point to the corresponding loop devices we've created
     #       in here as well as the "true" root device
-    #
-    # FIXME: we should set up the /dev/root symlink as well
-    echo "KERNEL==\"$root_true\", SYMLINK+=\"root-true\"" >> /sysroot/etc/udev/rules.d/50-udev*
-    echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-squash\"" >> /sysroot/etc/udev/rules.d/50-udev*
-    echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-rootfs\"" >> /sysroot/etc/udev/rules.d/50-udev*
-    echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-overlay\"" >> /sysroot/etc/udev/rules.d/50-udev*
+    rules=/sysroot/etc/udev/rules.d/50-ruckusrd.rules
+    echo "KERNEL==\"$root_true\", SYMLINK+=\"root-true\"" >> $rules
+    echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-squash\"" >> $rules
+    echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-rootfs\"" >> $rules
+    echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-overlay\"" >> $rules
 
     # setup easy mounting of /dev/root-true
     mkdir -p /sysroot/mnt/root-true
