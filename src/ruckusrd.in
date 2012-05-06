@@ -11,16 +11,7 @@
 #
 # It's been largely rewritten to be a mkinitrd replacement that can be used on
 # embedded systems, flash drives, live CDs, and normal desktop Linux systems.
-#
-#
-# This mkinitrd script (and the resulting initramfs) assumes the following:
-#
-# 1. All kernel bits needed for booting are built in except for DEVICE DRIVERS
-#    (e.g., scsi_mod, sg, sd_mod, libata, usb_storage, ext2, uhci_hcd, ehci_hcd,
-#    ohci_hcd, sr_mod, cdrom, dm_snapshot, dm_zero, dm_mirror, dm_region_hash,
-#    dm_log, dm_mod, raid1).  Drivers for individual SATA or PATA controllers
-#    need to get added to the initrd, but everything needed to boot from CD-ROM
-#    or USB flash drive should be compiled into the kernel.
+# See the file README for details.
 
 
 # check cwd so we don't accidentally use an installed version while we're
@@ -116,17 +107,15 @@ mkdir -p bin dev sys proc $DESTMODDIR sysroot etc/udev/rules.d lib/udev/rules.d
 
 # Generate a list of binaries to copy into our filesystem
 #
-# NOTE: We don't specify absolute paths here.  Each of these will get copied
-#       from wherever our PATH variable finds them.
+# NOTE: We have configure check for all these binaries and substitute their
+#       paths into this list.  The upside to this is that we already know
+#       exactly which binaries are on the system and where they're located.
+#       The downside of this is that new versions of programs installed in
+#       different locations will not get pulled into the initrd, even if they
+#       come first in PATH.
 #
 # NOTE: We're just going to copy all of these into bin.  There's really no point
 #       in differentiating between /bin and /sbin in the initramfs.
-#
-# FIXME: at this point, we're working with an FC5-ish version of udev... so we
-#        have udevstart and vol_id (in /sbin not /lib/udev) but not udevsettle
-#        or udevtrigger.  this is a very bad thing for us to be assuming (is
-#        anyone on Earth still using this version of udev other than us?), but
-#        we still need it for now.
 PROGS=""
 PROGS+=" @BASENAME@"
 PROGS+=" @BASH_SHELL@"

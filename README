@@ -5,7 +5,39 @@ Copyright 2012 Michael D Labriola <michael.d.labriola@gmail.com>
 Licensed under the GPLv3. See the file COPYING for details. 
 
 This script is a derivative of fedora's livecd-creator's mayflower script,
-written by David Zeuthen <davidz@redhat.com>.
+written by David Zeuthen <davidz@redhat.com>, circa Fedora 8.
 
-It's been largely rewritten to be a mkinitrd replacement that can be used on
-embedded systems, flash drives, live CDs, and normal desktop Linux systems.
+It's been largely rewritten to be a mkinitrd replacement specifically for
+embedded systems and removable media, but it's also perfectly usable on normal
+desktop Linux systmes.
+
+Due to it's primary use (embedded systems, removable media), it behaves a bit
+differently than your run-of-the-mill mkinitrd.
+
+ 1. All kernel bits needed for booting are assumed to be built in to the kernel
+    (e.g., scsi_mod, sg, sd_mod, libata, usb_storage, ext2, uhci_hcd, ehci_hcd,
+    ohci_hcd, sr_mod, cdrom, dm_snapshot, dm_zero, dm_mirror, dm_region_hash,
+    dm_log, dm_mod, raid1) except for DEVICE DRIVERS.  Drivers for individual
+    SATA or PATA controllers need to get added to the initrd, but everything
+    needed to boot from CD-ROM or USB flash drive should be compiled into the
+    kernel.
+
+ 2. Instead of selecting only the needed modules to support mounting the rootfs
+    of the host system running the script, ruckusrd sticks ALL the compiled ATA
+    modules (and their dependencies) in the initialramfs.  This is an attempt
+    to make the resulting initrd as system-independent as possible.
+
+ 3. If a squashfs.img exists at / of the rootfs, the initrd combines it with a
+    writable overlay (RAM via losetup) via the device mapper (so that it can be
+    mounted read/write).  The resulting virtual block device is then used as
+    the root device for booting.  If 'to_ram' is added to the kernel command
+    line, the initrd loads the squashfs image directly into RAM (so that the
+    underlying block device can be safely removed).  If a squashfs.img doesn't
+    exist, the system is booted in a normal manor.
+
+ 4. By default, the rootfs is mounted read-only.  It's normally up to the
+    booting system's init scripts to remount read-write if desired.  However,
+    this behavior can be changed by adding 'rw' to the kernel command line.
+
+ 5. If LVM is used for rootfs, it MUST be specified using the /dev/mapper/VG-LV
+    notation.  Using root=/dev/VG-LV notation WILL NOT work.

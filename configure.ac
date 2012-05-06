@@ -66,7 +66,13 @@ AC_PATH_PROG(BASH_SHELL, bash)
 AS_IF([test "BASH" = ""], [AC_MSG_ERROR([Could not find bash])])
 AC_ARG_VAR(BASH_SHELL, Path to bash)
 
-# we need either udevadm or udevstart
+# We need either udevadm or udevstart
+#
+# NOTE: We're trying to stay compatible with older versions of udev here.
+#        Really old versions had udevstart and vol_id (in /sbin not /lib/udev)
+#        but not udevadm (udevsettle or udevtrigger).  We deal with this by
+#        requiring either udevstart or udevadm and substituting the path to
+#        whichever is found as the UDEVADM variable.
 AC_PATH_PROGS(UDEVADM, [udevadm udevstart])
 AS_IF([test "UDEVADM" = ""], [AC_MSG_ERROR([Either udevadm or udevstart are required])])
 AC_ARG_VAR(UDEVADM, Path to either udevadm or udevstart)

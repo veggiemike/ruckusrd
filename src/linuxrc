@@ -10,30 +10,7 @@
 #
 # It's been largely rewritten to be used as the initramfs /init script for a
 # mkinitrd replacement that can be used on embedded systems, flash drives, live
-# CDs, and normal desktop Linux systems.
-#
-#
-# This initramfs script assumes the following:
-#
-# 1. All kernel bits needed for booting are built in except for DEVICE DRIVERS
-#    (e.g., scsi_mod, sg, sd_mod, libata, usb_storage, ext2, uhci_hcd, ehci_hcd,
-#    ohci_hcd, sr_mod, cdrom, dm_snapshot, dm_zero, dm_mirror, dm_region_hash,
-#    dm_log, dm_mod, raid1).  Drivers for individual SATA or PATA controllers
-#    need to get added to the initrd, but everything needed to boot from CD-ROM
-#    or USB flash drive should be compiled into the kernel.
-#
-# 2. If a squashfs.img exists at / of the rootfs, the desired behavior is to
-#    load a compressed filesystem image (contained at / of the squashfs image)
-#    into RAM, overlay it with a certain ammount of RAM (so that it can be
-#    mounted read/write) via the device mapper, and use the resulting virtual
-#    block device as the root device for booting.  If the squashfs.img doesn't
-#    exist, system is booted normally.
-#
-#    /rootdevice/squashfs.img/rootfs.img
-#
-# 3. If LVM is used for rootfs, it MUST be specified using the /dev/mapper/VG-LV
-#    notation.  Using root=/dev/VG-LV notation WILL NOT work.
-#
+# CDs, and normal desktop Linux systems.  See the file README for details.
 #
 # NOTE: At the moment, and this might change, we're not loading KMS video
 #       drivers in here.  I was planning on doing just that, but I couldn't
@@ -45,19 +22,15 @@
 #       you get penguins a split second after booting starts, but you also get a
 #       big white box that obscures some of the output.  So the best way to
 #       ensure you get the penguin logos appears to still be to set
-#       vga=something to initialize the vga framebuffer for a split seconds
-#       before the KMS video driver gets loaded.  And If we do that and then
-#       load the KMS driver in the initrd, you get two modesets within a 1-2
-#       second window... which just looks strange.
+#       vga=something to initialize the vga framebuffer for a few seconds before
+#       the KMS video driver gets loaded.  And If we do that and then load the
+#       KMS driver in the initrd, you get two modesets within a 1-2 second
+#       window... which just looks strange.
 #
 #       If we ever decide to play with plymouth or some other nice splash screen
 #       utility, we might want to revisit this and just ditch the penguin logos
 #       (although I kinda like being able to see right off the bat how many CPUs
 #       have been detected).
-#
-# NOTE: This initramfs script will ALWAYS mount the rootfs read-only.  It's the
-#       underlying rootfs' init scripts responsibility to remount read-write if
-#       desired.
 
 
 decho()
