@@ -171,6 +171,7 @@ root=""
 rootflags=""
 rootfstype="auto"
 to_ram=""
+maint=""
 quiet=0
 overlay_size="512M"
 dmroot=0
@@ -194,6 +195,9 @@ for o in `cat /proc/cmdline` ; do
         ;;
     to_ram)
         to_ram=1
+	;;
+    maint)
+	maint=1
 	;;
     blacklist=*)
         blacklist=${o#blacklist=}
@@ -467,7 +471,12 @@ if [ -f $SQUASHED ]; then
     mount -o ro,remount /sysroot
 fi
 
-
+if [ -n "$maint" ]; then
+    echo "Dropping to a maintenance shell, as requested. Good luck!"
+    echo
+    bash
+fi
+    
 if [ ! -x /sysroot$init ] ; then
     echo "---------------------------------------------------------"
     echo "WARNING: Requested $init binary does not exist on rootfs."
