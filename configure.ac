@@ -43,6 +43,7 @@ AC_DEFUN([NEEDED_PROGS],
 	  tree
 	  udevd
 	  umount
+	  vi
 	  vol_id
 	  switch_root
 	  dnl other progs needed for ruckusrd script
