@@ -423,6 +423,17 @@ if [ -f $SQUASHED ]; then
     rm -f /dev/root
     ln -s /dev/mapper/root-rw /dev/root
 
+    # if we didn't load squashfs.img into RAM, we need to move things around
+    # so that the final system can still have access (if needed) to the
+    # underlying device.  otherwise we end up with the new root mounted on
+    # top of the old root, and users won't be able to access the old root at
+    # all.
+    if [ -z "$to_ram" ]; then
+	mkdir /tmproot
+	mount --move /sysroot /tmproot
+    fi
+
+    # mount the final rootfs
     mount /dev/root /sysroot
 
     # copy over module options
@@ -436,6 +447,8 @@ if [ -f $SQUASHED ]; then
     #
     # NOTE: these symlinks point to the corresponding loop devices we've created
     #       in here as well as the "true" root device
+    #
+    # FIXME: we should set up the /dev/root symlink as well
     echo "KERNEL==\"$root_true\", SYMLINK+=\"root-true\"" >> /sysroot/etc/udev/rules.d/50-udev*
     echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-squash\"" >> /sysroot/etc/udev/rules.d/50-udev*
     echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-rootfs\"" >> /sysroot/etc/udev/rules.d/50-udev*
@@ -445,6 +458,22 @@ if [ -f $SQUASHED ]; then
     mkdir -p /sysroot/mnt/root-true
     echo "" >> /sysroot/etc/fstab
     echo "/dev/root-true /mnt/root-true auto noauto,ro 0 0" >> /sysroot/etc/fstab
+
+    # move the old sysroot into the new one, if needed.
+    #
+    # FIXME: this works, but the resulting sytem hangs for a few seconds
+    #        during reboot trying over and over again to umount root-true...
+    #
+    # FIXME: root-true isn't in /etc/mtab and doesn't show up as mounted if
+    #        you do a df... but it's in /proc/mounts.  i tried forging
+    #        /sysroot/etc/mtab, but fedora 8s sysinit clears mtab and
+    #        assumes only / was mounted coming out of the initrd.
+    #
+    # FIXME: there might not be a good fix for either of these problems in
+    #        here w/out having a knowledge of the system we're trying to
+    #        boot (i.e., we can't go sedding specific init scripts because
+    #        we want to be distro-agnostic)
+    [ -z "$to_ram" ] && mount --move /tmproot /sysroot/mnt/root-true
 
     mount -o ro,remount /sysroot
 fi
