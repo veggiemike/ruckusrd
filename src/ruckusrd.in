@@ -112,7 +112,7 @@ cd initramfs_dir
 # NOTE: We're just going to copy all our binaries into bin and ceate sbin as a
 #       compatability symlink incase something explicitly calls somethings from
 #       /sbin (e.g., /sbin/modprobe).
-mkdir -p bin dev sys proc $DESTMODDIR sysroot etc/udev/rules.d lib/udev
+mkdir -p bin dev sys proc $DESTMODDIR sysroot etc/udev/rules.d lib/udev/rules.d
 
 # Generate a list of binaries to copy into our filesystem
 #
