@@ -170,6 +170,7 @@ init="/sbin/init"
 root=""
 rootflags=""
 rootfstype="auto"
+to_ram=""
 quiet=0
 overlay_size="512M"
 dmroot=0
@@ -191,6 +192,9 @@ for o in `cat /proc/cmdline` ; do
     quiet)
         quiet=1
         ;;
+    to_ram)
+        to_ram=1
+	;;
     blacklist=*)
         blacklist=${o#blacklist=}
         echo "blacklist $blacklist" >> /etc/modprobe.conf
@@ -228,6 +232,7 @@ done
 decho "kernel commandline: `cat /proc/cmdline`"
 decho "init=$init"
 decho "root=$root"
+decho "to_ram=$to_ram"
 decho "rootflags=$rootflags"
 decho "rootfstype=$rootfstype"
 decho "overlay_size=$overlay_size"
@@ -387,16 +392,23 @@ if [ "$dmroot" != "1" ]; then
 fi
 
 
-# NOTE: if $SQUASHED exists, the system we're attempting to boot has been set up
-#       for loading rootfs into RAM via squashfs and device mapper voodoo
+# NOTE: if $SQUASHED exists, the system we're attempting to boot has been
+#       set up with a squashfs read-only rootfs image to be used with a
+#       writable overlay using some device mapper voodoo
+#
+# NOTE: additionally, $SQUASHED can be loaded into RAM to free up the
+#       underlying root device (excellent for booting off removable media on
+#       systems with enough RAM to handle such a thing.
 if [ -f $SQUASHED ]; then
     decho "setting up squashfs device mapper voodoo"
 
-    echo -n "Copying compressed rootfs image to RAM... "
-    dd if=$SQUASHED of=/squashed.img bs=512 2> /dev/null
-    umount -n /sysroot
-    echo "done"
-    SQUASHED="/squashed.img"
+    if [ -n "$to_ram" ]; then
+	echo -n "Copying compressed rootfs image to RAM... "
+	dd if=$SQUASHED of=/squashed.img bs=512 2> /dev/null
+	umount -n /sysroot
+	echo "done"
+	SQUASHED="/squashed.img"
+    fi
 
     SQUASHED_LOOPDEV=$( losetup -f )
     losetup $SQUASHED_LOOPDEV $SQUASHED
