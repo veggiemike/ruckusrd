@@ -1,1 +1,7 @@
+-*- mode: outline -*-
+
+* system fails to umount /mnt/root-true at reboot (squashfs, ! to_ram)
+
 * fix all the FIXMEs
+
+* test with DM udev events turned on, document results

@@ -458,21 +458,24 @@ if [ -f $SQUASHED ]; then
     echo "" >> /sysroot/etc/fstab
     echo "/dev/root-true /mnt/root-true auto noauto,ro 0 0" >> /sysroot/etc/fstab
 
-    # move the old sysroot into the new one, if needed.
+    # Move the old sysroot into the new one, if needed.
+    #
+    # NOTE: We can't just forge /etc/mtab at this point, because some systems
+    #       sysinit scripts purge old cruft out of that file on the assumption
+    #       that the initrd has ONLY mounted /.  So instead, we'll append a
+    #       scriptlet that does the forging into rc.local.
     #
     # FIXME: this works, but the resulting sytem hangs for a few seconds
     #        during reboot trying over and over again to umount root-true...
     #
-    # FIXME: root-true isn't in /etc/mtab and doesn't show up as mounted if
-    #        you do a df... but it's in /proc/mounts.  i tried forging
-    #        /sysroot/etc/mtab, but fedora 8s sysinit clears mtab and
-    #        assumes only / was mounted coming out of the initrd.
-    #
-    # FIXME: there might not be a good fix for either of these problems in
-    #        here w/out having a knowledge of the system we're trying to
-    #        boot (i.e., we can't go sedding specific init scripts because
-    #        we want to be distro-agnostic)
-    [ -z "$to_ram" ] && mount --move /tmproot /sysroot/mnt/root-true
+    # FIXME: there might not be a good fix for this problem here w/out having a
+    #        knowledge of the system we're trying to boot (i.e., we can't go
+    #        sedding specific init scripts because we want to be
+    #        distro-agnostic)
+    if [ -z "$to_ram" ]; then
+	mount --move /tmproot /sysroot/mnt/root-true
+	echo "echo /dev/root-true /mnt/root-true auto ro 0 0 >> /etc/mtab" >> /sysroot/etc/rc.local
+    fi
 
     mount -o ro,remount /sysroot
 fi
