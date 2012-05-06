@@ -168,6 +168,7 @@ SQUASHED="/sysroot/squashfs.img"
 # Declare all variables here.. mostly for housekeeping
 init="/sbin/init"
 root=""
+root_rw=""
 rootflags=""
 rootfstype="auto"
 to_ram=""
@@ -178,9 +179,10 @@ dmroot=0
 
 # Parse kernel commandline options
 #
-# NOTE: we ignore ro/rw requests on the commandline.  when this script hands off
-#       control the the underlying root filesystem's init process, the rootfs
-#       will be mounted ro.
+# NOTE: By default, when this script hands off control the the underlying
+#       root filesystem's init process, the rootfs will be mounted ro.  This
+#       behavior can be overriden by passing 'rw' on the kernel command
+#       line.
 #
 # NOTE: rootfstype, rootflags are only applied when mounting the specified root
 #       device.  in other words, they are not used when mounting the derivitive
@@ -198,6 +200,9 @@ for o in `cat /proc/cmdline` ; do
 	;;
     maint)
 	maint=1
+	;;
+    rw)
+        root_rw=1
 	;;
     blacklist=*)
         blacklist=${o#blacklist=}
@@ -470,6 +475,9 @@ if [ -f $SQUASHED ]; then
 
     mount -o ro,remount /sysroot
 fi
+
+# remount final root dev rw if requested
+[ -n "$root_rw" ] && mount -o rw,remount /sysroot
 
 if [ -n "$maint" ]; then
     echo "Dropping to a maintenance shell, as requested. Good luck!"
