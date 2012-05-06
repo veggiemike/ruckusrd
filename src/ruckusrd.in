@@ -178,7 +178,7 @@ done
 # Make a couple symlinks
 decho '********** MAKING SYMLINKS *****************************************************'
 ln="ln"
-[ "%opt_verbose" != "0" ] && ln+=" -v"
+[ "$opt_verbose" != "0" ] && ln+=" -v"
 $ln -s bash bin/sh
 $ln -s bin sbin
 $ln -s ../../sbin/vol_id lib/udev/vol_id
