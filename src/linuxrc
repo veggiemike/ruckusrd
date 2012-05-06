@@ -477,6 +477,15 @@ if [ -f $SQUASHED ]; then
     mount -o ro,remount /sysroot
 fi
 
+# ensure the /dev/root symlink exists on the target system once udev is done
+# doing its thing
+cat <<EOF >> /sysroot/etc/rc.local
+
+if [ ! -f /dev/root ]; then
+    ln -s `readlink /dev/root` /dev/root
+fi
+EOF
+
 # remount final root dev rw if requested
 [ -n "$root_rw" ] && mount -o rw,remount /sysroot
 
