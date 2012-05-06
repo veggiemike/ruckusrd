@@ -2,4 +2,5 @@ bin_SCRIPTS = ruckusrd
 
 dist_pkgdata_DATA = linuxrc
 
-# FIXME: i want to also install a symlink mkinintrd->ruckusrd
+install-exec-hook:
+	$(LN_S) ruckusrd $(DESTDIR)$(bindir)/mkinitrd

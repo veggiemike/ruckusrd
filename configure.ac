@@ -5,6 +5,7 @@ AM_INIT_AUTOMAKE(dist-bzip2 no-dist-gzip)
 
 AC_PROG_INSTALL
 AC_PROG_MKDIR_P
+AC_PROG_LN_S
 
 AC_DEFUN([NEEDED_PROGS],
 	 [dnl progs copied into the initramfs
