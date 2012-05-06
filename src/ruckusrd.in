@@ -13,6 +13,7 @@
 # embedded systems, flash drives, live CDs, and normal desktop Linux systems.
 # See the file README for details.
 
+VERSION="@VERSION@"
 
 # check cwd so we don't accidentally use an installed version while we're
 # developing
@@ -32,9 +33,11 @@ decho()
 
 
 usage() {
-    echo "$0 [--help] [--verbose] [-f] <out-initrd-image> <kernel-version>"
+    echo "ruckusrd v$VERSION - a super awesome, yet simple, mkinitrd replacement"
     echo
-    echo "example: $0 /boot/myinitramfs.img \`uname -r\`"
+    echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] <out-initrd-image> <kernel-version>"
+    echo
+    echo "example: $(basename $0) /boot/myinitramfs.img \`uname -r\`"
 }
 
 
@@ -48,6 +51,10 @@ while [ $# -gt 0 ] ; do
             usage
             exit 0
             ;;
+	-V|--version)
+	    echo v$VERSION
+	    exit 0
+	    ;;
         -f)
             opt_allow_overwrite=1
             ;;
