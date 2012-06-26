@@ -448,7 +448,7 @@ if [ -f $SQUASHED ]; then
     # NOTE: these symlinks point to the corresponding loop devices we've created
     #       in here as well as the "true" root device
     rules=/sysroot/etc/udev/rules.d/50-ruckusrd.rules
-    echo "KERNEL==\"$root_true\", SYMLINK+=\"root-true\"" >> $rules
+    echo "KERNEL==\"${root_true#/dev/}\", SYMLINK+=\"root-true\"" >> $rules
     echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-squash\"" >> $rules
     echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-rootfs\"" >> $rules
     echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-overlay\"" >> $rules
