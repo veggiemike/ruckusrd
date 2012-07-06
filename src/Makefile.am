@@ -3,4 +3,5 @@ bin_SCRIPTS = ruckusrd
 dist_pkgdata_DATA = linuxrc
 
 install-exec-hook:
-	$(LN_S) ruckusrd $(DESTDIR)$(bindir)/mkinitrd
+	$(RM) -f $(DESTDIR)$(bindir)/mkinitrd
+	(cd $(DESTDIR)$(bindir) && $(LN_S) ruckusrd mkinitrd)
