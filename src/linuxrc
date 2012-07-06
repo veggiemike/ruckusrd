@@ -489,7 +489,7 @@ EOF
     cat <<EOF >> /sysroot/etc/rc.local
 
 if [ ! -f /dev/root ]; then
-    ln -s `readlink /dev/root` /dev/root
+    ln -s `readlink /dev/root` /dev/root 2>/dev/null
 fi
 EOF
 
