@@ -90,13 +90,18 @@ AC_ARG_VAR(UDEVADM, Path to either udevadm or udevstart)
 # NOTE: This might not be the best way to fully expand the variable, but it
 #       works for me.  It might be portable.  It might not.  Fingers
 #       crossed.
-pkgdatadir=$datadir/$PACKAGE/linuxrc
+#
+# NOTE: This only works if we make sure $prefix has been set already...
+#       otherwise we end up with NONE in our path.
+test "$prefix" = "NONE" && prefix=/usr/local
+LINUXRC=$datadir/$PACKAGE/linuxrc
 while :; do
-    temp=`eval echo $pkgdatadir`
-    test "$temp" = "$pkgdatadir" && break
-    pkgdatadir=$temp
+    echo $LINUXRC
+    temp=`eval echo $LINUXRC`
+    test "$temp" = "$LINUXRC" && break
+    LINUXRC=$temp
 done
-AC_SUBST(LINUXRC, $pkgdatadir)
+AC_SUBST(LINUXRC)
 
 AC_CONFIG_FILES([Makefile \
 		 src/Makefile])
