@@ -101,7 +101,7 @@ original_pwd=$PWD
 
 TEMPDIR=`mktemp -d` || exit 1
 decho TEMPDIR: $TEMPDIR
-pushd $TEMPDIR > /dev/null
+cd $TEMPDIR > /dev/null
 mkdir initramfs_dir
 cd initramfs_dir
 
@@ -266,7 +266,8 @@ decho '********** CREATING COMPRESSED CPIO IMAGE *******************************
 cpio="cpio"
 [ "$opt_verbose" != "1" ] && cpio+=" --quiet"
 find . | $cpio -o -H newc | gzip -9 > ../initramfs || exit 1
-popd > /dev/null
+
+cd $original_pwd
 rm -f $INITRAMFS_TARGET
 $cp $TEMPDIR/initramfs $INITRAMFS_TARGET
 rm -rf $TEMPDIR
