@@ -14,6 +14,7 @@ AC_DEFUN([NEEDED_PROGS],
 	  cat
 	  chmod
 	  cut
+	  date
 	  dd
 	  dirname
 	  dmesg

@@ -146,6 +146,7 @@ rootflags=""
 rootfstype="auto"
 to_ram=""
 maint=""
+hoststamp=""
 quiet=0
 overlay_size="512M"
 dmroot=0
@@ -177,6 +178,9 @@ for o in `cat /proc/cmdline` ; do
     rw)
         root_rw=1
 	;;
+    hoststamp)
+        hoststamp=1
+        ;;
     blacklist=*)
         blacklist=${o#blacklist=}
         echo "blacklist $blacklist" >> /etc/modprobe.conf
@@ -488,6 +492,19 @@ if [ ! -f /dev/root ]; then
     ln -s `readlink /dev/root` /dev/root
 fi
 EOF
+
+    # append a timestamp to system hostname if configured
+    #
+    # FIXME: this isn't very distro-agnostic, is it?
+    if [ -n "$hoststamp" ]; then
+        stamp=`date +%s`
+        [ -f /sysroot/etc/sysconfig/network ] || break
+        . /sysroot/etc/sysconfig/network
+        [ -n "$HOSTNAME" ] || break
+        for x in /etc/sysconfig/network /etc/hosts; do
+            sed -i "s|\($HOSTNAME\)|\1-$stamp|" /sysroot/$x
+        done
+    fi
 
     mount -o ro,remount /sysroot
 fi
