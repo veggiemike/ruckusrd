@@ -47,6 +47,7 @@ AC_DEFUN([NEEDED_PROGS],
 	  vi
 	  vol_id
 	  switch_root
+	  cp
 	  dnl other progs needed for ruckusrd script
 	  ldd
 	  sed

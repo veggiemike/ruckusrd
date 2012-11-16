@@ -164,6 +164,7 @@ PROGS+=" @UMOUNT@"
 PROGS+=" @VI@"
 PROGS+=" @VOL_ID@"
 PROGS+=" @SWITCH_ROOT@"
+PROGS+=" @CP@"
 
 # Copy all the PROGS into the initramfs
 decho '********** COPYING PROGS TO INITRAMFS ******************************************'
