@@ -201,6 +201,14 @@ done
 decho '********** COPYING ATA DRIVERS TO INITRAMFS ************************************'
 find $HOSTMODDIR/drivers/ata -name \*.ko -exec $cp {} $DESTMODDIR/ \;
 
+# Copy over SCSI drivers
+decho '********** COPYING SCSI DRIVERS TO INITRAMFS ***********************************'
+find $HOSTMODDIR/drivers/scsi -name \*.ko -exec $cp {} $DESTMODDIR/ \;
+
+# Copy over block drivers
+decho '********** COPYING BLOCK DRIVERS TO INITRAMFS **********************************'
+find $HOSTMODDIR/drivers/block -name \*.ko -exec $cp {} $DESTMODDIR/ \;
+
 # NOTE: if we ever want to add DRM drivers as well (potentially for early KMS
 #       fbcon splash screen), just uncomment the following lines
 #
