@@ -391,7 +391,6 @@ if [ -f $SQUASHED ]; then
     if [ -n "$to_ram" ]; then
 	echo -n "Copying compressed rootfs image to RAM... "
 	dd if=$SQUASHED of=/squashed.img bs=512 2> /dev/null
-	umount -n /sysroot
 	echo "done"
 	SQUASHED="/squashed.img"
     fi
@@ -432,10 +431,13 @@ if [ -f $SQUASHED ]; then
     # underlying device.  otherwise we end up with the new root mounted on
     # top of the old root, and users won't be able to access the old root at
     # all.
-    if [ -z "$to_ram" ]; then
-	mkdir /tmproot
-	mount --move /sysroot /tmproot
-    fi
+    #
+    # NOTE: we always do this regardless of the to_ram variable so that we can
+    #       always have access to the original root device to scarf config files
+    #       from throughout this.  if to_ram is set, we will umount /tmproot
+    #       before we're all done.
+    mkdir /tmproot
+    mount --move /sysroot /tmproot
 
     # mount the final rootfs
     mount /dev/root /sysroot
@@ -446,6 +448,34 @@ if [ -f $SQUASHED ]; then
     #       modeprobe.conf before modules get loaded... can't exactly edit
     #       modprobe.conf and reboot, as our changes get lost.
     [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
+
+    # NOTE: the following modprobe and HAL blocks should probably include/ln
+    #       under normal operations, but if we've loaded the rootfs.img into RAM
+    #       we should cp the files into the appropriate directories on root-rw
+
+    # append an include line to modprobe.conf pointing to root-true
+    #
+    # NOTE: this is so we can provide users with an easy place to store
+    #       persistent changes to modprobe.conf on the root-true device.
+    if [ -z "$to_ram" ]; then
+        echo "include /mnt/root-true/modprobe.d" >> /sysroot/etc/modprobe.conf
+    elif [ -d /tmproot/modprobe.d ]; then
+        cp -a /tmproot/modprobe.d /sysroot/etc/modprobe.d/ruckusrd
+    fi
+
+    # tell HAL to look in root-true
+    #
+    # NOTE: similar to the modprobe include statement, this creates a symlink
+    #       pointing to a directory on root-true so that the user can store some
+    #       settings persistently.
+    mkdir -p /sysroot/{,usr/local/}etc/hal/fdi/policy
+    if [ -z "$to_ram" ]; then
+        ln -s /mnt/root-true/hal.fdi /sysroot/etc/hal/fdi/policy/ruckusrd
+        ln -s /mnt/root-true/hal.fdi /sysroot/usr/local/etc/hal/fdi/policy/ruckusrd
+    elif [ -d /tmproot/hal.fdi ]; then
+        cp -a /tmproot/hal.fdi /sysroot/etc/hal/fdi/policy/ruckusrd
+        cp -a /tmproot/hal.fdi /sysroot/usr/local/etc/hal/fdi/policy/ruckusrd
+    fi
 
     # create udev rules for /dev/root-* symlinks
     #
@@ -461,28 +491,6 @@ if [ -f $SQUASHED ]; then
     mkdir -p /sysroot/mnt/root-true
     echo "" >> /sysroot/etc/fstab
     echo "/dev/root-true /mnt/root-true auto noauto,ro 0 0" >> /sysroot/etc/fstab
-
-    # Move the old sysroot into the new one, if needed.
-    #
-    # NOTE: We can't just forge /etc/mtab at this point, because some systems
-    #       sysinit scripts purge old cruft out of that file on the assumption
-    #       that the initrd has ONLY mounted /.  So instead, we'll append a
-    #       scriptlet that does the forging into rc.local.
-    #
-    # FIXME: this works, but the resulting sytem hangs for a few seconds
-    #        during reboot trying over and over again to umount root-true...
-    #
-    # FIXME: there might not be a good fix for this problem here w/out having a
-    #        knowledge of the system we're trying to boot (i.e., we can't go
-    #        sedding specific init scripts because we want to be
-    #        distro-agnostic)
-    if [ -z "$to_ram" ]; then
-	mount --move /tmproot /sysroot/mnt/root-true
-	cat <<EOF >> /sysroot/etc/rc.local
-
-echo /dev/root-true /mnt/root-true auto ro 0 0 >> /etc/mtab
-EOF
-    fi
 
     # ensure the /dev/root symlink exists on the target system once udev is done
     # doing its thing
@@ -504,6 +512,30 @@ EOF
         for x in /etc/sysconfig/network /etc/hosts; do
             sed -i "s|\($HOSTNAME\)|\1-$stamp|" /sysroot/$x
         done
+    fi
+
+    # Move the old sysroot into the new one, if needed.
+    #
+    # NOTE: We can't just forge /etc/mtab at this point, because some systems
+    #       sysinit scripts purge old cruft out of that file on the assumption
+    #       that the initrd has ONLY mounted /.  So instead, we'll append a
+    #       scriptlet that does the forging into rc.local.
+    #
+    # FIXME: this works, but the resulting sytem hangs for a few seconds
+    #        during reboot trying over and over again to umount root-true...
+    #
+    # FIXME: there might not be a good fix for this problem here w/out having a
+    #        knowledge of the system we're trying to boot (i.e., we can't go
+    #        sedding specific init scripts because we want to be
+    #        distro-agnostic)
+    if [ -z "$to_ram" ]; then
+	mount --move /tmproot /sysroot/mnt/root-true
+	cat <<EOF >> /sysroot/etc/rc.local
+
+echo /dev/root-true /mnt/root-true auto ro 0 0 >> /etc/mtab
+EOF
+    else
+        umount /tmproot        
     fi
 
     mount -o ro,remount /sysroot
