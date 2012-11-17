@@ -449,32 +449,24 @@ if [ -f $SQUASHED ]; then
     #       modprobe.conf and reboot, as our changes get lost.
     [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
 
-    # NOTE: the following modprobe and HAL blocks should probably include/ln
-    #       under normal operations, but if we've loaded the rootfs.img into RAM
-    #       we should cp the files into the appropriate directories on root-rw
-
-    # append an include line to modprobe.conf pointing to root-true
+    # populate sysroot with config files
     #
-    # NOTE: this is so we can provide users with an easy place to store
-    #       persistent changes to modprobe.conf on the root-true device.
-    if [ -z "$to_ram" ]; then
-        echo "include /mnt/root-true/modprobe.d" >> /sysroot/etc/modprobe.conf
-    elif [ -d /tmproot/modprobe.d ]; then
-        cp -a /tmproot/modprobe.d /sysroot/etc/modprobe.d/ruckusrd
-    fi
-
-    # tell HAL to look in root-true
+    # NOTE: we create symlinks under normal operations, but if we've loaded the
+    #       rootfs.img into RAM we should cp the files into the appropriate
+    #       directories on root-rw
     #
-    # NOTE: similar to the modprobe include statement, this creates a symlink
-    #       pointing to a directory on root-true so that the user can store some
-    #       settings persistently.
-    mkdir -p /sysroot/{,usr/local/}etc/hal/fdi/policy
-    if [ -z "$to_ram" ]; then
-        ln -s /mnt/root-true/hal.fdi /sysroot/etc/hal/fdi/policy/ruckusrd
-        ln -s /mnt/root-true/hal.fdi /sysroot/usr/local/etc/hal/fdi/policy/ruckusrd
-    elif [ -d /tmproot/hal.fdi ]; then
-        cp -a /tmproot/hal.fdi /sysroot/etc/hal/fdi/policy/ruckusrd
-        cp -a /tmproot/hal.fdi /sysroot/usr/local/etc/hal/fdi/policy/ruckusrd
+    # NOTE: have to do this in 2 iterations.  1st, we make all parent
+    #       directories that will be needed to house symlinks.  2nd, we create
+    #       the symlinks/copies.
+    if [ -d /tmproot/conf ]; then
+        pushd /tmproot/conf >/dev/null
+        find * -type d -exec mkdir -p /sysroot/{} \;
+        if [ -z "$to_ram" ]; then
+            find * -type f -exec ln -s /mnt/root-true/conf/{} /sysroot/{} \;
+        else
+            find * -type f -exec cp {} /sysroot/{} \;
+        fi
+        popd >/dev/null
     fi
 
     # create udev rules for /dev/root-* symlinks
