@@ -48,12 +48,12 @@ AC_DEFUN([NEEDED_PROGS],
 	  vol_id
 	  switch_root
 	  cp
+	  find
 	  dnl other progs needed for ruckusrd script
 	  ldd
 	  sed
 	  modprobe
 	  depmod
-	  find
 	  bash
 	  cpio
 	  mksquashfs
