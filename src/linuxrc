@@ -458,13 +458,18 @@ if [ -f $SQUASHED ]; then
     # NOTE: have to do this in 2 iterations.  1st, we make all parent
     #       directories that will be needed to house symlinks.  2nd, we create
     #       the symlinks/copies.
+    #
+    # NOTE: we've got bash set to exit immediately if a command fails, so we
+    #       have to make sure wild-card expansions don't cause find to fail.
+    #       more accurately, we're just going to ignore find failures
+    #       altogether by echoing nothing in a || contidional.
     if [ -d /tmproot/conf ]; then
         pushd /tmproot/conf >/dev/null
-        find * -type d -exec mkdir -p /sysroot/{} \;
+        find * -type d -exec mkdir -p /sysroot/{} \; 2>/dev/null || echo -n
         if [ -z "$to_ram" ]; then
-            find * -type f -exec ln -s /mnt/root-true/conf/{} /sysroot/{} \;
+            find * -type f -exec ln -s /mnt/root-true/conf/{} /sysroot/{} \; || echo -n
         else
-            find * -type f -exec cp {} /sysroot/{} \;
+            find * -type f -exec cp {} /sysroot/{} \; || echo -n
         fi
         popd >/dev/null
     fi
