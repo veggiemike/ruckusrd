@@ -485,9 +485,14 @@ if [ -f $SQUASHED ]; then
     echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-overlay\"" >> $rules
 
     # setup easy mounting of /dev/root-true
+    #
+    # NOTE: we let the fstab injection fail to allow users to put new copies of
+    #       fstab in the conf dir... which might overwrite /sysroot/etc/fstab
+    #       with a symlink that's broken until we hand off control via
+    #       switch_root.
     mkdir -p /sysroot/mnt/root-true
-    echo "" >> /sysroot/etc/fstab
-    echo "/dev/root-true /mnt/root-true auto noauto,ro 0 0" >> /sysroot/etc/fstab
+    echo "" >> /sysroot/etc/fstab || echo -n
+    echo "/dev/root-true /mnt/root-true auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
 
     # ensure the /dev/root symlink exists on the target system once udev is done
     # doing its thing
