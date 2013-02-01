@@ -451,9 +451,13 @@ if [ -f $SQUASHED ]; then
 
     # populate sysroot with config files
     #
-    # NOTE: we create symlinks under normal operations, but if we've loaded the
-    #       rootfs.img into RAM we should cp the files into the appropriate
-    #       directories on root-rw
+    # NOTE: we used to create symlinks unless we were loading the rootfs.img
+    #       into RAM, but that leads to problems with some applications that
+    #       expect a file to be a normal file (e.g., /etc/sudoers) and was also
+    #       causing all kinds of regressions (e.g., what if the file exists
+    #       already in rootfs?  what if the config file you want to cp into
+    #       rootfs needs to actually be a symlink?).  so, regardless, we now cp
+    #       the files.
     #
     # NOTE: have to do this in 2 iterations.  1st, we make all parent
     #       directories that will be needed to house symlinks.  2nd, we create
@@ -466,11 +470,7 @@ if [ -f $SQUASHED ]; then
     if [ -d /tmproot/conf ]; then
         pushd /tmproot/conf >/dev/null
         find * -type d -exec mkdir -p /sysroot/{} \; 2>/dev/null || echo -n
-        if [ -z "$to_ram" ]; then
-            find * -type f -exec ln -fs /mnt/root-true/conf/{} /sysroot/{} \; || echo -n
-        else
-            find * -type f -exec cp {} /sysroot/{} \; || echo -n
-        fi
+        find * -type f -exec cp -dp {} /sysroot/{} \; || echo -n
         popd >/dev/null
     fi
 
