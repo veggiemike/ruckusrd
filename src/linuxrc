@@ -124,10 +124,10 @@ mknod /dev/null c 1 3
 mknod /dev/kmsg c 1 11
 mkdir /dev/pts
 mkdir -m 1777 /dev/shm
-ln -s /proc/self/fd /dev/fd
-ln -s fd/0 /dev/stdin
-ln -s fd/1 /dev/stdout
-ln -s fd/2 /dev/stderr
+ln -fs /proc/self/fd /dev/fd
+ln -fs fd/0 /dev/stdin
+ln -fs fd/1 /dev/stdout
+ln -fs fd/2 /dev/stderr
 
 # mount virtual filesystems
 mount -n -t proc proc /proc
@@ -257,12 +257,12 @@ else
             dmroot=1
             ;;
         /dev/md*|/dev/V*|/dev/mapper/*)
-            ln -s $root /dev/root
+            ln -fs $root /dev/root
             thingtomount=$root
             dmroot=1
             ;;
         /dev/*)
-            ln -s $root /dev/root
+            ln -fs $root /dev/root
             thingtomount=$root
             ;;
         *)
@@ -423,8 +423,7 @@ if [ -f $SQUASHED ]; then
     echo 0 `blockdev --getsz $BASE_LOOPDEV` snapshot $BASE_LOOPDEV $OVERLAY_LOOPDEV p 8 | dmsetup create root-rw
 
     # set up new /dev/root symlink
-    rm -f /dev/root
-    ln -s /dev/mapper/root-rw /dev/root
+    ln -fs /dev/mapper/root-rw /dev/root
 
     # if we didn't load squashfs.img into RAM, we need to move things around
     # so that the final system can still have access (if needed) to the
@@ -496,10 +495,17 @@ if [ -f $SQUASHED ]; then
 
     # ensure the /dev/root symlink exists on the target system once udev is done
     # doing its thing
+    #
+    # FIXME: what if /dev on the real rootfs already has a /dev/root symlink
+    #        (e.g., from the last time we booted)?  i want to let udev do
+    #        it's thing... but if an old /dev/root exists and points to the
+    #        wrong device, won't boot...  i can't guarantee that the
+    #        /dev/root we created has been removed by the host system's init
+    #        scripts on shutdown.
     cat <<EOF >> /sysroot/etc/rc.local
 
 if [ ! -f /dev/root ]; then
-    ln -s `readlink /dev/root` /dev/root 2>/dev/null
+    ln -fs `readlink /dev/root` /dev/root 2>/dev/null
 fi
 EOF
 
