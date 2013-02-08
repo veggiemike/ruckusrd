@@ -473,6 +473,18 @@ if [ -f $SQUASHED ]; then
         popd >/dev/null
     fi
 
+    # update ld
+    #
+    # NOTE: we'll need to do this if the config area had any shared libs,
+    #       otherwise our system could be unstable once booted.
+    #
+    # NOTE: we do this chrooted, so we only need to copy chroot into the
+    #       initramfs.
+    #
+    # NOTE: while we do care if this fails, it really shouldn't make the
+    #       system unbootable, so we'll ignore failure.
+    chroot /sysroot /usr/bin/env /bin/bash -c ldconfig || echo -n
+
     # create udev rules for /dev/root-* symlinks
     #
     # NOTE: these symlinks point to the corresponding loop devices we've created
