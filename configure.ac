@@ -49,6 +49,7 @@ AC_DEFUN([NEEDED_PROGS],
 	  switch_root
 	  cp
 	  find
+	  chroot
 	  dnl other progs needed for ruckusrd script
 	  ldd
 	  sed

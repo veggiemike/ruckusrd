@@ -166,6 +166,7 @@ PROGS+=" @VOL_ID@"
 PROGS+=" @SWITCH_ROOT@"
 PROGS+=" @CP@"
 PROGS+=" @FIND@"
+PROGS+=" @CHROOT@"
 
 
 # Copy all the PROGS into the initramfs
