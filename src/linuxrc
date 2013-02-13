@@ -483,7 +483,14 @@ if [ -f $SQUASHED ]; then
     #
     # NOTE: while we do care if this fails, it really shouldn't make the
     #       system unbootable, so we'll ignore failure.
-    chroot /sysroot /usr/bin/env /bin/bash -c ldconfig || echo -n
+    #
+    # NOTE: instead of hardcoding the path to ldconfig (which would be assuming
+    #       too much about the system we're trying to boot, regardless of path
+    #       standards), we setup an env with PATH set super-inclusively then let
+    #       bash use PATH to find ldconfig inside the chrooted system.
+    CHROOTPATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
+    chroot /sysroot /usr/bin/env -i PATH=$CHROOTPATH /bin/bash -c ldconfig \
+        || echo -n
 
     # create udev rules for /dev/root-* symlinks
     #
