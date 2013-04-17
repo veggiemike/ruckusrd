@@ -468,8 +468,8 @@ if [ -f $SQUASHED ]; then
     #       altogether by echoing nothing in a || contidional.
     if [ -d /tmproot/conf ]; then
         pushd /tmproot/conf >/dev/null
-        find * -type d -exec mkdir -p /sysroot/{} \; 2>/dev/null || echo -n
-        find * -type f -exec cp -dp {} /sysroot/{} \; || echo -n
+        find . -type d -exec mkdir -p /sysroot/{} \; 2>/dev/null || echo -n
+        find . ! -type d -exec cp -dp {} /sysroot/{} \; || echo -n
         popd >/dev/null
     fi
 
