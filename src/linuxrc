@@ -562,19 +562,31 @@ EOF
     #       that the initrd has ONLY mounted /.  So instead, we'll append a
     #       scriptlet that does the forging into rc.local.
     #
-    # FIXME: this works, but the resulting sytem hangs for a few seconds
-    #        during reboot trying over and over again to umount root-true...
+    # NOTE: We add a little mini-service hear to cleanly unmount root-true.
+    #       W/out this, the resulting sytem hangs for 30 seconds or so during
+    #       reboot trying over and over again to umount root-true...
     #
-    # FIXME: there might not be a good fix for this problem here w/out having a
-    #        knowledge of the system we're trying to boot (i.e., we can't go
-    #        sedding specific init scripts because we want to be
-    #        distro-agnostic)
+    # FIXME: This assumes a SysV-Init style system in /etc, which is a safe
+    #        assumption considering all the other udev assumptions in
+    #        here... but we'll want to address this at some point so we can
+    #        work w/ systemd and maybe upstart.
     if [ -z "$to_ram" ]; then
 	mount --move /tmproot /sysroot/mnt/root-true
 	cat <<EOF >> /sysroot/etc/rc.local
 
 echo /dev/root-true /mnt/root-true auto ro 0 0 >> /etc/mtab
 EOF
+
+        cat <<EOF > /sysroot/etc/init.d/ruckusrd
+#!/bin/sh
+mount -o remount,ro /mnt/root-true
+umount -l /mnt/root-true
+EOF
+
+        chmod +x /sysroot/etc/init.d/ruckusrd
+        ln -s ../init.d/ruckusrd /sysroot/etc/rc0.d/S00ruckusrd_halt
+        ln -s ../init.d/ruckusrd /sysroot/etc/rc6.d/S00ruckusrd_reboot
+
     else
         umount /tmproot        
     fi

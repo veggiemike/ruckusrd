@@ -1,7 +1,9 @@
 -*- mode: outline -*-
 
-* system fails to umount /mnt/root-true at reboot (squashfs, ! to_ram)
+* add a squashfs= boot arg to specify an image
 
 * fix all the FIXMEs
 
 * test with DM udev events turned on, document results
+
+* migrate to new versions of udev and systemd (and update README)
