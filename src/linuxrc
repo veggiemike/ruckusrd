@@ -450,26 +450,29 @@ if [ -f $SQUASHED ]; then
 
     # populate sysroot with config files
     #
-    # NOTE: we used to create symlinks unless we were loading the rootfs.img
+    # NOTE: We used to create symlinks unless we were loading the rootfs.img
     #       into RAM, but that leads to problems with some applications that
     #       expect a file to be a normal file (e.g., /etc/sudoers) and was also
-    #       causing all kinds of regressions (e.g., what if the file exists
-    #       already in rootfs?  what if the config file you want to cp into
-    #       rootfs needs to actually be a symlink?).  so, regardless, we now cp
-    #       the files.
+    #       causing all kinds of regressions (e.g., What if the file exists
+    #       already in rootfs?  What if the config file you want to cp into
+    #       rootfs needs to actually be a symlink?).  Additionally, the
+    #       conditional code was getting a bit messy.  So, regardless, we now
+    #       always recursively copy the files.
     #
-    # NOTE: have to do this in 2 iterations.  1st, we make all parent
-    #       directories that will be needed to house symlinks.  2nd, we create
-    #       the symlinks/copies.
+    # NOTE: This would be much easier via rsync, but I didn't want to require
+    #       adding rsync (and its required libs) to the initramfs.  Here's a
+    #       list of the gotchas we have to address when overlaying the contents
+    #       of the rootfs with the contents of conf:
     #
-    # NOTE: we've got bash set to exit immediately if a command fails, so we
-    #       have to make sure wild-card expansions don't cause find to fail.
-    #       more accurately, we're just going to ignore find failures
-    #       altogether by echoing nothing in a || contidional.
+    #       1. Replacing a dir in rootfs w/ a symlink in conf.  If you don't
+    #          handle this case specially, you end up with a symlink getting
+    #          copied into the existing rootfs dir instead of replacing it.
+    #          Problem can be avoided by removing the target dir in rootfs
+    #          prior to doing a recursive copy.
     if [ -d /tmproot/conf ]; then
         pushd /tmproot/conf >/dev/null
-        find . -type d -exec mkdir -p /sysroot/{} \; 2>/dev/null || echo -n
-        find . ! -type d -exec cp -dp {} /sysroot/{} \; || echo -n
+        find . -type l -exec mv /sysroot/{} /sysroot/{}.ruckusrd \;
+        cp -dpR . /sysroot/
         popd >/dev/null
     fi
 

@@ -48,6 +48,7 @@ AC_DEFUN([NEEDED_PROGS],
 	  vol_id
 	  switch_root
 	  cp
+	  mv
 	  find
 	  chroot
 	  dnl other progs needed for ruckusrd script
