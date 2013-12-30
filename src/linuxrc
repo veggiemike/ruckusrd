@@ -341,7 +341,9 @@ fi
 # NOTE: The root dev becomes impossible to unmount (and thus, impossible to
 #       safely fsck) after we pass control over to the host os (unless we load
 #       the whole image into RAM).
-go="fsck -TC $thingtomount"
+#
+# NOTE: We create an empty /etc/mtab to keep fsck from moaning.
+go="echo -n > /etc/mtab; fsck -TC $thingtomount"
 decho $go
 eval $go
 
