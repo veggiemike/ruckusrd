@@ -482,7 +482,7 @@ if [ -f $SQUASHED ]; then
     #          prior to doing a recursive copy.
     if [ -d /tmproot/conf ]; then
         pushd /tmproot/conf >/dev/null
-        find . -type l -exec mv /sysroot/{} /sysroot/{}.ruckusrd \;
+        find . -type l -exec mv /sysroot/{} /sysroot/{}.ruckusrd 2>/dev/null \;
         cp -dpR . /sysroot/
         popd >/dev/null
     fi
