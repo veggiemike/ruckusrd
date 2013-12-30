@@ -51,6 +51,11 @@ AC_DEFUN([NEEDED_PROGS],
 	  mv
 	  find
 	  chroot
+	  fsck
+	  e2fsck
+	  fsck.ext2
+	  fsck.ext3
+	  fsck.ext4
 	  dnl other progs needed for ruckusrd script
 	  ldd
 	  sed
@@ -62,9 +67,9 @@ AC_DEFUN([NEEDED_PROGS],
 	 ])
 
 m4_foreach_w([P], NEEDED_PROGS,
-		  [AC_PATH_PROG(m4_toupper(P), P, [], $PATH:/lib/udev)
+		  [AC_PATH_PROG(m4_bpatsubst(m4_toupper(P), [\.], [_]), P, [], $PATH:/lib/udev)
 		   AS_IF([test "$m4_toupper(P)" = ""], [AC_MSG_ERROR([Could not find P])])
-		   AC_ARG_VAR(m4_toupper(P), Path to P)])
+		   AC_ARG_VAR(m4_bpatsubst(m4_toupper(P), [\.], [_]), Path to P)])
 
 # bash is a special case, because bash sets the variable BASH to $0, which
 # results in /bin/sh on tons of systems.

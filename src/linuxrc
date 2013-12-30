@@ -336,6 +336,15 @@ else
     bash
 fi
 
+# run fsck on root dev
+#
+# NOTE: The root dev becomes impossible to unmount (and thus, impossible to
+#       safely fsck) after we pass control over to the host os (unless we load
+#       the whole image into RAM).
+go="fsck -TC $thingtomount"
+decho $go
+eval $go
+
 mountoptions=" -o ro"
 if [ -n "$rootflags" ]; then
     mountoptions+=",$rootflags"

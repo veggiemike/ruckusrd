@@ -168,10 +168,19 @@ PROGS+=" @CP@"
 PROGS+=" @MV@"
 PROGS+=" @FIND@"
 PROGS+=" @CHROOT@"
+PROGS+=" @FSCK@"
+PROGS+=" @E2FSCK@"
+PROGS+=" @FSCK_EXT2@"
+PROGS+=" @FSCK_EXT3@"
+PROGS+=" @FSCK_EXT4@"
 
 
 # Copy all the PROGS into the initramfs
 decho '********** COPYING PROGS TO INITRAMFS ******************************************'
+# FIXME: This doesn't preserve hard-links.  I always want to deref symlinks,
+#        but it would be nice if we could NOT deref hardlinks.  Or,
+#        conditionally not deref any link if what it pointed to has also been
+#        added to the initramfs...?
 cp="cp"
 [ "$opt_verbose" != "0" ] && cp+=" -v"
 for x in $PROGS; do
