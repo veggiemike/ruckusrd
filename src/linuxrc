@@ -345,7 +345,11 @@ fi
 #       the whole image into RAM).
 #
 # NOTE: We create an empty /etc/mtab to keep fsck from moaning.
-go="echo -n > /etc/mtab; fsck -TC $thingtomount"
+#
+# NOTE: While we do care if this fails, we don't really want a failure to keep
+#       the system from booting, especially since an exit status of 1 indicates
+#       that fsck found AND SUCCESSFULLY FIXED some errors.
+go="echo -n > /etc/mtab; fsck -TC $thingtomount || echo -n"
 decho $go
 eval $go
 
