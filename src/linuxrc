@@ -142,6 +142,7 @@ SQUASHED="/sysroot/squashfs.img"
 init="/sbin/init"
 root=""
 root_rw=""
+root_true_rw="ro"
 rootflags=""
 rootfstype="auto"
 to_ram=""
@@ -159,7 +160,7 @@ dmroot=0
 #       line.
 #
 # NOTE: rootfstype, rootflags are only applied when mounting the specified root
-#       device.  in other words, they are not used when mounting the derivitive
+#       device.  in other words, they are not used when mounting the derivative
 #       devices created when we load rootfs into RAM.
 for o in `cat /proc/cmdline` ; do
     case $o in 
@@ -177,6 +178,7 @@ for o in `cat /proc/cmdline` ; do
 	;;
     rw)
         root_rw=1
+        root_true_rw="rw"
 	;;
     hoststamp)
         hoststamp=1
@@ -524,7 +526,7 @@ if [ -f $SQUASHED ]; then
     #       switch_root.
     mkdir -p /sysroot/mnt/root-true
     echo "" >> /sysroot/etc/fstab || echo -n
-    echo "/dev/root-true /mnt/root-true auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
+    echo "/dev/root-true /mnt/root-true auto noauto,$root_true_rw 0 0" >> /sysroot/etc/fstab || echo -n
 
     # ensure the /dev/root symlink exists on the target system once udev is done
     # doing its thing
@@ -572,9 +574,10 @@ EOF
     #        work w/ systemd and maybe upstart.
     if [ -z "$to_ram" ]; then
 	mount --move /tmproot /sysroot/mnt/root-true
+	mount -o remount,$root_true_rw /sysroot/mnt/root-true
 	cat <<EOF >> /sysroot/etc/rc.local
 
-echo /dev/root-true /mnt/root-true auto ro 0 0 >> /etc/mtab
+echo /dev/root-true /mnt/root-true auto $root_true_rw 0 0 >> /etc/mtab
 EOF
 
         cat <<EOF > /sysroot/etc/init.d/ruckusrd
