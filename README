@@ -48,13 +48,14 @@ differently than your run-of-the-mill mkinitrd.
     modules (and their dependencies) in the initialramfs.  This is an attempt
     to make the resulting initrd as system-independent as possible.
 
- 3. If a squashfs.img exists at / of the rootfs, the initrd combines it with a
-    writable overlay (RAM via losetup) via the device mapper (so that it can be
-    mounted read/write).  The resulting virtual block device is then used as
-    the root device for booting.  If 'to_ram' is added to the kernel command
-    line, the initrd loads the squashfs image directly into RAM (so that the
-    underlying block device can be safely removed).  If a squashfs.img doesn't
-    exist, the system is booted in a normal manor.
+ 3. If a squashfs.img exists at / of the rootfs (or if you've supplied
+    squashfs= or squashdev= on the kernel command line), the initrd combines
+    it with a writable overlay (RAM via losetup) via the device mapper (so
+    that it can be mounted read/write).  The resulting virtual block device
+    is then used as the root device for booting.  If 'to_ram' is added to
+    the kernel command line, the initrd loads the squashfs image directly
+    into RAM (so that the underlying block device can be safely removed).
+    If a squashfs.img doesn't exist, the system is booted in a normal manor.
 
  4. By default, the rootfs is mounted read-only.  It's normally up to the
     booting system's init scripts to remount read-write if desired.  However,
