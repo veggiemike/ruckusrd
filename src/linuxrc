@@ -223,6 +223,7 @@ hoststamp=""
 quiet=0
 overlay_size="512M"
 dmroot=0
+squashfs="squashfs.img"
 
 # Parse kernel commandline options
 #
@@ -273,6 +274,9 @@ for o in `cat /proc/cmdline` ; do
     overlay_size=*)
         overlay_size=${o#overlay_size=}
         ;;
+    squashfs=*)
+        squashfs=${o#squashfs=}
+        ;;
     *)
         # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
         #       max_loop=16" to get written in modprobe.conf...
@@ -303,6 +307,7 @@ decho "to_ram=$to_ram"
 decho "maint=$maint"
 decho "hoststamp=$hoststamp"
 decho "overlay_size=$overlay_size"
+decho "squashfs=$squashfs"
 
 echo -n "determining what to mount... "
 
