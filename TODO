@@ -1,9 +1,17 @@
 -*- mode: outline -*-
 
-* add a squashfs= boot arg to specify an image
+* For 1.0.0
 
-* fix all the FIXMEs
+ 1. migrate to new versions of udev and systemd (and update README)
 
-* test with DM udev events turned on, document results
 
-* migrate to new versions of udev and systemd (and update README)
+* For whenever
+
+ 1. fix all the FIXMEs
+
+ 2. test with DM udev events turned on, document results
+
+ 3. documentation (html, man)
+
+ 4. conf removal mechanism (i.e., list of files/dirs to be removed prior to
+ conf population)

@@ -11,6 +11,27 @@ It's been largely rewritten to be a mkinitrd replacement specifically for
 embedded systems and removable media, but it's also perfectly usable on normal
 desktop Linux systms.
 
+
+Strengths:
+
+ 1.  Squashfs Root Filesystem.  When supplied with a squashfs.img
+     containing a root filesystem, an initrd created by RuckusRD will
+     create a read-write virtual device for the rootfs by combining the
+     squashfs image (read-only by nature) with a read-write overlay of
+     system RAM.  Furthermore, the underlying squashfs.img can be loaded
+     entirely into RAM, enabling the user to unmount and remove the boot
+     media.  Persistent changes to the essentially non-memory-retentive
+     system can be handled by a special "conf" directory.
+
+ 2.  Universal Initramfs.  Images created by RuckusRD can be used for
+     multiple machines with different hardware without.  This is done by
+     making sure that only device drivers are compiled as modules, and all
+     the modules that COULD BE required to get us to the rootfs are
+     included in the initramfs (not just the ones for THIS MACHINE).
+
+
+Details:
+
 Due to it's primary use (embedded systems, removable media), it behaves a bit
 differently than your run-of-the-mill mkinitrd.
 

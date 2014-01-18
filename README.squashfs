@@ -1,0 +1,36 @@
+-*- mode: outline -*-
+
+* Creating squashfs.img
+
+To create a squashfs.img from an existing installation:
+
+ 1. Create rootfs image file:
+
+    # dd if=/dev/zero of=rootfs.img bs=1M seek=10M count=0
+    # mkfs.ext4 rootfs.img
+
+ 2. Put stuff on it.  This can be done by restoring from one or more dump
+    images (see dump(8)), by extracting from a tar file or other archive, or by
+    installing directly into the image file.
+
+ 3. Create squashfs:
+
+    # mkdir squashfs
+    # mv rootfs.img squashfs
+    # mksquashfs squashfs squashfs.img
+
+ 4. Put squashfs.img at / of your boot device.
+
+
+* Booting
+UUID
+LABEL
+CDLABEL
+
+* The conf dir
+
+* Advanced usage
+** to_ram
+** squashfs=
+** squashdev=
+*** example use case (lots of virtual machines sharing squashfs)
