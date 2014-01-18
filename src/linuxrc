@@ -106,6 +106,78 @@ emergency_shell()
 }
 
 
+# This method creates udev rules such that we end up with a /dev/$1 symlink
+# that points to the device specified by $2, which can be CDLABEL, LABEL, UUID,
+# or an actual device name (e.g., /dev/sda1, /dev/md0, /dev/mapper/vg0_lv1).
+#
+# NOTE: We try to depend on the hotplug implementation as little as possible in
+#       here (i.e., we're leaving the door open for mdev as much as possible).
+#
+# NOTE: This method modifies the following important global variables:
+#
+#       thingtomount: argument to be mounted for root filesys
+#
+#       dmroot: set to 1 if thingtomount requires device mapper
+generate_udev_rules()
+{
+    name=$1
+    str=$2
+
+    # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA, USB, and
+    #       SCSI should all be using them.
+    case $str in
+        CDLABEL=*)
+            CDLABEL=${str#CDLABEL=}
+            echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-cdlabel.rules
+            echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-cdlabel.rules
+            decho "Added udev rule for CDLABEL=='$CDLABEL'"
+            if [ "$name" = "root" ]; then
+                thingtomount=/dev/root
+                dmroot=0
+            fi
+            ;;
+        LABEL=*)
+            LABEL=${str#LABEL=}
+            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$LABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-label.rules
+            decho "Added udev rule for LABEL=='$LABEL'"
+            if [ "$name" = "root" ]; then
+                thingtomount=/dev/root
+                dmroot=1
+            fi
+            ;;
+        UUID=*)
+            UUID=${str#UUID=}
+            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"$UUID\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/01-uuid.rules
+            decho "Added udev rule for UUID=='$UUID'"
+            if [ "$name" = "root" ]; then
+                thingtomount=/dev/root
+                dmroot=1
+            fi
+            ;;
+        /dev/md*|/dev/V*|/dev/mapper/*)
+            ln -fs $str /dev/$name
+            if [ "$name" = "root" ]; then
+                thingtomount=$str
+                dmroot=1
+            fi
+            ;;
+        /dev/*)
+            ln -fs $str /dev/$name
+            if [ "$name" = "root" ]; then
+                thingtomount=$str
+                dmroot=0
+            fi
+            ;;
+        *)
+            if [ "$name" = "root" ]; then
+                thingtomount=$str
+                dmroot=0
+            fi
+            ;;
+    esac
+}
+
+
 trap "emergency_shell" 0 2
 
 # exit immediately if a command fails
@@ -140,7 +212,7 @@ SQUASHED="/sysroot/squashfs.img"
 
 # Declare all variables here.. mostly for housekeeping
 init="/sbin/init"
-root=""
+root="/dev/something"
 root_rw=""
 root_true_rw="ro"
 rootflags=""
@@ -227,53 +299,9 @@ decho "overlay_size=$overlay_size"
 
 echo -n "determining what to mount... "
 
-# NOTE: we try to depend on the hotplug implementation as little as possible in
-#        here (i.e., we're leaving the door open for mdev as much as possible).
+generate_udev_rules root $root
 
-# generate udev rules to generate /dev/root symlink
-if [ -z $root ] ; then
-    root=/dev/something
-else
-    # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA, USB, and
-    #       SCSI should all be using them.
-    case $root in
-        CDLABEL=*)
-            CDLABEL=${root#CDLABEL=}
-            echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
-            echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"root\"" >> /etc/udev/rules.d/00-cdlabel.rules
-            decho "Added udev rule for CDLABEL=='$CDLABEL'"
-            thingtomount=/dev/root
-            ;;
-        LABEL=*)
-            LABEL=${root#LABEL=}
-            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$LABEL\", SYMLINK+=\"root\"" > /etc/udev/rules.d/00-label.rules
-            decho "Added udev rule for LABEL=='$LABEL'"
-            thingtomount=/dev/root
-            dmroot=1
-            ;;
-        UUID=*)
-            UUID=${root#UUID=}
-            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"$UUID\", SYMLINK+=\"root\"" > /etc/udev/rules.d/01-uuid.rules
-            decho "Added udev rule for UUID=='$UUID'"
-            thingtomount=/dev/root
-            dmroot=1
-            ;;
-        /dev/md*|/dev/V*|/dev/mapper/*)
-            ln -fs $root /dev/root
-            thingtomount=$root
-            dmroot=1
-            ;;
-        /dev/*)
-            ln -fs $root /dev/root
-            thingtomount=$root
-            ;;
-        *)
-            thingtomount=$root
-            ;;
-    esac
-fi
-
-echo $thingtomount
+echo "$thingtomount (dmroot=$dmroot)"
 
 echo "udev_log=\"error\"" >> /etc/udev/udev.conf
 
