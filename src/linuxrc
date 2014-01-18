@@ -250,8 +250,10 @@ for o in `cat /proc/cmdline` ; do
 	;;
     rw)
         root_rw=1
+        ;;
+    root_true_rw)
         root_true_rw="rw"
-	;;
+        ;;
     hoststamp)
         hoststamp=1
         ;;
