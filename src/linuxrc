@@ -291,12 +291,17 @@ for o in `cat /proc/cmdline` ; do
     esac
 done
 
+
 decho "kernel commandline: `cat /proc/cmdline`"
 decho "init=$init"
 decho "root=$root"
-decho "to_ram=$to_ram"
+decho "root_rw=$root_rw"
+decho "root_true_rw=$root_true_rw"
 decho "rootflags=$rootflags"
 decho "rootfstype=$rootfstype"
+decho "to_ram=$to_ram"
+decho "maint=$maint"
+decho "hoststamp=$hoststamp"
 decho "overlay_size=$overlay_size"
 
 echo -n "determining what to mount... "
@@ -598,7 +603,7 @@ EOF
     #       that the initrd has ONLY mounted /.  So instead, we'll append a
     #       scriptlet that does the forging into rc.local.
     #
-    # NOTE: We add a little mini-service hear to cleanly unmount root-true.
+    # NOTE: We add a little mini-service here to cleanly unmount root-true.
     #       W/out this, the resulting sytem hangs for 30 seconds or so during
     #       reboot trying over and over again to umount root-true...
     #
@@ -625,7 +630,7 @@ EOF
         ln -s ../init.d/ruckusrd /sysroot/etc/rc6.d/S00ruckusrd_reboot
 
     else
-        umount /tmproot        
+        umount /tmproot
     fi
 
     mount -o ro,remount /sysroot
