@@ -208,8 +208,6 @@ mount -n -t sysfs sysfs /sys
 # setup hotplug
 echo "" > /proc/sys/kernel/hotplug
 
-SQUASHED="/sysroot/squashfs.img"
-
 # Declare all variables here.. mostly for housekeeping
 init="/sbin/init"
 root="/dev/something"
@@ -224,6 +222,7 @@ quiet=0
 overlay_size="512M"
 dmroot=0
 squashfs="squashfs.img"
+squashdev=""
 
 # Parse kernel commandline options
 #
@@ -277,6 +276,9 @@ for o in `cat /proc/cmdline` ; do
     squashfs=*)
         squashfs=${o#squashfs=}
         ;;
+    squashdev=*)
+        squashdev=${o#squashdev=}
+        ;;
     *)
         # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
         #       max_loop=16" to get written in modprobe.conf...
@@ -308,10 +310,12 @@ decho "maint=$maint"
 decho "hoststamp=$hoststamp"
 decho "overlay_size=$overlay_size"
 decho "squashfs=$squashfs"
+decho "squashdev=$squashdev"
 
 echo -n "determining what to mount... "
 
 generate_udev_rules root $root
+[ -n "$squashdev" ] && generate_udev_rules squashdev $squashdev
 
 echo "$thingtomount (dmroot=$dmroot)"
 
@@ -412,6 +416,17 @@ if [ "$RES" != "0" ] ; then
     echo "Mount rootfs at /sysroot and exit shell to continue. Good luck!"
     echo
     bash
+fi
+
+# look for squashdev
+if [ -h /dev/squashdev ]; then
+    # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
+    go="mkdir -p /squashdev && mount -n -t auto -o ro /dev/squashdev /squashdev"
+    decho $go
+    eval $go
+    SQUASHED="/squashdev/$squashfs"
+else
+    SQUASHED="/sysroot/$squashfs"
 fi
 
 # only pass kernel command line if we're launching /sbin/init
@@ -572,6 +587,15 @@ if [ -f $SQUASHED ]; then
     echo "" >> /sysroot/etc/fstab || echo -n
     echo "/dev/root-true /mnt/root-true auto noauto,$root_true_rw 0 0" >> /sysroot/etc/fstab || echo -n
 
+    # setup easy mounting of /dev/squashdev
+    #
+    # NOTE: This one does not follow the rw/ro semantics of root and root_true,
+    #       it just always mounts ro.
+    if [ -h /dev/squashdev ]; then
+        mkdir -p /sysroot/mnt/squashdev
+        echo "/dev/squashdev /mnt/squashdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
+    fi
+
     # ensure the /dev/root symlink exists on the target system once udev is done
     # doing its thing
     #
@@ -633,6 +657,19 @@ EOF
         chmod +x /sysroot/etc/init.d/ruckusrd
         ln -s ../init.d/ruckusrd /sysroot/etc/rc0.d/S00ruckusrd_halt
         ln -s ../init.d/ruckusrd /sysroot/etc/rc6.d/S00ruckusrd_reboot
+
+        # add stuff for the potentially seperate squashdev
+        if [ -h /dev/squashdev ]; then
+	    mount --move /squashdev /sysroot/mnt/squashdev
+	    cat <<EOF >> /sysroot/etc/rc.local
+echo /dev/squashdev /mnt/squashdev auto ro 0 0 >> /etc/mtab
+EOF
+
+            cat <<EOF >> /sysroot/etc/init.d/ruckusrd
+mount -o remount,ro /mnt/squashdev
+umount -l /mnt/squashdev
+EOF
+        fi
 
     else
         umount /tmproot
