@@ -112,7 +112,8 @@ while :; do
 done
 AC_SUBST(LINUXRC)
 
-AC_CONFIG_FILES([Makefile \
+AC_CONFIG_FILES([Makefile
+		 docs/Makefile
 		 src/Makefile])
 
 # Do this one seperate, so we can add the chmod
