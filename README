@@ -68,3 +68,6 @@ differently than your run-of-the-mill mkinitrd.
 NOTE: The linuxrc boot script assumes a System V Init system is being
       used.  For now, RuckusRD will NOT work with other init
       implementations (e.g., systemd, upstart).
+
+
+See docs/ for more ramblings.  ;-)
