@@ -1,0 +1,18 @@
+-*- mode: outline -*-
+
+The RuckusRD squashfs rootfs mechanism is perfect for providing the illusion
+of a read-write root filesystem when using read-only media (e.g.,
+CD/DVD-ROM, write-protected flash).
+
+I have not checked with any DOD security folk regarding this, but it
+certainly seems to me to be a silver bullet for the ongoing IA problem of
+downgrading machines classification after returning from a top secret
+mission.  Reboot.  Unclassified.
+
+Granted, non-memory-retentive rootfs means you'll lose data that might be
+important (e.g., log files, state files) mid-mission if a machine crashes or
+gets rebooted for some reason.  I'm pretty sure all these scenarios can be
+worked around, though, perhaps resulting in one or two machines with real
+storage and the rest of the machines running non-retentively (e.g., backbone
+servers with real storage fetching all systems' log files in real-time).
+Then you'd just have to wory about downgrading one or two backbone servers.
