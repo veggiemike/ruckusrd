@@ -4,7 +4,7 @@ Copyright 2012-2014 Michael D Labriola <michael.d.labriola@gmail.com>
 
 Licensed under the GPLv3. See the file COPYING for details. 
 
-This script is a derivative of fedora's livecd-creator's mayflower script,
+This utility is a derivative of fedora's livecd-creator's mayflower script,
 written by David Zeuthen <davidz@redhat.com>, circa Fedora 8.
 
 It's been largely rewritten to be a mkinitrd replacement specifically for
@@ -24,10 +24,11 @@ Strengths:
      system can be handled by a special "conf" directory.
 
  2.  Universal Initramfs.  Images created by RuckusRD can be used for
-     multiple machines with different hardware without.  This is done by
-     making sure that only device drivers are compiled as modules, and all
-     the modules that COULD BE required to get us to the rootfs are
-     included in the initramfs (not just the ones for THIS MACHINE).
+     multiple machines with different hardware without regenerating initrd.
+     This is done by making sure that only device drivers are compiled as
+     modules, and all the modules that COULD BE required to get us to the
+     rootfs are included in the initramfs (not just the ones for THIS
+     MACHINE).
 
 
 Details:
@@ -65,9 +66,14 @@ differently than your run-of-the-mill mkinitrd.
     notation.  Using root=/dev/VG-LV notation WILL NOT work.
 
 
-NOTE: The linuxrc boot script assumes a System V Init system is being
-      used.  For now, RuckusRD will NOT work with other init
-      implementations (e.g., systemd, upstart).
+NOTE: The linuxrc boot script assumes a System V Init system is being used
+      to do some housekeeping regarding the Squashfs root filesystem.  For
+      now, RuckusRD's squashfs functionality will NOT work propperly with
+      other init implementations (e.g., systemd, upstart).  All testing thus
+      far has been done on relatively old distros using relatively old
+      versions of udev, so there may be upstream udev incompatiblities as
+      well.  Ironing this out is planned as the driver for an eventual 1.0
+      release.
 
 
 See docs/ for more ramblings.  ;-)

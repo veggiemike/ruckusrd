@@ -2,7 +2,7 @@
 
 * For 1.0.0
 
- 1. migrate to new versions of udev and systemd (and update README)
+ 1. Iron out the kinks using new versions of udev and systemd (and update README)
 
 
 * For whenever
@@ -14,4 +14,8 @@
  3. documentation (html, man)
 
  4. conf removal mechanism (i.e., list of files/dirs to be removed prior to
- conf population)
+    conf population)
+
+ 5. make tree optional
+
+ 6. autodetect vol_id vs blkid for udev rules
