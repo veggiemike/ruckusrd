@@ -33,6 +33,11 @@
 #       have been detected).
 
 
+# a couple substitutions
+have_mdadm=@have_mdadm@
+have_lvm=@have_lvm@
+
+
 decho()
 {
     if [ "$quiet" != "1" ]; then
@@ -70,31 +75,35 @@ do_raid_and_lvm()
     #       /dev/sdb has been created.
     [ "$1" != "0" ] && sleep 1
 
-    # autogen mdadm.conf
-    echo 'DEVICE /dev/sd*[0-9]' > /etc/mdadm.conf
-    mdadm --examine --scan | sed 's|/dev/.tmp.|/dev/|' >> /etc/mdadm.conf
-    [ "$quiet" != "1" ] && cat /etc/mdadm.conf
+    if [ "$have_mdadm" != "0" ]; then
+        # autogen mdadm.conf
+	echo 'DEVICE /dev/sd*[0-9]' > /etc/mdadm.conf
+	mdadm --examine --scan | sed 's|/dev/.tmp.|/dev/|' >> /etc/mdadm.conf
+	[ "$quiet" != "1" ] && cat /etc/mdadm.conf
 
-    grep ARRAY /etc/mdadm.conf >/dev/null && raid=1 || raid=0
-    if [ "$raid" != "0" ]; then
-        echo "initializing RAID devices..."
-        go="mdadm --assemble --scan"
-        [ "$quiet" != "1" ] && go="$go -v"
-        decho $go
-        eval $go
+	grep ARRAY /etc/mdadm.conf >/dev/null && raid=1 || raid=0
+	if [ "$raid" != "0" ]; then
+            echo "initializing RAID devices..."
+            go="mdadm --assemble --scan"
+            [ "$quiet" != "1" ] && go="$go -v"
+            decho $go
+            eval $go
+	fi
     fi
 
-    echo "initializing LVM..."
+    if [ "$have_lvm" != "0" ]; then
+	echo "initializing LVM..."
 
-    go="lvm vgscan --mknodes"
-    [ "$quiet" != "1" ] && go="$go -v"
-    decho $go
-    eval $go
+	go="lvm vgscan --mknodes"
+	[ "$quiet" != "1" ] && go="$go -v"
+	decho $go
+	eval $go
 
-    go="lvm vgchange -a y"
-    [ "$quiet" != "1" ] && go="$go -v"
-    decho $go
-    eval $go
+	go="lvm vgchange -a y"
+	[ "$quiet" != "1" ] && go="$go -v"
+	decho $go
+	eval $go
+    fi
 }
 
 

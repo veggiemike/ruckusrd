@@ -30,8 +30,6 @@ AC_DEFUN([NEEDED_PROGS],
 	  losetup
 	  ls
 	  lsmod
-	  lvm
-	  mdadm
 	  mkdir
 	  mknod
 	  modprobe
@@ -76,6 +74,18 @@ m4_foreach_w([P], NEEDED_PROGS,
 AC_PATH_PROG(BASH_SHELL, bash)
 AS_IF([test "$BASH_SHELL" = ""], [AC_MSG_ERROR([Could not find bash])])
 AC_ARG_VAR(BASH_SHELL, Path to bash)
+
+# we only enable LVM support if system has lvm binary
+AC_PATH_PROG(LVM, lvm)
+AS_IF([test "$LVM" != ""], have_lvm=1, have_lvm=0)
+AC_SUBST(have_lvm)
+AC_ARG_VAR(LVM, Path to lvm)
+
+# we only enable RAID support if system has mdadm
+AC_PATH_PROG(MDADM, mdadm)
+AS_IF([test "$MDADM" != ""], have_mdadm=1, have_mdadm=0)
+AC_SUBST(have_mdadm)
+AC_ARG_VAR(MDADM, Path to mdadm)
 
 # We need either udevadm or udevstart
 #
@@ -123,7 +133,8 @@ AC_SUBST(LINUXRC)
 
 AC_CONFIG_FILES([Makefile
 		 docs/Makefile
-		 src/Makefile])
+		 src/Makefile
+		 src/linuxrc])
 
 # Do this one seperate, so we can add the chmod
 AC_CONFIG_FILES([src/ruckusrd], [chmod +x src/ruckusrd])
