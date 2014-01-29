@@ -7,6 +7,8 @@ AC_PROG_INSTALL
 AC_PROG_MKDIR_P
 AC_PROG_LN_S
 
+
+# these programs are required on the host system
 AC_DEFUN([NEEDED_PROGS],
 	 [dnl progs copied into the initramfs
 	  basename
@@ -65,9 +67,10 @@ AC_DEFUN([NEEDED_PROGS],
 	 ])
 
 m4_foreach_w([P], NEEDED_PROGS,
-		  [AC_PATH_PROG(m4_bpatsubst(m4_toupper(P), [\.], [_]), P, [], $PATH:/lib/udev)
-		   AS_IF([test "$m4_toupper(P)" = ""], [AC_MSG_ERROR([Could not find P])])
-		   AC_ARG_VAR(m4_bpatsubst(m4_toupper(P), [\.], [_]), Path to P)])
+  [AC_PATH_PROG(m4_bpatsubst(m4_toupper(P), [\.], [_]), P, [], $PATH:/lib/udev)
+   AS_IF([test "$m4_toupper(P)" = ""], [AC_MSG_ERROR([Could not find P])])
+   AC_ARG_VAR(m4_bpatsubst(m4_toupper(P), [\.], [_]), Path to P)
+  ])
 
 # bash is a special case, because bash sets the variable BASH to $0, which
 # results in /bin/sh on tons of systems.
@@ -75,17 +78,25 @@ AC_PATH_PROG(BASH_SHELL, bash)
 AS_IF([test "$BASH_SHELL" = ""], [AC_MSG_ERROR([Could not find bash])])
 AC_ARG_VAR(BASH_SHELL, Path to bash)
 
-# we only enable LVM support if system has lvm binary
-AC_PATH_PROG(LVM, lvm)
-AS_IF([test "$LVM" != ""], have_lvm=1, have_lvm=0)
-AC_SUBST(have_lvm)
-AC_ARG_VAR(LVM, Path to lvm)
 
-# we only enable RAID support if system has mdadm
-AC_PATH_PROG(MDADM, mdadm)
-AS_IF([test "$MDADM" != ""], have_mdadm=1, have_mdadm=0)
-AC_SUBST(have_mdadm)
-AC_ARG_VAR(MDADM, Path to mdadm)
+# these optional programs can be used to add extra functionality if present
+# on the system (e.g, booting off of LVM/RAID), but aren't strictly
+# necessary.
+AC_DEFUN([OPTIONAL_PROGS],
+	 [lvm # used in linuxrc to boot off of LVM
+	  mdadm # used in linuxrc to boot off of RAID
+	 ])
+
+m4_foreach_w([P], OPTIONAL_PROGS,
+  [AC_PATH_PROG(m4_bpatsubst(m4_toupper(P), [\.], [_]), P, [], $PATH:/lib/udev)
+   m4_define([have_p], [])
+   m4_append([have_p], [have_])
+   m4_append([have_p], m4_bpatsubst(P, [\.], [_]))
+   AS_IF([test "$m4_toupper(P)" != ""], [have_p=1], [have_p=0])
+   AC_SUBST(have_p)
+   AC_ARG_VAR(m4_bpatsubst(m4_toupper(P), [\.], [_]), Path to P)
+  ])
+
 
 # We need either udevadm or udevstart
 #
