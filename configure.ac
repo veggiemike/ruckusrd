@@ -74,7 +74,7 @@ m4_foreach_w([P], NEEDED_PROGS,
 # bash is a special case, because bash sets the variable BASH to $0, which
 # results in /bin/sh on tons of systems.
 AC_PATH_PROG(BASH_SHELL, bash)
-AS_IF([test "BASH" = ""], [AC_MSG_ERROR([Could not find bash])])
+AS_IF([test "$BASH_SHELL" = ""], [AC_MSG_ERROR([Could not find bash])])
 AC_ARG_VAR(BASH_SHELL, Path to bash)
 
 # We need either udevadm or udevstart
