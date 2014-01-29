@@ -80,10 +80,19 @@ AC_ARG_VAR(BASH_SHELL, Path to bash)
 # We need either udevadm or udevstart
 #
 # NOTE: We're trying to stay compatible with older versions of udev here.
-#        Really old versions had udevstart and vol_id (in /sbin not /lib/udev)
-#        but not udevadm (udevsettle or udevtrigger).  We deal with this by
-#        requiring either udevstart or udevadm and substituting the path to
-#        whichever is found as the UDEVADM variable.
+#       Really old versions had udevstart and vol_id (in /sbin not
+#       /lib/udev) but not udevadm (udevsettle or udevtrigger).  We deal
+#       with this by requiring either udevstart or udevadm and substituting
+#       the path to whichever is found as the UDEVADM variable.
+#
+# FIXME: This definately doesn't work on debian squeeze based systems (udev
+#        164-3) but does work on suse enterprise 11.1 (udev 128-13.10.1) and
+#        really old versions of fedora (tested on 5 (udev 084) and 8 (udev
+#        118)).
+#
+# FIXME: Maybe we should be checking by udev version as apposed to guessing
+#        based on what utilities are installed... "udevinfo --version" or
+#        "udevadm info --version"
 AC_PATH_PROGS(UDEVADM, [udevadm udevstart])
 AS_IF([test "UDEVADM" = ""], [AC_MSG_ERROR([Either udevadm or udevstart are required])])
 AC_ARG_VAR(UDEVADM, Path to either udevadm or udevstart)
