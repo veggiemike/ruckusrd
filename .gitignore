@@ -11,3 +11,4 @@ configure
 
 # built files
 src/ruckusrd
+src/linuxrc
