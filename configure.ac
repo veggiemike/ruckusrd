@@ -41,7 +41,6 @@ AC_DEFUN([NEEDED_PROGS],
 	  rm
 	  sed
 	  sleep
-	  tree
 	  udevd
 	  umount
 	  vi
@@ -85,6 +84,7 @@ AC_ARG_VAR(BASH_SHELL, Path to bash)
 AC_DEFUN([OPTIONAL_PROGS],
 	 [lvm # used in linuxrc to boot off of LVM
 	  mdadm # used in linuxrc to boot off of RAID
+	  tree # used by ruckusrd w/ verbose output
 	 ])
 
 m4_foreach_w([P], OPTIONAL_PROGS,

@@ -274,7 +274,13 @@ decho '********** COPYING LINUXRC TO INITRAMFS *********************************
 $cp $LINUXRC init || exit 1
 chmod a+x init
 
-[ "$opt_verbose" != "0" ] && tree -psugDFCa .
+if [ "$opt_verbose" != "0" ]; then
+    if [ "$have_tree" != "0" ]; then
+	tree -psugDFCa .
+    else
+	find . | sort
+    fi
+fi
 
 # Strip debug info
 decho '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
