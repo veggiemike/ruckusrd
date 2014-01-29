@@ -55,6 +55,7 @@ AC_DEFUN([NEEDED_PROGS],
 	  fsck.ext2
 	  fsck.ext3
 	  fsck.ext4
+	  sort
 	  dnl other progs needed for ruckusrd script
 	  ldd
 	  sed

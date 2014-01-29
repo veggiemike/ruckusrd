@@ -173,6 +173,7 @@ PROGS+=" @E2FSCK@"
 PROGS+=" @FSCK_EXT2@"
 PROGS+=" @FSCK_EXT3@"
 PROGS+=" @FSCK_EXT4@"
+PROGS+=" @SORT@"
 
 
 # Copy all the PROGS into the initramfs
