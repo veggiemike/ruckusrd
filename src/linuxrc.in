@@ -36,6 +36,8 @@
 # a couple substitutions
 have_mdadm=@have_mdadm@
 have_lvm=@have_lvm@
+have_blkid=@have_blkid@
+have_vol_id=@have_vol_id@
 have_udevadm=@have_udevadm@
 have_udevstart=@have_udevstart@
 
@@ -134,13 +136,22 @@ generate_udev_rules()
     name=$1
     str=$2
 
+    # blkid vs vol_id compatibility
+    if [ "$have_blkid" != "" ]; then
+	get_label="/sbin/blkid -o value -s LABEL"
+	get_uuid="/sbin/blkid -o value -s UUID"
+    else
+	get_label="/sbin/vol_id -l"
+	get_uuid="/sbin/vol_id -u"
+    fi
+
     # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA, USB, and
     #       SCSI should all be using them.
     case $str in
         CDLABEL=*)
             CDLABEL=${str#CDLABEL=}
-            echo "KERNEL==\"sr[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-cdlabel.rules
-            echo "KERNEL==\"scd[0-9]\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-cdlabel.rules
+            echo "KERNEL==\"sr[0-9]\", PROGRAM=\"$get_label %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-cdlabel.rules
+            echo "KERNEL==\"scd[0-9]\", PROGRAM=\"$get_label %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-cdlabel.rules
             decho "Added udev rule for CDLABEL=='$CDLABEL'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root
@@ -149,7 +160,7 @@ generate_udev_rules()
             ;;
         LABEL=*)
             LABEL=${str#LABEL=}
-            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -l %N\", RESULT==\"$LABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-label.rules
+            echo "SUBSYSTEM==\"block\", PROGRAM=\"$get_label %N\", RESULT==\"$LABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-label.rules
             decho "Added udev rule for LABEL=='$LABEL'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root
@@ -158,7 +169,7 @@ generate_udev_rules()
             ;;
         UUID=*)
             UUID=${str#UUID=}
-            echo "SUBSYSTEM==\"block\", PROGRAM=\"/lib/udev/vol_id -u %N\", RESULT==\"$UUID\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/01-uuid.rules
+            echo "SUBSYSTEM==\"block\", PROGRAM=\"$get_uuid %N\", RESULT==\"$UUID\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/01-uuid.rules
             decho "Added udev rule for UUID=='$UUID'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root

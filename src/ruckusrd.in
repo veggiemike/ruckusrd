@@ -163,6 +163,7 @@ PROGS+=" @UDEVADM@"
 PROGS+=" @UDEVSTART@"
 PROGS+=" @UMOUNT@"
 PROGS+=" @VI@"
+PROGS+=" @BLKID@"
 PROGS+=" @VOL_ID@"
 PROGS+=" @SWITCH_ROOT@"
 PROGS+=" @CP@"
@@ -195,7 +196,6 @@ ln="ln"
 [ "$opt_verbose" != "0" ] && ln+=" -v"
 $ln -s bash bin/sh
 $ln -s bin sbin
-$ln -s ../../sbin/vol_id lib/udev/vol_id
 
 # Copy all required shared libs
 decho '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
