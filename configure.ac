@@ -83,9 +83,9 @@ AC_ARG_VAR(BASH_SHELL, Path to bash)
 # on the system (e.g, booting off of LVM/RAID), but aren't strictly
 # necessary.
 AC_DEFUN([OPTIONAL_PROGS],
-	 [lvm # used in linuxrc to boot off of LVM
-	  mdadm # used in linuxrc to boot off of RAID
-	  tree # used by ruckusrd w/ verbose output
+	 [lvm dnl used in linuxrc to boot off of LVM
+	  mdadm dnl used in linuxrc to boot off of RAID
+	  tree dnl used by ruckusrd with verbose output
 	 ])
 
 m4_foreach_w([P], OPTIONAL_PROGS,
