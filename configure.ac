@@ -103,21 +103,25 @@ m4_foreach_w([P], OPTIONAL_PROGS,
 #
 # NOTE: We're trying to stay compatible with older versions of udev here.
 #       Really old versions had udevstart and vol_id (in /sbin not
-#       /lib/udev) but not udevadm (udevsettle or udevtrigger).  We deal
-#       with this by requiring either udevstart or udevadm and substituting
-#       the path to whichever is found as the UDEVADM variable.
+#       /lib/udev) but not udevadm (udevsettle or udevtrigger).  We'll check
+#       for udevadm 1st, then check for udevstart if needed.  In linuxrc,
+#       we'll key on have_udevadm to tweak usage.
+have_udevadm=0
+have_udevstart=0
+AC_PATH_PROG(UDEVADM, [udevadm])
+AS_IF([test "$UDEVADM" != ""],
+  [have_udevadm=1],
+  [AC_PATH_PROG(UDEVSTART, [udevstart])
+   AS_IF([test "$UDEVSTART" != ""],
+     [have_udevstart=1],
+     [AC_MSG_ERROR([Either udevadm or udevstart are required])
+     ])
+  ])
+AC_SUBST(have_udevadm)
+AC_SUBST(have_udevstart)
+AC_ARG_VAR(UDEVADM, [Path to udevadm])
+AC_ARG_VAR(UDEVSTART, [Path to udevstart (udevadm is prefered)])
 #
-# FIXME: This definately doesn't work on debian squeeze based systems (udev
-#        164-3) but does work on suse enterprise 11.1 (udev 128-13.10.1) and
-#        really old versions of fedora (tested on 5 (udev 084) and 8 (udev
-#        118)).
-#
-# FIXME: Maybe we should be checking by udev version as apposed to guessing
-#        based on what utilities are installed... "udevinfo --version" or
-#        "udevadm info --version"
-AC_PATH_PROGS(UDEVADM, [udevadm udevstart])
-AS_IF([test "UDEVADM" = ""], [AC_MSG_ERROR([Either udevadm or udevstart are required])])
-AC_ARG_VAR(UDEVADM, Path to either udevadm or udevstart)
 
 # In addition to the checked for binary paths, we need to also substitute
 # the path to our linuxrc file into the ruckusrd script.  Let's do that via

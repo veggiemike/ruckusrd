@@ -36,6 +36,8 @@
 # a couple substitutions
 have_mdadm=@have_mdadm@
 have_lvm=@have_lvm@
+have_udevadm=@have_udevadm@
+have_udevstart=@have_udevstart@
 
 
 decho()
@@ -337,10 +339,11 @@ echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
 
 decho "starting udevd"
 /sbin/udevd --daemon
-if [ -x /sbin/udevadm ]; then
+
+# compatibility for realy old versions of udev, circa FC5
+if [ "$have_udevadm" != "" ]; then
     /sbin/udevadm trigger
 else
-    # using an old version of udev, FC5-ish
     /sbin/udevstart
 fi
 
