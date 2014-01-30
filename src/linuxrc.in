@@ -345,13 +345,34 @@ echo "udev_log=\"error\"" >> /etc/udev/udev.conf
 
 # rules for loading modules
 #
-echo -n "ACTION==\"add\", SUBSYSTEM==\"?*\", ENV{MODALIAS}==\"?*\", RUN+=\"/sbin/modprobe $" >> /etc/udev/rules.d/10-modprobe.rules
-echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
+# FIXME: Originally (i.e., when I was using an ancient version of
+#        udev), we were configuring udev to load modules right here by
+#        injecting a single globular rule into /etc/udev/rules.d.
+#        This was working fine until I started playing with a system
+#        that used a version of udev that no longer installed
+#        vol_id...  I've got a few options here.
+#
+#        1. Inject this rule if have_vol_id.  This will mimick what I
+#           was already doing, but might conflict with the newly
+#           populated /lib/udev/rules.d
+#
+#        2. Only inject if we haven't populated /lib/udev/rules.d.
+#           This will ensure that we don't clobber the new rules, but
+#           I know things were working before with the injected
+#           modprobe rule...
+#
+# FIXME: I'm going with #2 for now.
+if [ -z "$(ls -A /lib/udev/rules.d)" ]; then
+    echo -n "ACTION==\"add\", SUBSYSTEM==\"?*\", ENV{MODALIAS}==\"?*\", RUN+=\"/sbin/modprobe $" >> /etc/udev/rules.d/10-modprobe.rules
+    echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
+fi
 
 decho "starting udevd"
 /sbin/udevd --daemon
 
 # compatibility for realy old versions of udev, circa FC5
+#
+# FIXME: should I also "settle" in here?
 if [ "$have_udevadm" != "" ]; then
     /sbin/udevadm trigger
 else

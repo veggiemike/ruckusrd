@@ -112,6 +112,22 @@ cd initramfs_dir
 #       /sbin (e.g., /sbin/modprobe).
 mkdir -p bin dev sys proc $DESTMODDIR sysroot etc/udev/rules.d lib/udev/rules.d
 
+# Copy host system's udev rules
+#
+# NOTE: We're copying the rules in /lib/udev, NOT the ones in /etc/udev.
+#
+# FIXME: I did this because I THINK that lib/udev is installed by udev
+#        and /etc/ isn't, but that's a wild assumption.
+#
+# FIXME: this was needed to get things working on avlinux 6 (debian
+#        squeeze)... but I don't know what version of udev causes our
+#        injected modprobe.rule (in linuxrc) to no longer work.
+#
+# FIXME: the rules use users/groups that aren't defined unless we also
+#        copy over passwd and group... not sure I like that... :-/
+cp -va /lib/udev/rules.d/* lib/udev/rules.d || exit 1
+cp -va /etc/{passwd,group} etc/ || exit 1
+
 # Generate a list of binaries to copy into our filesystem
 #
 # NOTE: We have configure check for all these binaries and substitute their
