@@ -10,23 +10,34 @@ AC_PROG_LN_S
 
 # these programs are required on the host system
 AC_DEFUN([NEEDED_PROGS],
-	 [dnl progs copied into the initramfs
+	 [dnl all progs are copied into the initramfs
 	  basename
 	  blockdev
 	  cat
 	  chmod
+	  chroot
+	  cp
+	  cpio
 	  cut
 	  date
 	  dd
+	  depmod
 	  dirname
 	  dmesg
 	  dmsetup
+	  e2fsck
 	  echo
 	  env
+	  find
+	  fsck
+	  fsck.ext2
+	  fsck.ext3
+	  fsck.ext4
 	  grep
 	  insmod
 	  kill
 	  killall5
+	  ldd
 	  less
 	  ln
 	  losetup
@@ -34,35 +45,23 @@ AC_DEFUN([NEEDED_PROGS],
 	  lsmod
 	  mkdir
 	  mknod
+	  mksquashfs
+	  modinfo
 	  modprobe
 	  mount
+	  mv
 	  pidof
+	  ps
 	  readlink
 	  rm
+	  rmmod
 	  sed
 	  sleep
+	  sort
+	  switch_root
 	  udevd
 	  umount
 	  vi
-	  switch_root
-	  cp
-	  mv
-	  find
-	  chroot
-	  fsck
-	  e2fsck
-	  fsck.ext2
-	  fsck.ext3
-	  fsck.ext4
-	  sort
-	  dnl other progs needed for ruckusrd script
-	  ldd
-	  sed
-	  modprobe
-	  depmod
-	  bash
-	  cpio
-	  mksquashfs
 	 ])
 
 m4_foreach_w([P], NEEDED_PROGS,
