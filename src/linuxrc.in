@@ -368,7 +368,10 @@ if [ -z "$(ls -A /lib/udev/rules.d)" ]; then
 fi
 
 decho "starting udevd"
-/sbin/udevd --daemon
+# FIXME: when did --resolve-names get added?  I know my old fedora 9
+#        box didn't have that flag...
+/sbin/udevd --daemon --resolve-names=never || \
+    /sbin/udevd --daemon
 
 # compatibility for realy old versions of udev, circa FC5
 #

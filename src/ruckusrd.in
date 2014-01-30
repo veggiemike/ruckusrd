@@ -126,7 +126,7 @@ mkdir -p bin dev sys proc $DESTMODDIR sysroot etc/udev/rules.d lib/udev/rules.d
 # FIXME: the rules use users/groups that aren't defined unless we also
 #        copy over passwd and group... not sure I like that... :-/
 cp -va /lib/udev/rules.d/* lib/udev/rules.d || exit 1
-cp -va /etc/{passwd,group} etc/ || exit 1
+#cp -va /etc/{passwd,group} etc/ || exit 1
 
 # Generate a list of binaries to copy into our filesystem
 #
