@@ -362,6 +362,10 @@ echo "udev_log=\"error\"" >> /etc/udev/udev.conf
 #           modprobe rule...
 #
 # FIXME: I'm going with #2 for now.
+#
+# FIXME: No 1 is bad... if i have blkid, i don't even check for vol_id.  and
+#        having blkid actually has no correlation with the version of udev
+#        we're using.
 if [ -z "$(ls -A /lib/udev/rules.d)" ]; then
     echo -n "ACTION==\"add\", SUBSYSTEM==\"?*\", ENV{MODALIAS}==\"?*\", RUN+=\"/sbin/modprobe $" >> /etc/udev/rules.d/10-modprobe.rules
     echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
