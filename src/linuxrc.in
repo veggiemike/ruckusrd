@@ -137,7 +137,7 @@ generate_udev_rules()
     str=$2
 
     # blkid vs vol_id compatibility
-    if [ "$have_blkid" != "" ]; then
+    if [ "$have_blkid" != "0" ]; then
 	get_label="/sbin/blkid -o value -s LABEL"
 	get_uuid="/sbin/blkid -o value -s UUID"
     else
