@@ -376,7 +376,7 @@ decho "starting udevd"
 # compatibility for realy old versions of udev, circa FC5
 #
 # FIXME: should I also "settle" in here?
-if [ "$have_udevadm" != "" ]; then
+if [ "$have_udevadm" != "0" ]; then
     /sbin/udevadm trigger
 else
     /sbin/udevstart
