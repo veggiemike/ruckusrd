@@ -19,3 +19,5 @@
  5. make tree optional
 
  6. autodetect vol_id vs blkid for udev rules
+
+ 7. conf= flag to specify confdir

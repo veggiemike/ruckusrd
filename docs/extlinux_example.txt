@@ -1,0 +1,36 @@
+serial 0 115200
+default vesamenu.c32
+timeout 50
+
+menu background splash.png
+menu title RuckusRD is your daddy!
+menu rows 5
+menu passwordrow 4
+menu tabmsgrow 11
+menu cmdlinerow 11
+menu timeoutrow 13
+menu endrow 17
+menu color border 0 #ffffffff #00000000
+menu color sel 7 #ffffffff #ff000000
+menu color title 0 #ffffffff #00000000
+menu color tabmsg 0 #ffffffff #00000000
+menu color unsel 0 #ffffffff #00000000
+menu color hotsel 0 #ff000000 #ffffffff
+menu color hotkey 7 #ffffffff #ff000000
+menu color timeout_msg 0 #ffffffff #00000000
+menu color timeout 0 #ffffffff #00000000
+menu color cmdline 0 #ffffffff #00000000
+menu hidden
+menu hiddenrow 5
+menu autoboot "Booting default in # second{,s}..."
+
+label xen0
+	menu label Source Ruckus (3.13.0-mdl1)
+	kernel mboot.c32
+	append /boot/xen.gz  vga=mode-0x314 --- /boot/vmlinuz-3.13.0-mdl1 root=UUID= quiet console=ttyS0,115200n8 console=tty0 --- /boot/initrd-3.13.0-mdl1.img
+	menu default
+
+label linux0
+	menu label Source Ruckus (3.13.0-mdl1, bare metal)
+	kernel /boot/vmlinuz-3.13.0-mdl1
+	append initrd=/boot/initrd-3.13.0-mdl1.img root=UUID= quiet console=ttyS0,115200n8 console=tty0 vga=0x314
