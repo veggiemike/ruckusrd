@@ -28,6 +28,7 @@ AC_DEFUN([NEEDED_PROGS],
 	  e2fsck
 	  echo
 	  env
+	  fdisk
 	  find
 	  fsck
 	  fsck.ext2
