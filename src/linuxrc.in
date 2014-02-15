@@ -91,7 +91,7 @@ do_raid_and_lvm()
             go="mdadm --assemble --scan"
             [ "$quiet" != "1" ] && go="$go -v"
             decho $go
-            eval $go
+            eval $go || echo "WARNING: RAID initialization failed"
 	fi
     fi
 
@@ -101,12 +101,12 @@ do_raid_and_lvm()
 	go="lvm vgscan --mknodes"
 	[ "$quiet" != "1" ] && go="$go -v"
 	decho $go
-	eval $go
+	eval $go || echo "WARNING: LVM initialization failed"
 
 	go="lvm vgchange -a y"
 	[ "$quiet" != "1" ] && go="$go -v"
 	decho $go
-	eval $go
+	eval $go || echo "WARNING: LVM initialization failed"
     fi
 }
 
