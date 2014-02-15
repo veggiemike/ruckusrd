@@ -23,6 +23,9 @@ else
     LINUXRC=@LINUXRC@
 fi
 
+# a couple substitutions
+have_tree=@have_tree@
+
 
 decho()
 {
