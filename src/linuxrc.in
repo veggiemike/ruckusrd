@@ -380,13 +380,46 @@ decho "starting udevd"
 /sbin/udevd --daemon --resolve-names=never || \
     /sbin/udevd --daemon
 
-# compatibility for realy old versions of udev, circa FC5
+# load loop module (if not built-in)
+if [ -d /sys/module/loop ]; then
+    loop_builtin=1
+else
+    loop_builtin=0
+    modprobe loop
+fi
+
+# tell udevd to start processing its queue
 #
-# FIXME: should I also "settle" in here?
+# NOTE: We're maintaining (for now) compatibility for realy old versions of
+#       udev, circa FC5, that used udevstart instead of udevadm (and had
+#       slightly different behavior).
+#
+# FIXME: should I also "settle" in here?  that would wait until udev is done
+#        emptying its queue... but we already have a timer loop later on.
 if [ "$have_udevadm" != "0" ]; then
     /sbin/udevadm trigger
+
+    if [ "$loop_builtin" != 0 ]; then
+        # create loop devices
+        #
+        # NOTE: If loop was compiled in, then the module didn't get loaded,
+        #       which means udev won't ever create the /dev/loop* device
+        #       nodes.
+        #
+        # FIXME: This assumes that the device minor numbers increment by 1 per
+        #        loop device, which can be untrue if loop was compiled with
+        #        support for partitions.  I don't care right now.  Anyone
+        #        actually building loop into their kernels AND changing the
+        #        defaults will have to change the following for loop.
+        for ((x=0; x<8; x++)); do
+            mknod -m 660 /dev/loop$x b 7 $x
+        done
+    fi
 else
     /sbin/udevstart
+
+    # NOTE: Testing on old hardware with loop compiled into the kernel
+    #       indicates that udevstart creates /dev/loop1-8 for us.
 fi
 
 # initialize LVM if needed now
