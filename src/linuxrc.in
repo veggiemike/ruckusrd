@@ -227,6 +227,9 @@ ln -fs fd/2 /dev/stderr
 mount -n -t proc proc /proc
 mount -n -t sysfs sysfs /sys
 
+# create /etc/mtab symlink
+ln -fs /proc/mounts /etc/mtab
+
 # setup hotplug
 echo "" > /proc/sys/kernel/hotplug
 
@@ -453,7 +456,7 @@ if [ -n "$rootflags" ]; then
     mountoptions+=",$rootflags"
 fi
 
-go="mount -n -t $rootfstype $mountoptions $thingtomount /sysroot"
+go="mount -t $rootfstype $mountoptions $thingtomount /sysroot"
 decho $go
 eval $go
 RES=$?
@@ -472,7 +475,7 @@ fi
 # look for squashdev
 if [ -h /dev/squashdev ]; then
     # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
-    go="mkdir -p /squashdev && mount -n -t auto -o ro /dev/squashdev /squashdev"
+    go="mkdir -p /squashdev && mount -t auto -o ro /dev/squashdev /squashdev"
     decho $go
     eval $go
     SQUASHED="/squashdev/$squashfs"
@@ -521,7 +524,7 @@ if [ -f $SQUASHED ]; then
     SQUASHED_LOOPDEV=$( losetup -f )
     losetup $SQUASHED_LOOPDEV $SQUASHED
     mkdir -p /squashfs
-    mount -n -t squashfs -o ro $SQUASHED_LOOPDEV /squashfs
+    mount -t squashfs -o ro $SQUASHED_LOOPDEV /squashfs
 
     BASE_LOOPDEV=$( losetup -f )
     losetup $BASE_LOOPDEV /squashfs/rootfs.img
