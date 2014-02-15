@@ -16,8 +16,4 @@
  4. conf removal mechanism (i.e., list of files/dirs to be removed prior to
     conf population)
 
- 5. make tree optional
-
- 6. autodetect vol_id vs blkid for udev rules
-
- 7. conf= flag to specify confdir
+ 5. conf= flag to specify confdir
