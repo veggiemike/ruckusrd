@@ -538,7 +538,9 @@ if [ -f $SQUASHED ]; then
     #       argument will cause dd to bail.
     decho "creating overlay image (size=$overlay_size)"
     dd if=/dev/null of=/overlay bs=1 count=0 seek=$overlay_size 2> /dev/null
+    decho "losetup for overlay"
     OVERLAY_LOOPDEV=$( losetup -f )
+    decho "device: $OVERLAY_LOOPDEV"
     losetup $OVERLAY_LOOPDEV /overlay
 
     # set up the snapshot
@@ -546,7 +548,9 @@ if [ -f $SQUASHED ]; then
     # NOTE: start_sector num_sectors target_type target_args
     #
     # NOTE: manpage doesn't describe snapshot's args...
+    decho "setting up snapshot device (root-rw)"
     echo 0 `blockdev --getsz $BASE_LOOPDEV` snapshot $BASE_LOOPDEV $OVERLAY_LOOPDEV p 8 | dmsetup create root-rw
+    decho "done"
 
     # set up new /dev/root symlink
     ln -fs /dev/mapper/root-rw /dev/root
@@ -562,9 +566,11 @@ if [ -f $SQUASHED ]; then
     #       from throughout this.  if to_ram is set, we will umount /tmproot
     #       before we're all done.
     mkdir /tmproot
+    decho "moving /sysroot to /tmproot"
     mount --move /sysroot /tmproot
 
     # mount the final rootfs
+    decho "mounting final rootfs at /sysroot"
     mount /dev/root /sysroot
 
     # copy over module options
@@ -596,10 +602,12 @@ if [ -f $SQUASHED ]; then
     #          Problem can be avoided by removing the target dir in rootfs
     #          prior to doing a recursive copy.
     if [ -d /tmproot/conf ]; then
+        echo -n "installing files from conf dir..."
         pushd /tmproot/conf >/dev/null
         find . -type l -exec mv /sysroot/{} /sysroot/{}.ruckusrd 2>/dev/null \;
         cp -dpR . /sysroot/
         popd >/dev/null
+        echo " done"
     fi
 
     # update ld
@@ -617,6 +625,10 @@ if [ -f $SQUASHED ]; then
     #       too much about the system we're trying to boot, regardless of path
     #       standards), we setup an env with PATH set super-inclusively then let
     #       bash use PATH to find ldconfig inside the chrooted system.
+    #
+    # FIXME: this really only NEEDS to be done if we have a conf dir..., and
+    #        there's a conditional for that right above.
+    decho "updating ld"
     CHROOTPATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
     chroot /sysroot /usr/bin/env -i PATH=$CHROOTPATH /bin/bash -c ldconfig \
         || echo -n
