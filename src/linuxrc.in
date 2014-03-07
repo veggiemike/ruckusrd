@@ -790,8 +790,14 @@ if [ -n "$maint" ]; then
     echo
     bash
 fi
-    
-if [ ! -x /sysroot$init ] ; then
+
+# NOTE: Inside initramfs, prior to switch_root, if $init is a symlink w/
+#       absolute path, it will be broken...
+init_check=/sysroot$init
+if [ -L $init_check ]; then
+    init_check=/sysroot$(readlink $init_check)
+fi
+if [ ! -x $init_check ]; then
     echo "---------------------------------------------------------"
     echo "WARNING: Requested $init binary does not exist on rootfs."
     echo "---------------------------------------------------------"
