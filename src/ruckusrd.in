@@ -38,7 +38,7 @@ decho()
 usage() {
     echo "ruckusrd v$VERSION - a super awesome, yet simple, mkinitrd replacement"
     echo
-    echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] <out-initrd-image> <kernel-version>"
+    echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] [-b basedir] <out-initrd-image> <kernel-version>"
     echo
     echo "example: $(basename $0) /boot/myinitramfs.img \`uname -r\`"
 }
@@ -48,6 +48,7 @@ opt_allow_overwrite=0
 opt_verbose=0
 INITRAMFS_TARGET=""
 KERNEL=""
+BASEDIR=""
 while [ $# -gt 0 ] ; do
     case $1 in
         --help)
@@ -63,6 +64,10 @@ while [ $# -gt 0 ] ; do
             ;;
         -v|--verbose)
             opt_verbose=1
+            ;;
+        -b)
+            BASEDIR=$2
+            shift
             ;;
         *)
             if [ -z "$INITRAMFS_TARGET" ] ; then
@@ -97,7 +102,7 @@ fi
 
 echo "Building an initramfs at $INITRAMFS_TARGET for kernel $KERNEL"
 
-HOSTMODDIR=/lib/modules/$KERNEL/kernel
+HOSTMODDIR=$BASEDIR/lib/modules/$KERNEL/kernel
 DESTMODDIR=lib/modules/$KERNEL
 
 original_pwd=$PWD
