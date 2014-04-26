@@ -1,0 +1,71 @@
+-*- outline -*
+
+* Busybox goodness
+
+I'm playing around with the idea of including a busybox submodule, compiling
+(or cross-compiling) busybox, and including it in the initramfs instead of
+ANY host utils.  This means we won't have to worry about versions of host
+tools, most notably udev.  Of course, that means we'll need to migrate to
+mdev.
+
+Pro:
+ + Fewer conditional blocks
+ + Smaller initramfs image (by a lot, I think)
+ + Faster boot time (because of smaller initramfs?)
+ + Less (no?) dependence on host sytem
+ + Ability to cross-compile
+
+Con:
+ - Need to rewrite udev bits of linuxrc to use mdev
+ - Need to make sure we're not using any bash-isms that aren't in ash
+
+
+* --with-system-busybox=
+Should we allow the user to use a pre-compiled busybox if available instead
+of building our own?  I don't think there's really much to gain from doing
+this... and it brings us back into having to wory about host system utils
+(e.g., does the system's busybox have everything we need compiled in?  does
+it even work?  how old is it?).  So I'm leaning towards 'no'.
+
+
+* where to install it
+So, when we build and install ruckusrd, we'll have to build and install
+busybox and it's links file into pkgdatadir.
+
+
+* does busybox have everything we need?
+I think so, but what about:
+  - lvm
+  - mdadm
+  - blkid, vol_id equivalent
+  - readlink
+  - mknod
+  - fsck
+  - dd
+  - losetup
+  - umount -l
+  - mount -o ro/rw/loop --move
+  - device mapper (dmsetup, blockdev)
+  - find
+  - cp -dpR
+  - chroot
+
+
+* ash behavior?
+trap, set, exec, variable substrings, $() subshell, $(()) arithmetic,
+pushd/popd, here docs
+
+
+* linuxrc.in ruckusrd.in no longer?
+If we're building/installing our own specificly configured busybox binary
+for use on the initramfs, will we still need to substitute anything in the
+linuxrc or ruckusrd scripts?
+
+** ruckusrd.in
+VERSION, path to LINUXRC, have_tree.  Will need path to busybox and links
+file instead of all the host binary substitutions for the progs list.
+
+** linuxrc.in
+nothing will need to be substituted anymore, unless we want to be able to
+track what version of ruckusrd built the initramfs... which might actually
+be a good idea regardless.
