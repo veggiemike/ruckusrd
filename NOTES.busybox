@@ -35,20 +35,19 @@ busybox and it's links file into pkgdatadir.
 
 * does busybox have everything we need?
 I think so, but what about:
-  - lvm
-  - mdadm
-  - blkid, vol_id equivalent
-  - readlink
-  - mknod
-  - fsck
-  - dd
-  - losetup
-  - umount -l
-  - mount -o ro/rw/loop --move
-  - device mapper (dmsetup, blockdev)
-  - find
-  - cp -dpR
-  - chroot
+  - lvm, dm (nope)
+  - mdadm (nope)
+  - blockdev (nope, we use it for dm voodoo)
+  - blkid (yes, but just lists all)
+  - fsck (yes, but what fstypes?)
+
+lvm includes device mapper and is available at
+https://git.fedorahosted.org/cgit/lvm2.git/ or
+git://git.fedorahosted.org/git/lvm2.git
+
+mdadm: https://github.com/neilbrown/mdadm.git
+
+blockdev is a part of util-linux... might need to lookup size a different way.
 
 
 * ash behavior?
