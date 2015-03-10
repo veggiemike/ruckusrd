@@ -1,0 +1,61 @@
+-*- org -*-
+
+* OverlayFS instead of device mapper voodoo
+
+
+* usage
+** global flags
+--verbose
+--force
+--dry-run
+
+** Create initramfs
+ruckusrd create [--base=DIR] [--kernel=VERSION] IMGNAME
+
+By default, won't overwrite existing image file.  Default basedir is /.
+Default kernel version is currently running kernel.
+
+** Install (initial setup)
+ruckusrd install [--root=DIR] [--persistent=SIZE] IMG1 [IMG2 IMG3 ...]
+
+Install generated ruckusrd.cfg, selected fs images into ROOTDIR.  Default
+rootdir is /mnt/root-true.  If --persistent, an additional journal-less EXT4
+image of SIZE MB will be created for committing changes to.
+
+By default, won't overwrite existing cfg or images.
+
+** Adding another layer
+ruckusrd add-layer IMG
+
+Adds another base (read-only) layer to the config.  This will automatically be
+placed underneath the top (persistent rw) layer.
+
+By default, won't overwrite existing image (but will append to existing cfg).
+
+** Remove a layer
+ruckusrd rm-layer IMG
+
+Both this and add-layer might be silly if all they do is add/rm lines from the
+cfg file...  We'll see.
+
+** Committing changes on a non-persistent setup.
+ruckusrd commit [--append]
+
+Commits run-time changes by creating a new base (read-only) layer and adding it
+to the config.  If desired, changes can be merged into the topmost bottom layer
+(this will work much better if we keep the topmost bottom layer as
+non-squashfs).
+
+** Merging layers together
+ruckusrd merge LAYER1 LAYER2 ...
+
+Merge the specified filesystem images into a single filesystem layer.  This can
+be done periodically to keep things from getting too crazy (i.e., because I'm
+assuming that having a dozen bottom layers in an overlayfs is probably pretty
+slow).
+
+
+* persistent vs non-persistent
+
+how am i going to allow for both?  right now, we're non-persistent with a
+special conf dir for modifications... but it's manually intensive.
