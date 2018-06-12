@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# RuckusRD - a super awesome, yet simple, mkinitrd replacement
+#
+# Copyright 2012-2018 Michael D Labriola <michael.d.labriola@gmail.com>
+#
+# Licensed under the GPLv3. See the file COPYING for details. 
+#
+# This script is a utility for building the Linux kernel and installing it and
+# all needed files into a local directory.  After doing this, you can execute
+# kernel_installer (which installs to a remote host) or kernel_tar (which
+# creates a self-extracting installer).
+
+
+if [ -z "$MAKE" ]; then
+    MAKE="make"
+fi
+export MAKE
+
+export SRP_ROOT=$PWD/FOO
+
+rm -rf $SRP_ROOT
+
+CPUCOUNT=`grep processor /proc/cpuinfo | wc -l`
+# using CPUCOUNT*4 here because KBuild uses recursive Make calls... this
+# seems to mostly equate to a normal package's -jCPUCOUNT+1
+NUMJOBS=$((CPUCOUNT*4))
+
+# build
+$MAKE -j$NUMJOBS || exit 1
+
+# build/install modules
+$MAKE INSTALL_MOD_PATH=$SRP_ROOT modules_install || exit 2
+
+VERSION=$(basename $SRP_ROOT/lib/modules/*)
+VERSION_NAME=$VERSION
+if [ -n "$NOVERSION" ]; then
+    VERSION_NAME=test
+fi
+
+# create initrd usuing ruckusrd
+mkdir -p $SRP_ROOT/boot &&
+ruckusrd -v -b $SRP_ROOT $SRP_ROOT/boot/initrd-$VERSION_NAME.img $VERSION || exit 3
+
+# install other files in SRP_ROOT
+cp -v arch/i386/boot/bzImage $SRP_ROOT/boot/vmlinuz-$VERSION_NAME &&
+cp -v System.map $SRP_ROOT/boot/System.map-$VERSION_NAME &&
+cp -v .config $SRP_ROOT/boot/config-$VERSION_NAME || exit -1
+
+rm -rf $SRP_ROOT/lib/firmware || exit -1
+    
+echo VERSION: $VERSION
+echo VERSION_NAME: $VERSION_NAME

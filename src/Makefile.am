@@ -1,6 +1,11 @@
 bin_SCRIPTS = ruckusrd
 
-dist_pkgdata_DATA = linuxrc
+dist_bin_SCRIPTS =
+dist_bin_SCRIPTS += kernel_builder
+dist_bin_SCRIPTS += kernel_installer
+dist_bin_SCRIPTS += kernel_tar
+
+pkgdata_DATA = linuxrc
 
 install-exec-hook:
 	$(RM) -f $(DESTDIR)$(bindir)/mkinitrd

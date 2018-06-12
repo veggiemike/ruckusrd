@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# RuckusRD - a super awesome, yet simple, mkinitrd replacement
+#
+# Copyright 2012-2018 Michael D Labriola <michael.d.labriola@gmail.com>
+#
+# Licensed under the GPLv3. See the file COPYING for details. 
+#
+# This script is a utility for creating a self-extracting installer for a built
+# Linux kernel.  First run `kernel_builder`, then run this.
+
+export SRP_ROOT=$PWD/FOO
+
+VERSION=$(basename $SRP_ROOT/lib/modules/*)
+
+filename=$PWD/kernel-installer-$VERSION.sh
+
+echo VERSION: $VERSION
+echo filename: $filename
+
+# create the initial installer script
+cat > $filename <<EOF
+#!/bin/sh
+skip=__SKIP__
+VERSION=$VERSION
+
+echo -n "removing preexisting modules in \$PWD/lib/modules/$VERSION... "
+rm -rf \$PWD/lib/modules/$VERSION && echo DONE || { echo FAIL; exit 1; }
+
+echo -n "extracting archive... "
+tail -n +\$skip \$0 | bzcat | tar -x --no-same-owner --no-same-permissions && echo DONE || { echo FAIL; exit 1; }
+
+echo "!! don't forget to update your bootloader (e.g., grub, extlinux) !!"
+
+exit 0
+EOF
+
+# sed the actual length into it
+skip=$((`wc -l $filename | awk '{print $1}'`+1))
+echo skip: $skip
+sed -i "s|__SKIP__|$skip|" $filename
+
+# and now append the archive
+echo -n "appending kernel archive to $filename... "
+pushd $SRP_ROOT >/dev/null
+(tar -c . | bzip2 >> $filename) || { echo FAIL; exit 1; }
+popd >/dev/null
+echo DONE
+
+# and make it executable
+echo -n "making $filename executable... "
+chmod +x $filename && echo DONE || { echo FAIL; exit 1; }
+
+exit 0
