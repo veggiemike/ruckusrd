@@ -248,6 +248,10 @@ overlay_size="512M"
 dmroot=0
 squashfs="squashfs.img"
 squashdev=""
+sqsh_layers=""
+sqsh_layerdev=""
+sqsh_layerdir=""
+ram_layer=""
 
 # Parse kernel commandline options
 #
@@ -304,6 +308,18 @@ for o in `cat /proc/cmdline` ; do
     squashdev=*)
         squashdev=${o#squashdev=}
         ;;
+    sqsh_layers=*)
+        sqsh_layers=${o#sqsh_layers=}
+        # make layers space-delimited for iterating
+        sqsh_layers=${sqsh_layers//:/ }
+        ;;
+    sqsh_layerdev=*)
+        sqsh_layerdev=${o#sqsh_layerdev=}
+        sqsh_layerdir=/sqsh_layerdev/
+        ;;
+    ram_layer=*)
+        ram_layer=${o#ram_layer=}
+        ;;
     *)
         # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
         #       max_loop=16" to get written in modprobe.conf...
@@ -336,11 +352,16 @@ decho "hoststamp=$hoststamp"
 decho "overlay_size=$overlay_size"
 decho "squashfs=$squashfs"
 decho "squashdev=$squashdev"
+decho "sqsh_layers=$sqsh_layers"
+decho "sqsh_layerdev=$sqsh_layerdev"
+decho "ram_layer=$ram_layer"
 
 echo -n "determining what to mount... "
 
 generate_udev_rules root $root
 [ -n "$squashdev" ] && generate_udev_rules squashdev $squashdev
+[ -n "$sqsh_layerdev" ] && generate_udev_rules sqsh_layerdev $sqsh_layerdev
+
 
 echo "$thingtomount (dmroot=$dmroot)"
 
@@ -521,6 +542,14 @@ else
     SQUASHED="/sysroot/$squashfs"
 fi
 
+# look for sqsh_layerdev
+if [ -h /dev/sqsh_layerdev ]; then
+    # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
+    go="mkdir -p $sqsh_layerdir && mount -t auto -o ro /dev/sqsh_layerdev $sqsh_layerdir"
+    decho $go
+    eval $go
+fi
+
 # only pass kernel command line if we're launching /sbin/init
 if [ "$init" == "/sbin/init" ] ; then
     initargs=$(cat /proc/cmdline)
@@ -542,14 +571,82 @@ if [ "$dmroot" != "1" ]; then
 fi
 
 
-# NOTE: if $SQUASHED exists, the system we're attempting to boot has been
-#       set up with a squashfs read-only rootfs image to be used with a
-#       writable overlay using some device mapper voodoo
-#
-# NOTE: additionally, $SQUASHED can be loaded into RAM to free up the
-#       underlying root device (excellent for booting off removable media on
-#       systems with enough RAM to handle such a thing.
-if [ -f $SQUASHED ]; then
+# do prep for squashfs magic common to both old device-mapper and new overlayfs
+# implementations
+if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
+    decho "doing common squashfs prep"
+
+    # if we didn't load squashfs.img into RAM, we need to move things around
+    # so that the final system can still have access (if needed) to the
+    # underlying device.  otherwise we end up with the new root mounted on
+    # top of the old root, and users won't be able to access the old root at
+    # all.
+    #
+    # NOTE: we always do this regardless of the to_ram variable so that we can
+    #       always have access to the original root device to scarf config files
+    #       from throughout this.  if to_ram is set, we will umount /tmproot
+    #       before we're all done.
+    mkdir /tmproot
+    decho "moving /sysroot to /tmproot"
+    mount --move /sysroot /tmproot
+
+    # this path isn't valid until after the new /sysroot has been mounted
+    rules=/sysroot/etc/udev/rules.d/50-ruckusrd.rules
+fi
+
+# squashfs magic time
+if [ -n "$sqsh_layers" ]; then
+    # do new OverlayFS based stuff
+    decho "setting up OverlayFS squashfs layers"
+
+    # copy to ram if requested
+    if [ -n "$to_ram" ]; then
+        echo -n "Copying squashfs layer(s) to RAM... "
+        decho ""
+        go="cp -a"
+        [ "$quiet" != "1" ] && go="go -v"
+        go="$go $sqsh_layers /"
+        eval $go
+	echo "done"
+    fi
+
+    pushd /tmproot
+
+    # mount individual layers
+    for x in $sqsh_layers; do
+        mount $sqsh_layerdir$x.sqsh $x
+    done
+
+    # create ram layer if requested
+    if [ -n "ram_layer" ]; then
+        mount -t tmpfs -osize=$ram_layer ram_layer upper
+        mkdir -p upper/{upper,work}
+    fi
+
+    # mount the merged filesystem
+    mount -t overlay -o \
+          lowerdir=$sqsh_layers,upperdir=upper/upper,workdir=upper/work \
+          sqsh_overlay /sysroot
+
+    # setup easy mounting of /dev/sqsh_layerdev
+    #
+    # NOTE: This does not follow the rw/ro semantics of root and root_true, it
+    #       just always mounts ro.
+    #
+    if [ -h /dev/sqsh_layerdev ]; then
+        mkdir -p /sysroot/mnt/sqsh_layerdev
+        echo "/dev/sqsh_layerdev /mnt/sqsh_layerdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
+    fi
+
+elif [ -f $SQUASHED ]; then
+    # NOTE: if $SQUASHED exists, the system we're attempting to boot has been
+    #       set up with a squashfs read-only rootfs image to be used with a
+    #       writable overlay using some device mapper voodoo
+    #
+    # NOTE: additionally, $SQUASHED can be loaded into RAM to free up the
+    #       underlying root device (excellent for booting off removable media
+    #       on systems with enough RAM to handle such a thing.
+    #
     decho "setting up squashfs device mapper voodoo"
 
     if [ -n "$to_ram" ]; then
@@ -593,30 +690,9 @@ if [ -f $SQUASHED ]; then
     # set up new /dev/root symlink
     ln -fs /dev/mapper/root-rw /dev/root
 
-    # if we didn't load squashfs.img into RAM, we need to move things around
-    # so that the final system can still have access (if needed) to the
-    # underlying device.  otherwise we end up with the new root mounted on
-    # top of the old root, and users won't be able to access the old root at
-    # all.
-    #
-    # NOTE: we always do this regardless of the to_ram variable so that we can
-    #       always have access to the original root device to scarf config files
-    #       from throughout this.  if to_ram is set, we will umount /tmproot
-    #       before we're all done.
-    mkdir /tmproot
-    decho "moving /sysroot to /tmproot"
-    mount --move /sysroot /tmproot
-
     # mount the final rootfs
     decho "mounting final rootfs at /sysroot"
     mount /dev/root /sysroot
-
-    # copy over module options
-    #
-    # NOTE: we really want to do this. without it there's no way to update
-    #       modeprobe.conf before modules get loaded... can't exactly edit
-    #       modprobe.conf and reboot, as our changes get lost.
-    [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
 
     # populate sysroot with config files
     #
@@ -674,12 +750,48 @@ if [ -f $SQUASHED ]; then
     # create udev rules for /dev/root-* symlinks
     #
     # NOTE: these symlinks point to the corresponding loop devices we've created
-    #       in here as well as the "true" root device
-    rules=/sysroot/etc/udev/rules.d/50-ruckusrd.rules
-    echo "KERNEL==\"${root_true#/dev/}\", SYMLINK+=\"root-true\"" >> $rules
+    #       in here
     echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-squash\"" >> $rules
     echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-rootfs\"" >> $rules
     echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-overlay\"" >> $rules
+
+    # ensure the /dev/root symlink exists on the target system once udev is done
+    # doing its thing
+    #
+    # FIXME: what if /dev on the real rootfs already has a /dev/root symlink
+    #        (e.g., from the last time we booted)?  i want to let udev do
+    #        it's thing... but if an old /dev/root exists and points to the
+    #        wrong device, won't boot...  i can't guarantee that the
+    #        /dev/root we created has been removed by the host system's init
+    #        scripts on shutdown.
+    #
+    # FIXME: why were we doing this?  is there anything post initramfs that
+    #        REQUIRES a /dev/root symlink?
+    #
+    cat <<EOF >> /sysroot/etc/rc.local
+
+if [ ! -f /dev/root ]; then
+    ln -fs `readlink /dev/root` /dev/root 2>/dev/null
+fi
+EOF
+
+fi
+
+
+# do extra squashfs magic common to both old device-mapper and new overlayfs
+# implementations
+if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
+    decho "doing common squashfs finalization"
+
+    # copy over module options
+    #
+    # NOTE: we really want to do this. without it there's no way to update
+    #       modeprobe.conf before modules get loaded... can't exactly edit
+    #       modprobe.conf and reboot, as our changes get lost.
+    [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
+
+    # create udev rule for /dev/root-true symlink
+    echo "KERNEL==\"${root_true#/dev/}\", SYMLINK+=\"root-true\"" >> $rules
 
     # setup easy mounting of /dev/root-true
     #
@@ -695,30 +807,28 @@ if [ -f $SQUASHED ]; then
     #
     # NOTE: This one does not follow the rw/ro semantics of root and root_true,
     #       it just always mounts ro.
+    #
+    # FIXME: don't forget to remove this when we remove the old squshfs.img
+    #        device-mapper based implementation
+    #
     if [ -h /dev/squashdev ]; then
         mkdir -p /sysroot/mnt/squashdev
         echo "/dev/squashdev /mnt/squashdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
     fi
 
-    # ensure the /dev/root symlink exists on the target system once udev is done
-    # doing its thing
+    # setup easy mounting of /dev/sqsh_layerdev
     #
-    # FIXME: what if /dev on the real rootfs already has a /dev/root symlink
-    #        (e.g., from the last time we booted)?  i want to let udev do
-    #        it's thing... but if an old /dev/root exists and points to the
-    #        wrong device, won't boot...  i can't guarantee that the
-    #        /dev/root we created has been removed by the host system's init
-    #        scripts on shutdown.
-    cat <<EOF >> /sysroot/etc/rc.local
-
-if [ ! -f /dev/root ]; then
-    ln -fs `readlink /dev/root` /dev/root 2>/dev/null
-fi
-EOF
+    # NOTE: This one does not follow the rw/ro semantics of root and root_true,
+    #       it just always mounts ro.
+    if [ -h /dev/sqsh_layerdev ]; then
+        mkdir -p /sysroot/mnt/sqsh_layerdev
+        echo "/dev/sqsh_layerdev /mnt/sqsh_layerdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
+    fi
 
     # append a timestamp to system hostname if configured
     #
     # FIXME: this isn't very distro-agnostic, is it?
+    #
     if [ -n "$hoststamp" ]; then
         stamp=`date +%s`
         [ -f /sysroot/etc/sysconfig/network ] || break
@@ -775,12 +885,27 @@ umount -l /mnt/squashdev
 EOF
         fi
 
+        # add stuff for the potentially seperate sqsh_layerdev
+        if [ -h /dev/sqsh_layerdev ]; then
+	    mount --move $sqsh_layerdir /sysroot/mnt/$sqsh_layerdir
+            sqsh_layerdir=/mnt/$sqsh_layerdir
+	    cat <<EOF >> /sysroot/etc/rc.local
+echo /dev/sqsh_layerdev $sqsh_layerdir auto ro 0 0 >> /etc/mtab
+EOF
+
+            cat <<EOF >> /sysroot/etc/init.d/ruckusrd
+mount -o remount,ro $sqsh_layerdir
+umount -l $sqsh_layerdev
+EOF
+        fi
+
     else
         umount /tmproot
     fi
 
     mount -o ro,remount /sysroot
 fi
+
 
 # remount final root dev rw if requested
 [ -n "$root_rw" ] && mount -o rw,remount /sysroot

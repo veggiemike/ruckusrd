@@ -10,23 +10,26 @@ Until we remove it, the old squashfs behavior (complete w/ autodetecting
 presence of squashfs.img at /) will remain.  Will probably wait a rev or so
 before removal.
 
-If =sqsh_layers=layer1,layer2= is provided on the kernel command line,
+If =sqsh_layers=layer1:layer2= is provided on the kernel command line,
 =/layer1.sqsh= will be mounted at =/layer1=, =/layer2.sqsh= at =/layer2=, etc.
-These layers will be used as the "lower layers" for an OverlayFS mount.
+These layers will be used as the "lower layers" for an OverlayFS mount.  Note
+that OverlayFS stacks lower layers from right to left (i.e., =layer1= is
+stacked on top of =layer2=).
 
 The "upper layer" is for read-write functionality.  Unless overriden via other
 parameters, =/upper= will be used.
 
 After switching root, this will result in the rootdev being at =/mnt/root-true=
-with each read-only squashfs layer being mounted at =/mnt/root-true/layerN=.
+with each read-only squashfs layer being mounted at =/mnt/layer-NAME=.
 Since the upper layer needs to be writable, the rootdev will be mounted
 read-write.
 
 * Additional parameters
 ** ram_layer=SIZE
 Use RAM for the upper layer.  This will result in tmpfs of the requested SIZE
-mounted at =/upper=.  Since rootdev will no longer need to be writable, it will
-be mounted read-only.
+mounted at =/upper=.  Any valid value for the tmpfs =size== option can be
+specified (e.g., 2G, 50%).  Since rootdev will no longer need to be writable,
+it will be mounted read-only.
 
 ** sqsh_layerdev=DEV
 Use DEV as an alternate device for locating the sqsh layers.  DEV will be
@@ -36,13 +39,13 @@ rootdev for the upper layer.
 
 * Kernel command line examples
 ** read-write upper on rootdev
-root=/dev/sda1 sqsh_layers=extra,server,base
+root=/dev/sda1 sqsh_layers=extra:server:base
 
 ** read-write upper on rootdev but sqsh_layers on alternate read-only device
-root=/dev/xvda1 sqsh_layerdev=/dev/xvdb1 sqsh_layers=extra,server,base
+root=/dev/xvda1 sqsh_layerdev=/dev/xvdb1 sqsh_layers=extra:server:base
 
 ** read-only rootdev, RAM upper layer
-root=/dev/sda1 sqsh_layers=extra,server,base ram_layer=5G
+root=/dev/sda1 sqsh_layers=extra:server:base ram_layer=50%
 
 * Making changes persistent when using ram_layer
 At any point, while running with =ram_layer=, changes can be made persistent by
@@ -51,12 +54,12 @@ doing:
 : # mksquashfs /mnt/root-true/upper/upper \
 :      /mnt/root-true/newlayer.sqsh
 
-and appending newlayer to =sqsh_layers= on the kernel command line.
+and preppending =newlayer:= to =sqsh_layers= on the kernel command line.
 
 How to merge a couple squashfs layers into a single one...?
 
-Say you've got base,server,new1,new2,new3 and you want to merge all the new
-layers togeter:
+Say you've got =new3:new2:new1:server:base= and you want to merge all the new
+layers together:
 
 copy contents of new1, new2, and new3 into a new tmpfs mount, then mksquashfs
 and modify kernel params
