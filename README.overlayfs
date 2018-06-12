@@ -1,61 +1,199 @@
 -*- org -*-
 
-* OverlayFS instead of device mapper voodoo
+OverlayFS instead of device mapper voodoo
 
+* Overview
+As always, default behavior of linuxrc script will be to assemble a traditional
+root filesystem and switch over to it.
 
-* usage
+Until we remove it, the old squashfs behavior (complete w/ autodetecting
+presence of squashfs.img at /) will remain.  Will probably wait a rev or so
+before removal.
+
+If =sqsh_layers=layer1,layer2= is provided on the kernel command line,
+=/layer1.sqsh= will be mounted at =/layer1=, =/layer2.sqsh= at =/layer2=, etc.
+These layers will be used as the "lower layers" for an OverlayFS mount.
+
+The "upper layer" is for read-write functionality.  Unless overriden via other
+parameters, =/upper= will be used.
+
+After switching root, this will result in the rootdev being at =/mnt/root-true=
+with each read-only squashfs layer being mounted at =/mnt/root-true/layerN=.
+Since the upper layer needs to be writable, the rootdev will be mounted
+read-write.
+
+* Additional parameters
+** ram_layer=SIZE
+Use RAM for the upper layer.  This will result in tmpfs of the requested SIZE
+mounted at =/upper=.  Since rootdev will no longer need to be writable, it will
+be mounted read-only.
+
+** sqsh_layerdev=DEV
+Use DEV as an alternate device for locating the sqsh layers.  DEV will be
+mounted read-only.  This is primarily for supporting sharing of a read-only
+device between multiple virtual machines which all have their own dedicated
+rootdev for the upper layer.
+
+* Kernel command line examples
+** read-write upper on rootdev
+root=/dev/sda1 sqsh_layers=extra,server,base
+
+** read-write upper on rootdev but sqsh_layers on alternate read-only device
+root=/dev/xvda1 sqsh_layerdev=/dev/xvdb1 sqsh_layers=extra,server,base
+
+** read-only rootdev, RAM upper layer
+root=/dev/sda1 sqsh_layers=extra,server,base ram_layer=5G
+
+* Making changes persistent when using ram_layer
+At any point, while running with =ram_layer=, changes can be made persistent by
+doing:
+
+: # mksquashfs /mnt/root-true/upper/upper \
+:      /mnt/root-true/newlayer.sqsh
+
+and appending newlayer to =sqsh_layers= on the kernel command line.
+
+How to merge a couple squashfs layers into a single one...?
+
+Say you've got base,server,new1,new2,new3 and you want to merge all the new
+layers togeter:
+
+copy contents of new1, new2, and new3 into a new tmpfs mount, then mksquashfs
+and modify kernel params
+
+: # cd /mnt/root-true
+: # mkdir supernew
+: # mount -t tmpfs none supernew
+: # cp -a new[123]/* supernew
+: # mksquashfs supernew supernew.sqsh
+: # umount supernew
+
+or combine new1,2,3 with a secondary overlayfs mount?
+
+: # cd /mnt/root-true
+: # mkdir supernew
+: # mount -t overlayfs -o lowerdir=new3,new2,new1 none supernew
+: # mksquashfs supernew supernew.sqsh
+: # umount supernew
+
+* Filesystem creation example
+** base (using tmpfs as a dumping zone)
+mkdir -p merged
+mount -t tmpfs none merged
+
+pushd merged
+restore -rly -f path/to/base.img
+popd
+
+mksquashfs merged base.sqsh
+
+umount merged
+
+mkdir base
+mount -o loop base.sqsh base
+
+** server (via overlayfs)
+mount -t tmpfs none upper
+mkdir -p upper/{upper,work}
+
+mkdir merged
+mount -t overlay -o lowerdir=base,upperdir=upper/upper,workdir=upper/work \
+    none merged
+
+pushd merged
+restore -rly -f path/to/server.img
+popd
+
+umount merged
+
+mksquashfs upper/upper server.sqsh
+
+umount upper
+
+mkdir server
+mount -o loop server.sqsh server
+
+** extra (via overlayfs)
+mount -t tmpfs none upper
+mkdir -p upper/{upper,work}
+
+mkdir -p merged
+mount -t overlay -o \
+    lowerdir=server:base,upperdir=upper/upper,workdir=upper/work \
+    none merged
+
+pushd merged
+restore -ly path/to/extra.img
+popd
+
+umount merged
+
+mksquashfs upper/upper extra.sqsh
+
+umount upper
+
+mkdir extra
+mount -o loop extra.sqsh extra
+
+** config (via overlayfs)
+mount -t tmpfs none upper
+mkdir -p upper/{upper,work}
+
+mkdir -p merged
+mount -t overlay -o \
+    lowerdir=extra:server:base,upperdir=upper/upper,workdir=upper/work \
+    none merged
+
+pushd merged
+--- do manager stuff ---
+popd
+
+umount merged
+
+mksquashfs upper/upper config.sqsh
+
+umount upper
+
+mkdir config
+mount -o loop config.sqsh config
+
+* Possible ruckusrd usage changes and new functionality
 ** global flags
 --verbose
 --force
 --dry-run
+--version
 
-** Create initramfs
+** ruckusrd create
 ruckusrd create [--base=DIR] [--kernel=VERSION] IMGNAME
 
-By default, won't overwrite existing image file.  Default basedir is /.
+Create an initramfs image.  This is the basic replacement for mkinitrd.  Note
+that we are now deviating from the old Fedora-ish 'mkinitrd' usage, so this
+will break old scripts.
+
+By default, won't overwrite an existing image file.  Default basedir is /.
 Default kernel version is currently running kernel.
 
-** Install (initial setup)
-ruckusrd install [--root=DIR] [--persistent=SIZE] IMG1 [IMG2 IMG3 ...]
+** ruckusrd commit
+ruckusrd commit [--append] [LAYERNAME]
 
-Install generated ruckusrd.cfg, selected fs images into ROOTDIR.  Default
-rootdir is /mnt/root-true.  If --persistent, an additional journal-less EXT4
-image of SIZE MB will be created for committing changes to.
+Commits run-time changes on a non-persistent setup (i.e., when using
+=ram_layer=) by creating a new sqsh_layer to be added to the kernel command
+line.  If desired, changes can be merged into the topmost sqsh_layer.
 
-By default, won't overwrite existing cfg or images.
+NOTE: It's up to the user to actually modify the kernel command line arguments
+      in their bootloader config file.
 
-** Adding another layer
-ruckusrd add-layer IMG
+FIXME: could make the user commit and then merge in 2 steps... would simplify
+       command line parsing here a little.
 
-Adds another base (read-only) layer to the config.  This will automatically be
-placed underneath the top (persistent rw) layer.
-
-By default, won't overwrite existing image (but will append to existing cfg).
-
-** Remove a layer
-ruckusrd rm-layer IMG
-
-Both this and add-layer might be silly if all they do is add/rm lines from the
-cfg file...  We'll see.
-
-** Committing changes on a non-persistent setup.
-ruckusrd commit [--append]
-
-Commits run-time changes by creating a new base (read-only) layer and adding it
-to the config.  If desired, changes can be merged into the topmost bottom layer
-(this will work much better if we keep the topmost bottom layer as
-non-squashfs).
-
-** Merging layers together
+** ruckusrd merge
 ruckusrd merge LAYER1 LAYER2 ...
 
-Merge the specified filesystem images into a single filesystem layer.  This can
+Merge the specified squashfs layers into a single filesystem layer.  This can
 be done periodically to keep things from getting too crazy (i.e., because I'm
-assuming that having a dozen bottom layers in an overlayfs is probably pretty
+assuming that having a dozen lower layers in an overlayfs is probably pretty
 slow).
 
-
-* persistent vs non-persistent
-
-how am i going to allow for both?  right now, we're non-persistent with a
-special conf dir for modifications... but it's manually intensive.
+NOTE: It's up to the user to actually make similar changes to the kernel
+      command line in the bootloader config file.
