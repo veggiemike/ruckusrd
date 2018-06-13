@@ -311,7 +311,7 @@ for o in `cat /proc/cmdline` ; do
     sqsh_layers=*)
         sqsh_layers=${o#sqsh_layers=}
         # make layers space-delimited for iterating
-        sqsh_layers=${sqsh_layers//:/ }
+        sqsh_layers_ws=${sqsh_layers//:/ }
         ;;
     sqsh_layerdev=*)
         sqsh_layerdev=${o#sqsh_layerdev=}
@@ -576,19 +576,16 @@ fi
 if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     decho "doing common squashfs prep"
 
-    # if we didn't load squashfs.img into RAM, we need to move things around
-    # so that the final system can still have access (if needed) to the
-    # underlying device.  otherwise we end up with the new root mounted on
-    # top of the old root, and users won't be able to access the old root at
-    # all.
-    #
-    # NOTE: we always do this regardless of the to_ram variable so that we can
-    #       always have access to the original root device to scarf config files
-    #       from throughout this.  if to_ram is set, we will umount /tmproot
-    #       before we're all done.
+    # move /sysroot out of the way so we can still access it
     mkdir /tmproot
     decho "moving /sysroot to /tmproot"
     mount --move /sysroot /tmproot
+
+    # and make it rw (for a little while)
+    mount -o remount,rw /tmproot
+
+    # update this variable to point into /tmproot
+    SQUASHED="/tmproot/$squashfs"
 
     # this path isn't valid until after the new /sysroot has been mounted
     rules=/sysroot/etc/udev/rules.d/50-ruckusrd.rules
@@ -605,7 +602,8 @@ if [ -n "$sqsh_layers" ]; then
         decho ""
         go="cp -a"
         [ "$quiet" != "1" ] && go="go -v"
-        go="$go $sqsh_layers /"
+        go="$go $sqsh_layers_ws /"
+        decho $go
         eval $go
 	echo "done"
     fi
@@ -613,14 +611,23 @@ if [ -n "$sqsh_layers" ]; then
     pushd /tmproot
 
     # mount individual layers
-    for x in $sqsh_layers; do
-        mount $sqsh_layerdir$x.sqsh $x
+    for x in $sqsh_layers_ws; do
+        mkdir -p $x
+        mount -o ro $sqsh_layerdir$x.sqsh $x
     done
 
+    # create upper dirs
+    mkdir -p upper/{upper,work}
+    
     # create ram layer if requested
-    if [ -n "ram_layer" ]; then
-        mount -t tmpfs -osize=$ram_layer ram_layer upper
+    if [ -n "$ram_layer" ]; then
+        decho "creating ram_layer w/ size=$ram_layer"
+        mount -t tmpfs -o size=$ram_layer ram_layer upper
         mkdir -p upper/{upper,work}
+    else
+        # if we're not using ram_layer, we cannot remount sysroot ro later on,
+        # so we must change this flag to rw
+        root_true_rw=rw
     fi
 
     # mount the merged filesystem
@@ -751,6 +758,7 @@ elif [ -f $SQUASHED ]; then
     #
     # NOTE: these symlinks point to the corresponding loop devices we've created
     #       in here
+    decho "adding squashfs udev rules"
     echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-squash\"" >> $rules
     echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-rootfs\"" >> $rules
     echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-overlay\"" >> $rules
@@ -768,6 +776,7 @@ elif [ -f $SQUASHED ]; then
     # FIXME: why were we doing this?  is there anything post initramfs that
     #        REQUIRES a /dev/root symlink?
     #
+    decho "adding squashfs /dev/root tweak to rc.local"
     cat <<EOF >> /sysroot/etc/rc.local
 
 if [ ! -f /dev/root ]; then
@@ -869,8 +878,8 @@ umount -l /mnt/root-true
 EOF
 
         chmod +x /sysroot/etc/init.d/ruckusrd
-        ln -s ../init.d/ruckusrd /sysroot/etc/rc0.d/S00ruckusrd_halt
-        ln -s ../init.d/ruckusrd /sysroot/etc/rc6.d/S00ruckusrd_reboot
+        ln -fs ../init.d/ruckusrd /sysroot/etc/rc0.d/S00ruckusrd_halt
+        ln -fs ../init.d/ruckusrd /sysroot/etc/rc6.d/S00ruckusrd_reboot
 
         # add stuff for the potentially seperate squashdev
         if [ -h /dev/squashdev ]; then
@@ -903,12 +912,12 @@ EOF
         umount /tmproot
     fi
 
-    mount -o ro,remount /sysroot
+    mount -o remount,ro /sysroot
 fi
 
 
 # remount final root dev rw if requested
-[ -n "$root_rw" ] && mount -o rw,remount /sysroot
+[ -n "$root_rw" ] && mount -o remount,rw /sysroot
 
 if [ -n "$maint" ]; then
     echo "Dropping to a maintenance shell, as requested. Good luck!"

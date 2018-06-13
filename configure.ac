@@ -1,5 +1,5 @@
 AC_PREREQ([2.65])
-AC_INIT([ruckusrd], [0.10.3], [michael.d.labriola@gmail.com])
+AC_INIT([ruckusrd], [0.11.0-dev], [michael.d.labriola@gmail.com])
 
 AM_INIT_AUTOMAKE(dist-bzip2 no-dist-gzip)
 
