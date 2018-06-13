@@ -581,11 +581,11 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     decho "moving /sysroot to /tmproot"
     mount --move /sysroot /tmproot
 
-    # and make it rw (for a little while)
-    mount -o remount,rw /tmproot
-
-    # update this variable to point into /tmproot
-    SQUASHED="/tmproot/$squashfs"
+    # update this variable to point into /tmproot (unless we're using a
+    # squashdev)
+    if [ -z "$squashdev" ]; then
+        SQUASHED="/tmproot/$squashfs"
+    fi
 
     # this path isn't valid until after the new /sysroot has been mounted
     rules=/sysroot/etc/udev/rules.d/50-ruckusrd.rules
@@ -608,16 +608,23 @@ if [ -n "$sqsh_layers" ]; then
 	echo "done"
     fi
 
+    # make /tmproot rw, at least for now
+    #
+    # FIXME: maybe we should mount the layers in the tmpfs / and move them to
+    #        overlay later?  that way we could leave /tmproot ro?
+    #
+    mount -o remount,rw /tmproot
+
     pushd /tmproot
 
     # mount individual layers
     for x in $sqsh_layers_ws; do
-        mkdir -p $x
+        mkdir -p $x # FIXME: ro
         mount -o ro $sqsh_layerdir$x.sqsh $x
     done
 
     # create upper dirs
-    mkdir -p upper/{upper,work}
+    mkdir -p upper/{upper,work} # FIXME: ro
     
     # create ram layer if requested
     if [ -n "$ram_layer" ]; then
@@ -865,6 +872,9 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     #        work w/ systemd and maybe upstart.
     if [ -z "$to_ram" ]; then
 	mount --move /tmproot /sysroot/mnt/root-true
+        # FIXME: this remount seems awkward... overlay-mode will already have
+        #        the correct/required rw setting, and device-mapper-mode could
+        #        have just mounted with the correct mode to begin with...
 	mount -o remount,$root_true_rw /sysroot/mnt/root-true
 	cat <<EOF >> /sysroot/etc/rc.local
 
@@ -882,6 +892,10 @@ EOF
         ln -fs ../init.d/ruckusrd /sysroot/etc/rc6.d/S00ruckusrd_reboot
 
         # add stuff for the potentially seperate squashdev
+        #
+        # FIXME: why is this only happening if !to_ram?  is separate squashdev
+        #        really incompatible with to_ram?
+        #
         if [ -h /dev/squashdev ]; then
 	    mount --move /squashdev /sysroot/mnt/squashdev
 	    cat <<EOF >> /sysroot/etc/rc.local
@@ -895,6 +909,10 @@ EOF
         fi
 
         # add stuff for the potentially seperate sqsh_layerdev
+        #
+        # FIXME: why is this only happening if !to_ram?  is separate
+        #        sqsh_layerdev really incompatible with to_ram?
+        #
         if [ -h /dev/sqsh_layerdev ]; then
 	    mount --move $sqsh_layerdir /sysroot/mnt/$sqsh_layerdir
             sqsh_layerdir=/mnt/$sqsh_layerdir
@@ -910,6 +928,14 @@ EOF
 
     else
         umount /tmproot
+        # FIXME: why not just leave it mounted ro for consistency?  i guess so
+        #        we can eject removable media.
+        #
+        # FIXME: if to_ram, should we umount squashdev and sqsh_layerdev?  i
+        #        guess not... it seems that conceptually you wouldn't ever use
+        #        a seperate device for the images AND want to load them into
+        #        ram.  The use-case for to_ram is everything's loaded on
+        #        removable media that we'd like to be able to eject.
     fi
 
     mount -o remount,ro /sysroot
