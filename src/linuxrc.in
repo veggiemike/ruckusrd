@@ -250,7 +250,7 @@ squashfs="squashfs.img"
 squashdev=""
 sqsh_layers=""
 sqsh_layerdev=""
-sqsh_layerdir=""
+sqsh_layerdir="/tmproot"
 ram_layer=""
 
 # Parse kernel commandline options
@@ -315,7 +315,7 @@ for o in `cat /proc/cmdline` ; do
         ;;
     sqsh_layerdev=*)
         sqsh_layerdev=${o#sqsh_layerdev=}
-        sqsh_layerdir=/sqsh_layerdev/
+        sqsh_layerdir=/sqsh_layerdev
         ;;
     ram_layer=*)
         ram_layer=${o#ram_layer=}
@@ -608,38 +608,40 @@ if [ -n "$sqsh_layers" ]; then
 	echo "done"
     fi
 
-    # make /tmproot rw, at least for now
-    #
-    # FIXME: maybe we should mount the layers in the tmpfs / and move them to
-    #        overlay later?  that way we could leave /tmproot ro?
-    #
-    mount -o remount,rw /tmproot
-
-    pushd /tmproot
-
     # mount individual layers
     for x in $sqsh_layers_ws; do
-        mkdir -p $x # FIXME: ro
-        mount -o ro $sqsh_layerdir$x.sqsh $x
+        decho "mounting sqsh_layer: $x"
+        mkdir -p /sqsh_layer-$x
+        mount -o ro,loop $sqsh_layerdir/$x.sqsh /sqsh_layer-$x
     done
 
-    # create upper dirs
-    mkdir -p upper/{upper,work} # FIXME: ro
-    
     # create ram layer if requested
     if [ -n "$ram_layer" ]; then
         decho "creating ram_layer w/ size=$ram_layer"
-        mount -t tmpfs -o size=$ram_layer ram_layer upper
-        mkdir -p upper/{upper,work}
+        mkdir -p /upper
+        mount -t tmpfs -o size=$ram_layer ram_layer /upper
+        mkdir -p /upper/{upper,work}
+        upper=upper
     else
+        # need to remount rootfs rw so we can write into upper layer
+        decho "remounting /tmproot rw"
+        mount -o remount,rw /tmproot
+        mkdir -p /tmproot/upper/{upper,work}
+        upper=/tmproot/upper
         # if we're not using ram_layer, we cannot remount sysroot ro later on,
         # so we must change this flag to rw
+        #
+        # FIXME: still needed?
         root_true_rw=rw
     fi
 
     # mount the merged filesystem
+    decho "mounting overlayfs at /sysroot"
+    lower=/sqsh_layer-${sqsh_layers//:/:/sqsh_layer-}
+    decho "lower: $lower"
+    decho "upper: $upper"
     mount -t overlay -o \
-          lowerdir=$sqsh_layers,upperdir=upper/upper,workdir=upper/work \
+          lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work \
           sqsh_overlay /sysroot
 
     # setup easy mounting of /dev/sqsh_layerdev
@@ -647,10 +649,10 @@ if [ -n "$sqsh_layers" ]; then
     # NOTE: This does not follow the rw/ro semantics of root and root_true, it
     #       just always mounts ro.
     #
-    if [ -h /dev/sqsh_layerdev ]; then
-        mkdir -p /sysroot/mnt/sqsh_layerdev
-        echo "/dev/sqsh_layerdev /mnt/sqsh_layerdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
-    fi
+    #if [ -h /dev/sqsh_layerdev ]; then
+    #    mkdir -p /sysroot/mnt/sqsh_layerdev
+    #    echo "/dev/sqsh_layerdev /mnt/sqsh_layerdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
+    #fi
 
 elif [ -f $SQUASHED ]; then
     # NOTE: if $SQUASHED exists, the system we're attempting to boot has been
@@ -804,6 +806,9 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     # NOTE: we really want to do this. without it there's no way to update
     #       modeprobe.conf before modules get loaded... can't exactly edit
     #       modprobe.conf and reboot, as our changes get lost.
+    #
+    # FIXME: but do we want this if sqsh_layers w/out ram_overlay?
+    #
     [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
 
     # create udev rule for /dev/root-true symlink
@@ -815,9 +820,9 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     #       fstab in the conf dir... which might overwrite /sysroot/etc/fstab
     #       with a symlink that's broken until we hand off control via
     #       switch_root.
-    mkdir -p /sysroot/mnt/root-true
-    echo "" >> /sysroot/etc/fstab || echo -n
-    echo "/dev/root-true /mnt/root-true auto noauto,$root_true_rw 0 0" >> /sysroot/etc/fstab || echo -n
+    #mkdir -p /sysroot/mnt/root-true
+    #echo "" >> /sysroot/etc/fstab || echo -n
+    #echo "/dev/root-true /mnt/root-true auto noauto,$root_true_rw 0 0" >> /sysroot/etc/fstab || echo -n
 
     # setup easy mounting of /dev/squashdev
     #
@@ -827,19 +832,19 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     # FIXME: don't forget to remove this when we remove the old squshfs.img
     #        device-mapper based implementation
     #
-    if [ -h /dev/squashdev ]; then
-        mkdir -p /sysroot/mnt/squashdev
-        echo "/dev/squashdev /mnt/squashdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
-    fi
+    #if [ -h /dev/squashdev ]; then
+    #    mkdir -p /sysroot/mnt/squashdev
+    #    echo "/dev/squashdev /mnt/squashdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
+    #fi
 
     # setup easy mounting of /dev/sqsh_layerdev
     #
     # NOTE: This one does not follow the rw/ro semantics of root and root_true,
     #       it just always mounts ro.
-    if [ -h /dev/sqsh_layerdev ]; then
-        mkdir -p /sysroot/mnt/sqsh_layerdev
-        echo "/dev/sqsh_layerdev /mnt/sqsh_layerdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
-    fi
+    #if [ -h /dev/sqsh_layerdev ]; then
+    #    mkdir -p /sysroot/mnt/sqsh_layerdev
+    #    echo "/dev/sqsh_layerdev /mnt/sqsh_layerdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
+    #fi
 
     # append a timestamp to system hostname if configured
     #
@@ -847,6 +852,7 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     #
     if [ -n "$hoststamp" ]; then
         stamp=`date +%s`
+        decho "appending timestamp to hostname: $stamp"
         [ -f /sysroot/etc/sysconfig/network ] || break
         . /sysroot/etc/sysconfig/network
         [ -n "$HOSTNAME" ] || break
@@ -870,12 +876,19 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     #        assumption considering all the other udev assumptions in
     #        here... but we'll want to address this at some point so we can
     #        work w/ systemd and maybe upstart.
+    #
+    # NOTE: root-true is left mounted unless to_ram was specified, in which
+    #       case it is unmounted but the mountpoint is configured in /etc/fstab
+    #       for easy re-mounting.
+    #
+    mkdir -p /sysroot/mnt/root-true
     if [ -z "$to_ram" ]; then
+        decho "moving /tmproot to /sysroot/mnt/root-true"
 	mount --move /tmproot /sysroot/mnt/root-true
         # FIXME: this remount seems awkward... overlay-mode will already have
         #        the correct/required rw setting, and device-mapper-mode could
         #        have just mounted with the correct mode to begin with...
-	mount -o remount,$root_true_rw /sysroot/mnt/root-true
+	#mount -o remount,$root_true_rw /sysroot/mnt/root-true
 	cat <<EOF >> /sysroot/etc/rc.local
 
 echo /dev/root-true /mnt/root-true auto $root_true_rw 0 0 >> /etc/mtab
@@ -897,6 +910,8 @@ EOF
         #        really incompatible with to_ram?
         #
         if [ -h /dev/squashdev ]; then
+            decho "moving /squashdev to /sysroot/mnt/"
+            mkdir -p /sysroot/mnt/squashdev
 	    mount --move /squashdev /sysroot/mnt/squashdev
 	    cat <<EOF >> /sysroot/etc/rc.local
 echo /dev/squashdev /mnt/squashdev auto ro 0 0 >> /etc/mtab
@@ -914,7 +929,9 @@ EOF
         #        sqsh_layerdev really incompatible with to_ram?
         #
         if [ -h /dev/sqsh_layerdev ]; then
-	    mount --move $sqsh_layerdir /sysroot/mnt/$sqsh_layerdir
+            decho "moving $sqsh_layerdir to /sysroot/mnt/"
+	    mkdir -p /sysroot/mnt/$sqsh_layerdir
+            mount --move $sqsh_layerdir /sysroot/mnt/$sqsh_layerdir
             sqsh_layerdir=/mnt/$sqsh_layerdir
 	    cat <<EOF >> /sysroot/etc/rc.local
 echo /dev/sqsh_layerdev $sqsh_layerdir auto ro 0 0 >> /etc/mtab
@@ -924,10 +941,53 @@ EOF
 mount -o remount,ro $sqsh_layerdir
 umount -l $sqsh_layerdev
 EOF
+
+        else
+            sqsh_layerdir=/mnt/root-true
+        fi
+
+        # move individual layer mounts
+        for x in $sqsh_layers_ws; do
+            decho "moving /sqsh_layer-$x to /sysroot/mnt/"
+            mkdir -p /sysroot/mnt/sqsh_layer-$x
+            mount --move /sqsh_layer-$x /sysroot/mnt/sqsh_layer-$x
+            cat <<EOF >> /sysroot/etc/rc.local
+echo $sqsh_layerdir/$x /mnt/sqsh_layer-$x auto ro 0 0 >> /etc/mtab
+EOF
+
+            cat <<EOF >> /sysroot/etc/init.d/ruckusrd
+mount -o remount,ro /mnt/sqsh_layer-$x
+umount -l /mnt/sqsh_layer-$x
+EOF
+        done
+
+        # move ram layer if needed
+        if [ -n "$ram_layer" ]; then
+            decho "moving /upper to /sysroot/mnt/"
+            mount --move /upper /sysroot/mnt/upper
+            cat <<EOF >> /sysroot/etc/rc.local
+echo ram_layer /mnt/upper auto ro 0 0 >> /etc/mtab
+EOF
+
+            cat <<EOF >> /sysroot/etc/init.d/ruckusrd
+mount -o remount,ro /mnt/upper
+umount -l /mnt/upper
+EOF
         fi
 
     else
-        umount /tmproot
+        # setup easy mounting of /dev/root-true
+        #
+        # NOTE: we let the fstab injection fail to allow users to put new
+        #       copies of fstab in the conf dir... which might overwrite
+        #       /sysroot/etc/fstab with a symlink that's broken until we hand
+        #       off control via switch_root.
+        #
+        echo "" >> /sysroot/etc/fstab || echo -n
+        echo "/dev/root-true /mnt/root-true auto noauto,$root_true_rw 0 0" >> /sysroot/etc/fstab || echo -n
+
+        # unmount it
+        #
         # FIXME: why not just leave it mounted ro for consistency?  i guess so
         #        we can eject removable media.
         #
@@ -936,6 +996,9 @@ EOF
         #        a seperate device for the images AND want to load them into
         #        ram.  The use-case for to_ram is everything's loaded on
         #        removable media that we'd like to be able to eject.
+        #
+        decho "unmounting /tmproot"
+        umount /tmproot
     fi
 
     mount -o remount,ro /sysroot
