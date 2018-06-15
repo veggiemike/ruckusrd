@@ -40,6 +40,8 @@
 # - bash ${param#word} and ${param//#pattern/string} expansions
 # - bash trap
 # - bash $() command subst
+# - bash {} globbing (e.g., cp foo{,bak})
+# - bash var+=
 
 
 # a couple substitutions
@@ -595,6 +597,8 @@ fi
 if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     decho "doing common squashfs prep"
 
+    ln -s $root_true /dev/root-true
+
     # move /sysroot out of the way so we can still access it
     mkdir /tmproot
     decho "moving /sysroot to /tmproot"
@@ -607,7 +611,14 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     fi
 
     # this path isn't valid until after the new /sysroot has been mounted
-    rules=/sysroot/etc/udev/rules.d/50-ruckusrd.rules
+    #
+    # FIXME: why are we writing udev rules into /sysroot?  as with the fstab
+    #        changes, this file will get appended over and over again when
+    #        using overlayfs w/out ram_overlay.
+    #
+    # FIXME: oh, i do need /dev/root-true symlink in final sysem...
+    #
+    #rules=/sysroot/etc/udev/rules.d/50-ruckusrd.rules
 fi
 
 # squashfs magic time
@@ -620,11 +631,15 @@ if [ -n "$sqsh_layers" ]; then
         echo -n "Copying squashfs layer(s) to RAM... "
         decho ""
         go="cp -a"
-        [ "$quiet" != "1" ] && go="$go -v"
-        go="$go $sqsh_layers_ws /"
+        [ "$quiet" != "1" ] && go+=" -v"
+        for x in $sqsh_layers_ws; do
+            go+=" $sqsh_layerdir/$x.sqsh"
+        done
+        go+=" /"
         decho $go
         eval $go
 	echo "done"
+        sqsh_layerdir=/
     fi
 
     # mount individual layers
@@ -672,21 +687,10 @@ if [ -n "$sqsh_layers" ]; then
     # mount the merged filesystem
     decho "mounting overlayfs at /sysroot"
     lower=/sqsh_layer-${sqsh_layers//:/:/sqsh_layer-}
+    overlayflags=lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work
     decho "lower: $lower"
     decho "upper: $upper"
-    mount -t overlay -o \
-          lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work \
-          sqsh_overlay /sysroot
-
-    # setup easy mounting of /dev/sqsh_layerdev
-    #
-    # NOTE: This does not follow the rw/ro semantics of root and root_true, it
-    #       just always mounts ro.
-    #
-    #if [ -h /dev/sqsh_layerdev ]; then
-    #    mkdir -p /sysroot/mnt/sqsh_layerdev
-    #    echo "/dev/sqsh_layerdev /mnt/sqsh_layerdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
-    #fi
+    mount -t overlay -o $overlayflags rootfs /sysroot
 
 elif [ -f $SQUASHED ]; then
     # NOTE: if $SQUASHED exists, the system we're attempting to boot has been
@@ -801,10 +805,11 @@ elif [ -f $SQUASHED ]; then
     #
     # NOTE: these symlinks point to the corresponding loop devices we've created
     #       in here
-    decho "adding squashfs udev rules"
-    echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-squash\"" >> $rules
-    echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-rootfs\"" >> $rules
-    echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-overlay\"" >> $rules
+    #
+    #decho "adding squashfs udev rules"
+    #echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-squash\"" >> $rules
+    #echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-rootfs\"" >> $rules
+    #echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-overlay\"" >> $rules
 
     # ensure the /dev/root symlink exists on the target system once udev is done
     # doing its thing
@@ -848,7 +853,14 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     fi
 
     # create udev rule for /dev/root-true symlink
-    echo "KERNEL==\"${root_true#/dev/}\", SYMLINK+=\"root-true\"" >> $rules
+    #echo "KERNEL==\"${root_true#/dev/}\", SYMLINK+=\"root-true\"" >> $rules
+
+    # FIXME: all these tweaks to /sysroot's files will be PERSISTENT when using
+    #        overlayfs w/out ram_layer... which means they're going to get done
+    #        over and over every time we reboot...  so i'm commenting them all
+    #        out for now.  if it turns out that they were really NEEDED, we'll
+    #        have to figure something out.
+    #
 
     # setup easy mounting of /dev/root-true
     #
@@ -897,12 +909,68 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
         done
     fi
 
-    # Move the old sysroot into the new one, if needed.
+    # get ready to fix mtab
     #
     # NOTE: We can't just forge /etc/mtab at this point, because some systems
     #       sysinit scripts purge old cruft out of that file on the assumption
     #       that the initrd has ONLY mounted /.  So instead, we'll append a
     #       scriptlet that does the forging into rc.local.
+    #
+    # FIXME: This assumes a SysV-Init style system in /etc, which is a safe
+    #        assumption considering all the other udev assumptions in
+    #        here... but we'll want to address this at some point so we can
+    #        work w/ systemd.
+    #
+    # NOTE: We always have the rc.local appendage, but the content changes
+    #       depending on other params (e.g., squashdev, to_ram).
+    #
+    cp /sysroot/etc/rc.local{,.ruckusrdbak}
+    cat <<EOF >> /sysroot/etc/rc.local
+# --- begin ruckusrd appendage ---
+echo rootfs / overlay $overlayflags 0 0 >> /etc/mtab
+EOF
+
+    # move /squashdev into /sysroot
+    if [ -h /dev/squashdev ]; then
+        decho "moving /squashdev to /sysroot/mnt/"
+        mkdir -p /sysroot/mnt/squashdev
+	mount --move /squashdev /sysroot/mnt/squashdev
+	cat <<EOF >> /sysroot/etc/rc.local
+echo /dev/squashdev /mnt/squashdev auto ro 0 0 >> /etc/mtab
+EOF
+    fi
+
+    # move /sqsh_layerdev into /sysroot
+    if [ -h /dev/sqsh_layerdev ]; then
+        decho "moving /sqsh_layerdev to /sysroot/mnt/"
+	mkdir -p /sysroot/mnt/sqsh_layerdev
+        mount --move /sqsh_layerdev /sysroot/mnt/sqsh_layerdev
+	cat <<EOF >> /sysroot/etc/rc.local
+echo /dev/sqsh_layerdev /mnt/sqsh_layerdev auto ro 0 0 >> /etc/mtab
+EOF
+    fi
+
+    # move individual layer mounts into /sysroot
+    for x in $sqsh_layers_ws; do
+        decho "moving /sqsh_layer-$x to /sysroot/mnt/"
+        mkdir -p /sysroot/mnt/sqsh_layer-$x
+        mount --move /sqsh_layer-$x /sysroot/mnt/sqsh_layer-$x
+        cat <<EOF >> /sysroot/etc/rc.local
+echo /dev/sqsh_layer-$x /mnt/sqsh_layer-$x auto ro 0 0 >> /etc/mtab
+EOF
+    done
+
+    # move ram layer if needed
+    if [ -n "$ram_layer" ]; then
+        decho "moving /upper to /sysroot/mnt/"
+        mkdir -p /sysroot/mnt/upper
+        mount --move /upper /sysroot/mnt/upper
+        cat <<EOF >> /sysroot/etc/rc.local
+echo ram_layer /mnt/upper auto rw 0 0 >> /etc/mtab
+EOF
+    fi
+
+    # Move the old sysroot into the new one, if needed.
     #
     # NOTE: We add a little mini-service here to cleanly unmount root-true.
     #       W/out this, the resulting sytem hangs for 30 seconds or so during
@@ -911,7 +979,7 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     # FIXME: This assumes a SysV-Init style system in /etc, which is a safe
     #        assumption considering all the other udev assumptions in
     #        here... but we'll want to address this at some point so we can
-    #        work w/ systemd and maybe upstart.
+    #        work w/ systemd.
     #
     # NOTE: root-true is left mounted unless to_ram was specified, in which
     #       case it is unmounted but the mountpoint is configured in /etc/fstab
@@ -925,116 +993,23 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
         #        the correct/required rw setting, and device-mapper-mode could
         #        have just mounted with the correct mode to begin with...
 	#mount -o remount,$root_true_rw /sysroot/mnt/root-true
+        cp /sysroot/etc/rc.local{,.ruckusrdbak}
 	cat <<EOF >> /sysroot/etc/rc.local
-
 echo /dev/root-true /mnt/root-true auto $root_true_rw 0 0 >> /etc/mtab
 EOF
 
         cat <<EOF > /sysroot/etc/init.d/ruckusrd_shutdown
 #!/bin/sh
 
-# Write to wtmp file before unmounting /var
-/sbin/halt -w
-
-# Save mixer settings
-if ( grep -q alsa /proc/devices && which alsactl ) >/dev/null 2>&1; then
-   echo -n "Saving mixer settings... "
-   alsactl store && echo done || echo FAILED
-fi
-
-# Save random seed
-touch /var/lib/random-seed
-chmod 600 /var/lib/random-seed
-echo -n "Saving random seed... "
-dd if=/dev/urandom of=/var/lib/random-seed count=1 bs=512 2>/dev/null && echo done || echo FAILED
-
-echo > /etc/mtab
-
 # umount /mnt/root-true, so that we can umount / eventually.
-#
-# NOTE: If using sqsh_layers w/out ram_layer, this means / becomes read-only
-#       from here on out.  That's why we save mixer settings and random seed
-#       above.  Some systems will complain during the last few lines of their
-#       halt processing, but it should be ok.
-#
-mount -o remount,ro /mnt/root-true
 umount -l /mnt/root-true
+
+touch /.FOO 2>/dev/null && (rm /.FOO; echo rootfs is read-write) || echo rootfs is read-only
 EOF
 
         chmod +x /sysroot/etc/init.d/ruckusrd_shutdown
         ln -fs ../init.d/ruckusrd_shutdown /sysroot/etc/rc0.d/S00ruckusrd_halt
         ln -fs ../init.d/ruckusrd_shutdown /sysroot/etc/rc6.d/S00ruckusrd_reboot
-
-        # add stuff for the potentially seperate squashdev
-        if [ -h /dev/squashdev ]; then
-            decho "moving /squashdev to /sysroot/mnt/"
-            mkdir -p /sysroot/mnt/squashdev
-	    mount --move /squashdev /sysroot/mnt/squashdev
-	    cat <<EOF >> /sysroot/etc/rc.local
-echo /dev/squashdev /mnt/squashdev auto ro 0 0 >> /etc/mtab
-EOF
-
-#            cat <<EOF >> /sysroot/etc/init.d/ruckusrd_shutdown
-#mount -o remount,ro /mnt/squashdev
-#umount -l /mnt/squashdev
-#EOF
-        fi
-
-        # add stuff for the potentially seperate sqsh_layerdev
-        if [ -h /dev/sqsh_layerdev ]; then
-            decho "moving /sqsh_layerdev to /sysroot/mnt/"
-	    mkdir -p /sysroot/mnt/sqsh_layerdev
-            mount --move /sqsh_layerdev /sysroot/mnt/sqsh_layerdev
-	    cat <<EOF >> /sysroot/etc/rc.local
-echo /dev/sqsh_layerdev /mnt/sqsh_layerdev auto ro 0 0 >> /etc/mtab
-EOF
-
-#            cat <<EOF >> /sysroot/etc/init.d/ruckusrd_shutdown
-#mount -o remount,ro /mnt/sqsh_layerdev
-#umount -l /mnt/sqsh_layerdev
-#EOF
-
-            sqsh_layerdir=/mnt$sqsh_layerdir
-        else
-            sqsh_layerdir=${sqsh_layerdir//#\/tmproot/\/mnt\/root-true}
-        fi
-
-        # move individual layer mounts
-        #
-        # FIXME: all these tweaks to /sysroot's files will be PERSISTENT when
-        #        using overlayfs w/out ram_layer... which means they're going
-        #        to get done over and over every time we reboot...
-        #
-        #        might be able to simply rm /etc/mtab from ruckusrd_shutdown...
-        #        that's why i started taking out all the fstab appending above.
-        #
-        for x in $sqsh_layers_ws; do
-            decho "moving /sqsh_layer-$x to /sysroot/mnt/"
-            mkdir -p /sysroot/mnt/sqsh_layer-$x
-            mount --move /sqsh_layer-$x /sysroot/mnt/sqsh_layer-$x
-            cat <<EOF >> /sysroot/etc/rc.local
-echo /dev/$sqsh_layer-$x /mnt/sqsh_layer-$x auto ro 0 0 >> /etc/mtab
-EOF
-
-#            cat <<EOF >> /sysroot/etc/init.d/ruckusrd_shutdown
-#mount -o remount,ro /mnt/sqsh_layer-$x
-#umount -l /mnt/sqsh_layer-$x
-#EOF
-        done
-
-        # move ram layer if needed
-        if [ -n "$ram_layer" ]; then
-            decho "moving /upper to /sysroot/mnt/"
-            mount --move /upper /sysroot/mnt/upper
-            cat <<EOF >> /sysroot/etc/rc.local
-echo ram_layer /mnt/upper auto ro 0 0 >> /etc/mtab
-EOF
-
-#            cat <<EOF >> /sysroot/etc/init.d/ruckusrd_shutdown
-#mount -o remount,ro /mnt/upper
-#umount -l /mnt/upper
-#EOF
-        fi
 
     else
         # setup easy mounting of /dev/root-true
@@ -1052,6 +1027,23 @@ EOF
         umount /tmproot
     fi
 
+    # make sure rc.local doesn't grow into a giant mess
+    #
+    # NOTE: We made a copy of rc.local before we started appending to it.  This
+    #       makes rc.local restore itself to its previous state once it's done
+    #       executing our extra lines.
+    #
+    cat <<EOF >> /sysroot/etc/rc.local
+echo ---------------
+df -h
+echo ---------------
+mount
+echo ---------------
+cp /etc/rc.local{.ruckusrdbak,}
+EOF
+
+    # and finally, remount /sysroot read-only because most/all systems expect /
+    # to be mounted ro prior to their init systems taking over.
     mount -o remount,ro /sysroot
 fi
 
