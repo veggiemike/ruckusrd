@@ -31,6 +31,15 @@
 #       utility, we might want to revisit this and just ditch the penguin logos
 #       (although I kinda like being able to see right off the bat how many CPUs
 #       have been detected).
+#
+# ---- BUSYBOX COMPAT NOTE ----
+# So far, this script uses the following non-basic features that I should
+# double-check for busybox applet compatibility moving forward:
+#
+# - sed -i
+# - bash ${param#word} and ${param//#pattern/string} expansions
+# - bash trap
+# - bash $() command subst
 
 
 # a couple substitutions
@@ -251,6 +260,7 @@ squashdev=""
 sqsh_layers=""
 sqsh_layerdev=""
 sqsh_layerdir="/tmproot"
+sqsh_layerdir_rel=""
 ram_layer=""
 
 # Parse kernel commandline options
@@ -317,6 +327,9 @@ for o in `cat /proc/cmdline` ; do
         sqsh_layerdev=${o#sqsh_layerdev=}
         sqsh_layerdir=/sqsh_layerdev
         ;;
+    sqsh_layerdir=*)
+        sqsh_layerdir_rel=${o#sqsh_layerdir=}
+        ;;
     ram_layer=*)
         ram_layer=${o#ram_layer=}
         ;;
@@ -338,6 +351,10 @@ for o in `cat /proc/cmdline` ; do
     esac
 done
 
+# if user provided sqsh_layerdir, append it to the device mountpoint
+if [ -n "$sqsh_layerdir_rel" ]; then
+    sqsh_layerdir=$sqsh_layerdir/$sqsh_layerdir_rel
+fi
 
 decho "kernel commandline: `cat /proc/cmdline`"
 decho "init=$init"
@@ -354,6 +371,8 @@ decho "squashfs=$squashfs"
 decho "squashdev=$squashdev"
 decho "sqsh_layers=$sqsh_layers"
 decho "sqsh_layerdev=$sqsh_layerdev"
+decho "sqsh_layerdir=$sqsh_layerdir"
+decho "sqsh_layerdir_rel=$sqsh_layerdir_rel"
 decho "ram_layer=$ram_layer"
 
 echo -n "determining what to mount... "
@@ -545,7 +564,7 @@ fi
 # look for sqsh_layerdev
 if [ -h /dev/sqsh_layerdev ]; then
     # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
-    go="mkdir -p $sqsh_layerdir && mount -t auto -o ro /dev/sqsh_layerdev $sqsh_layerdir"
+    go="mkdir -p /sqsh_layerdev && mount -t auto -o ro /dev/sqsh_layerdev /sqsh_layerdev"
     decho $go
     eval $go
 fi
@@ -601,7 +620,7 @@ if [ -n "$sqsh_layers" ]; then
         echo -n "Copying squashfs layer(s) to RAM... "
         decho ""
         go="cp -a"
-        [ "$quiet" != "1" ] && go="go -v"
+        [ "$quiet" != "1" ] && go="$go -v"
         go="$go $sqsh_layers_ws /"
         decho $go
         eval $go
@@ -609,10 +628,25 @@ if [ -n "$sqsh_layers" ]; then
     fi
 
     # mount individual layers
+    #
+    # NOTE: We create /dev symlinks here to disguise the loopback device.
+    #       W/out it, some systems attempt to unmount loop devices prior to
+    #       other filesystems, which leads to problems.
+    #
+    #       we won't have to worry pre-switchroot paths being incorrect once we
+    #       swithcroot.
+    #
+    # FIXME: are these /dev symlinks still around after switchroot runs its own
+    #        udev stuff?
+    #
     for x in $sqsh_layers_ws; do
-        decho "mounting sqsh_layer: $x"
+        loopdev=$(losetup -f)
+        losetup $loopdev $sqsh_layerdir/$x.sqsh
+        ln -s $loopdev /dev/sqsh_layer-$x
         mkdir -p /sqsh_layer-$x
-        mount -o ro,loop $sqsh_layerdir/$x.sqsh /sqsh_layer-$x
+        go="mount -o ro /dev/sqsh_layer-$x /sqsh_layer-$x"
+        decho $go
+        eval $go
     done
 
     # create ram layer if requested
@@ -807,9 +841,11 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     #       modeprobe.conf before modules get loaded... can't exactly edit
     #       modprobe.conf and reboot, as our changes get lost.
     #
-    # FIXME: but do we want this if sqsh_layers w/out ram_overlay?
+    # NOTE: but we don't want this if sqsh_layers w/out ram_overlay
     #
-    [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
+    if [ -z "$ram_layer" ] || [ -f $SQUASHED ]; then
+        [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
+    fi
 
     # create udev rule for /dev/root-true symlink
     echo "KERNEL==\"${root_true#/dev/}\", SYMLINK+=\"root-true\"" >> $rules
@@ -894,21 +930,42 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
 echo /dev/root-true /mnt/root-true auto $root_true_rw 0 0 >> /etc/mtab
 EOF
 
-        cat <<EOF > /sysroot/etc/init.d/ruckusrd
+        cat <<EOF > /sysroot/etc/init.d/ruckusrd_shutdown
 #!/bin/sh
+
+# Write to wtmp file before unmounting /var
+/sbin/halt -w
+
+# Save mixer settings
+if ( grep -q alsa /proc/devices && which alsactl ) >/dev/null 2>&1; then
+   echo -n "Saving mixer settings... "
+   alsactl store && echo done || echo FAILED
+fi
+
+# Save random seed
+touch /var/lib/random-seed
+chmod 600 /var/lib/random-seed
+echo -n "Saving random seed... "
+dd if=/dev/urandom of=/var/lib/random-seed count=1 bs=512 2>/dev/null && echo done || echo FAILED
+
+echo > /etc/mtab
+
+# umount /mnt/root-true, so that we can umount / eventually.
+#
+# NOTE: If using sqsh_layers w/out ram_layer, this means / becomes read-only
+#       from here on out.  That's why we save mixer settings and random seed
+#       above.  Some systems will complain during the last few lines of their
+#       halt processing, but it should be ok.
+#
 mount -o remount,ro /mnt/root-true
 umount -l /mnt/root-true
 EOF
 
-        chmod +x /sysroot/etc/init.d/ruckusrd
-        ln -fs ../init.d/ruckusrd /sysroot/etc/rc0.d/S00ruckusrd_halt
-        ln -fs ../init.d/ruckusrd /sysroot/etc/rc6.d/S00ruckusrd_reboot
+        chmod +x /sysroot/etc/init.d/ruckusrd_shutdown
+        ln -fs ../init.d/ruckusrd_shutdown /sysroot/etc/rc0.d/S00ruckusrd_halt
+        ln -fs ../init.d/ruckusrd_shutdown /sysroot/etc/rc6.d/S00ruckusrd_reboot
 
         # add stuff for the potentially seperate squashdev
-        #
-        # FIXME: why is this only happening if !to_ram?  is separate squashdev
-        #        really incompatible with to_ram?
-        #
         if [ -h /dev/squashdev ]; then
             decho "moving /squashdev to /sysroot/mnt/"
             mkdir -p /sysroot/mnt/squashdev
@@ -917,48 +974,52 @@ EOF
 echo /dev/squashdev /mnt/squashdev auto ro 0 0 >> /etc/mtab
 EOF
 
-            cat <<EOF >> /sysroot/etc/init.d/ruckusrd
-mount -o remount,ro /mnt/squashdev
-umount -l /mnt/squashdev
-EOF
+#            cat <<EOF >> /sysroot/etc/init.d/ruckusrd_shutdown
+#mount -o remount,ro /mnt/squashdev
+#umount -l /mnt/squashdev
+#EOF
         fi
 
         # add stuff for the potentially seperate sqsh_layerdev
-        #
-        # FIXME: why is this only happening if !to_ram?  is separate
-        #        sqsh_layerdev really incompatible with to_ram?
-        #
         if [ -h /dev/sqsh_layerdev ]; then
-            decho "moving $sqsh_layerdir to /sysroot/mnt/"
-	    mkdir -p /sysroot/mnt/$sqsh_layerdir
-            mount --move $sqsh_layerdir /sysroot/mnt/$sqsh_layerdir
-            sqsh_layerdir=/mnt/$sqsh_layerdir
+            decho "moving /sqsh_layerdev to /sysroot/mnt/"
+	    mkdir -p /sysroot/mnt/sqsh_layerdev
+            mount --move /sqsh_layerdev /sysroot/mnt/sqsh_layerdev
 	    cat <<EOF >> /sysroot/etc/rc.local
-echo /dev/sqsh_layerdev $sqsh_layerdir auto ro 0 0 >> /etc/mtab
+echo /dev/sqsh_layerdev /mnt/sqsh_layerdev auto ro 0 0 >> /etc/mtab
 EOF
 
-            cat <<EOF >> /sysroot/etc/init.d/ruckusrd
-mount -o remount,ro $sqsh_layerdir
-umount -l $sqsh_layerdev
-EOF
+#            cat <<EOF >> /sysroot/etc/init.d/ruckusrd_shutdown
+#mount -o remount,ro /mnt/sqsh_layerdev
+#umount -l /mnt/sqsh_layerdev
+#EOF
 
+            sqsh_layerdir=/mnt$sqsh_layerdir
         else
-            sqsh_layerdir=/mnt/root-true
+            sqsh_layerdir=${sqsh_layerdir//#\/tmproot/\/mnt\/root-true}
         fi
 
         # move individual layer mounts
+        #
+        # FIXME: all these tweaks to /sysroot's files will be PERSISTENT when
+        #        using overlayfs w/out ram_layer... which means they're going
+        #        to get done over and over every time we reboot...
+        #
+        #        might be able to simply rm /etc/mtab from ruckusrd_shutdown...
+        #        that's why i started taking out all the fstab appending above.
+        #
         for x in $sqsh_layers_ws; do
             decho "moving /sqsh_layer-$x to /sysroot/mnt/"
             mkdir -p /sysroot/mnt/sqsh_layer-$x
             mount --move /sqsh_layer-$x /sysroot/mnt/sqsh_layer-$x
             cat <<EOF >> /sysroot/etc/rc.local
-echo $sqsh_layerdir/$x /mnt/sqsh_layer-$x auto ro 0 0 >> /etc/mtab
+echo /dev/$sqsh_layer-$x /mnt/sqsh_layer-$x auto ro 0 0 >> /etc/mtab
 EOF
 
-            cat <<EOF >> /sysroot/etc/init.d/ruckusrd
-mount -o remount,ro /mnt/sqsh_layer-$x
-umount -l /mnt/sqsh_layer-$x
-EOF
+#            cat <<EOF >> /sysroot/etc/init.d/ruckusrd_shutdown
+#mount -o remount,ro /mnt/sqsh_layer-$x
+#umount -l /mnt/sqsh_layer-$x
+#EOF
         done
 
         # move ram layer if needed
@@ -969,10 +1030,10 @@ EOF
 echo ram_layer /mnt/upper auto ro 0 0 >> /etc/mtab
 EOF
 
-            cat <<EOF >> /sysroot/etc/init.d/ruckusrd
-mount -o remount,ro /mnt/upper
-umount -l /mnt/upper
-EOF
+#            cat <<EOF >> /sysroot/etc/init.d/ruckusrd_shutdown
+#mount -o remount,ro /mnt/upper
+#umount -l /mnt/upper
+#EOF
         fi
 
     else
@@ -986,17 +1047,7 @@ EOF
         echo "" >> /sysroot/etc/fstab || echo -n
         echo "/dev/root-true /mnt/root-true auto noauto,$root_true_rw 0 0" >> /sysroot/etc/fstab || echo -n
 
-        # unmount it
-        #
-        # FIXME: why not just leave it mounted ro for consistency?  i guess so
-        #        we can eject removable media.
-        #
-        # FIXME: if to_ram, should we umount squashdev and sqsh_layerdev?  i
-        #        guess not... it seems that conceptually you wouldn't ever use
-        #        a seperate device for the images AND want to load them into
-        #        ram.  The use-case for to_ram is everything's loaded on
-        #        removable media that we'd like to be able to eject.
-        #
+        # unmount it (so we can eject removable media)
         decho "unmounting /tmproot"
         umount /tmproot
     fi

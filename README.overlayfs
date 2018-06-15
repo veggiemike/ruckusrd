@@ -37,6 +37,18 @@ mounted read-only.  This is primarily for supporting sharing of a read-only
 device between multiple virtual machines which all have their own dedicated
 rootdev for the upper layer.
 
+NOTE: This option cannot be used along with =to_ram= because... why would you
+      do that?  The point of =to_ram= is allowing for removal of the root
+      device after boot.  To use =to_ram= with a separate sqshdev would work in
+      theory, as long as we copy layers from the correct path, but how many
+      different pieces of removable media are really going to require at
+      bootup?  More than 1?  I see no use-case for that.
+
+** sqsh_layerdir=DIR
+Use DIR as the relative path to the images provided via =sqsh_layers=.  This is
+so that the layers can be located somewhere other than at the root of the
+specified device.
+
 * Kernel command line examples
 ** read-write upper on rootdev
 root=/dev/sda1 sqsh_layers=extra:server:base
