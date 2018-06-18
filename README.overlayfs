@@ -20,7 +20,7 @@ The "upper layer" is for read-write functionality.  Unless overriden via other
 parameters, =/upper= will be used.
 
 After switching root, this will result in the rootdev being at =/mnt/root-true=
-with each read-only squashfs layer being mounted at =/mnt/layer-NAME=.
+with each read-only squashfs layer being mounted at =/mnt/sqsh_layer-NAME=.
 Since the upper layer needs to be writable, the rootdev will be mounted
 read-write.
 
@@ -58,6 +58,9 @@ root=/dev/xvda1 sqsh_layerdev=/dev/xvdb1 sqsh_layers=extra:server:base
 
 ** read-only rootdev, RAM upper layer
 root=/dev/sda1 sqsh_layers=extra:server:base ram_layer=50%
+
+** unmounted/removable rootdev, RAM upper layer
+root=/dev/sda1 sqsh_layers=extra:server:base ram_layer=50% to_ram
 
 * Making changes persistent when using ram_layer
 At any point, while running with =ram_layer=, changes can be made persistent by

@@ -609,16 +609,6 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     if [ -z "$squashdev" ]; then
         SQUASHED="/tmproot/$squashfs"
     fi
-
-    # this path isn't valid until after the new /sysroot has been mounted
-    #
-    # FIXME: why are we writing udev rules into /sysroot?  as with the fstab
-    #        changes, this file will get appended over and over again when
-    #        using overlayfs w/out ram_overlay.
-    #
-    # FIXME: oh, i do need /dev/root-true symlink in final sysem...
-    #
-    #rules=/sysroot/etc/udev/rules.d/50-ruckusrd.rules
 fi
 
 # squashfs magic time
@@ -679,8 +669,6 @@ if [ -n "$sqsh_layers" ]; then
         upper=/tmproot/upper
         # if we're not using ram_layer, we cannot remount sysroot ro later on,
         # so we must change this flag to rw
-        #
-        # FIXME: still needed?
         root_true_rw=rw
     fi
 
@@ -796,20 +784,11 @@ elif [ -f $SQUASHED ]; then
     #
     # FIXME: this really only NEEDS to be done if we have a conf dir..., and
     #        there's a conditional for that right above.
+    #
     decho "updating ld"
     CHROOTPATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
     chroot /sysroot /usr/bin/env -i PATH=$CHROOTPATH /bin/bash -c ldconfig \
         || echo -n
-
-    # create udev rules for /dev/root-* symlinks
-    #
-    # NOTE: these symlinks point to the corresponding loop devices we've created
-    #       in here
-    #
-    #decho "adding squashfs udev rules"
-    #echo "KERNEL==\"${SQUASHED_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-squash\"" >> $rules
-    #echo "KERNEL==\"${BASE_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-rootfs\"" >> $rules
-    #echo "KERNEL==\"${OVERLAY_LOOPDEV#/dev/}\" SYMLINK+=\"root-loop-overlay\"" >> $rules
 
     # ensure the /dev/root symlink exists on the target system once udev is done
     # doing its thing
@@ -851,48 +830,6 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     if [ -z "$ram_layer" ] || [ -f $SQUASHED ]; then
         [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
     fi
-
-    # create udev rule for /dev/root-true symlink
-    #echo "KERNEL==\"${root_true#/dev/}\", SYMLINK+=\"root-true\"" >> $rules
-
-    # FIXME: all these tweaks to /sysroot's files will be PERSISTENT when using
-    #        overlayfs w/out ram_layer... which means they're going to get done
-    #        over and over every time we reboot...  so i'm commenting them all
-    #        out for now.  if it turns out that they were really NEEDED, we'll
-    #        have to figure something out.
-    #
-
-    # setup easy mounting of /dev/root-true
-    #
-    # NOTE: we let the fstab injection fail to allow users to put new copies of
-    #       fstab in the conf dir... which might overwrite /sysroot/etc/fstab
-    #       with a symlink that's broken until we hand off control via
-    #       switch_root.
-    #mkdir -p /sysroot/mnt/root-true
-    #echo "" >> /sysroot/etc/fstab || echo -n
-    #echo "/dev/root-true /mnt/root-true auto noauto,$root_true_rw 0 0" >> /sysroot/etc/fstab || echo -n
-
-    # setup easy mounting of /dev/squashdev
-    #
-    # NOTE: This one does not follow the rw/ro semantics of root and root_true,
-    #       it just always mounts ro.
-    #
-    # FIXME: don't forget to remove this when we remove the old squshfs.img
-    #        device-mapper based implementation
-    #
-    #if [ -h /dev/squashdev ]; then
-    #    mkdir -p /sysroot/mnt/squashdev
-    #    echo "/dev/squashdev /mnt/squashdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
-    #fi
-
-    # setup easy mounting of /dev/sqsh_layerdev
-    #
-    # NOTE: This one does not follow the rw/ro semantics of root and root_true,
-    #       it just always mounts ro.
-    #if [ -h /dev/sqsh_layerdev ]; then
-    #    mkdir -p /sysroot/mnt/sqsh_layerdev
-    #    echo "/dev/sqsh_layerdev /mnt/sqsh_layerdev auto noauto,ro 0 0" >> /sysroot/etc/fstab || echo -n
-    #fi
 
     # append a timestamp to system hostname if configured
     #
@@ -972,15 +909,6 @@ EOF
 
     # Move the old sysroot into the new one, if needed.
     #
-    # NOTE: We add a little mini-service here to cleanly unmount root-true.
-    #       W/out this, the resulting sytem hangs for 30 seconds or so during
-    #       reboot trying over and over again to umount root-true...
-    #
-    # FIXME: This assumes a SysV-Init style system in /etc, which is a safe
-    #        assumption considering all the other udev assumptions in
-    #        here... but we'll want to address this at some point so we can
-    #        work w/ systemd.
-    #
     # NOTE: root-true is left mounted unless to_ram was specified, in which
     #       case it is unmounted but the mountpoint is configured in /etc/fstab
     #       for easy re-mounting.
@@ -989,28 +917,9 @@ EOF
     if [ -z "$to_ram" ]; then
         decho "moving /tmproot to /sysroot/mnt/root-true"
 	mount --move /tmproot /sysroot/mnt/root-true
-        # FIXME: this remount seems awkward... overlay-mode will already have
-        #        the correct/required rw setting, and device-mapper-mode could
-        #        have just mounted with the correct mode to begin with...
-	#mount -o remount,$root_true_rw /sysroot/mnt/root-true
-        cp /sysroot/etc/rc.local{,.ruckusrdbak}
 	cat <<EOF >> /sysroot/etc/rc.local
 echo /dev/root-true /mnt/root-true auto $root_true_rw 0 0 >> /etc/mtab
 EOF
-
-        cat <<EOF > /sysroot/etc/init.d/ruckusrd_shutdown
-#!/bin/sh
-
-# umount /mnt/root-true, so that we can umount / eventually.
-umount -l /mnt/root-true
-
-touch /.FOO 2>/dev/null && (rm /.FOO; echo rootfs is read-write) || echo rootfs is read-only
-EOF
-
-        chmod +x /sysroot/etc/init.d/ruckusrd_shutdown
-        ln -fs ../init.d/ruckusrd_shutdown /sysroot/etc/rc0.d/S00ruckusrd_halt
-        ln -fs ../init.d/ruckusrd_shutdown /sysroot/etc/rc6.d/S00ruckusrd_reboot
-
     else
         # setup easy mounting of /dev/root-true
         #
@@ -1027,6 +936,17 @@ EOF
         umount /tmproot
     fi
 
+    # add some debug output
+    if [ "$quiet" != "1" ]; then
+    cat <<EOF >> /sysroot/etc/rc.local
+echo ---------------
+df -h
+echo ---------------
+mount
+echo ---------------
+EOF
+    fi
+
     # make sure rc.local doesn't grow into a giant mess
     #
     # NOTE: We made a copy of rc.local before we started appending to it.  This
@@ -1034,13 +954,44 @@ EOF
     #       executing our extra lines.
     #
     cat <<EOF >> /sysroot/etc/rc.local
-echo ---------------
-df -h
-echo ---------------
-mount
-echo ---------------
 cp /etc/rc.local{.ruckusrdbak,}
 EOF
+
+    # fix unmount chicken-and-the-egg problem
+    #
+    # NOTE: If not to_ram, the device(s) required to assemble the rootfs end up
+    #       getting moved to mountpoints on top of the rootfs in the final
+    #       system.  This leaves us with a can't unmount /mnt/squashdev w/out
+    #       unmounting / first dilemma leading to potential errors and
+    #       time-outs during shutdown.  The easy fix is to lazy-unmount the
+    #       troublesome devices.  The messy part is how to do it w/out making
+    #       assumptions about the system being booted.  We have to register
+    #       some sort of script to execute at shutdown, after mostly everything
+    #       has finished, but before the system tries to unmount its rootfs.
+    #
+    # FIXME: figure out how to make this not depend on SysV-Init style scripts,
+    #        and the naming/ordering of the host systems shutdown/halt scripts.
+    #
+    if [ -z "$to_ram" ]; then
+        cat <<EOF > /sysroot/etc/init.d/ruckusrd_umount
+#!/bin/sh
+
+# quietly umount rootfs dependencies that we left mounted on top of rootfs, so
+# that we can umount / eventually.
+umount -l /mnt/root-true 2>/dev/null
+umount -l /mnt/squashdev 2>/dev/null
+umount -l /mnt/sqsh_layerdev 2>/dev/null
+EOF
+        for x in $sqsh_layers_ws; do
+            cat <<EOF >> /sysroot/etc/init.d/ruckusrd_umount
+umount -l /mnt/sqsh_layer-$x 2>/dev/null
+EOF
+        done
+
+        chmod +x /sysroot/etc/init.d/ruckusrd_umount
+        ln -fs ../init.d/ruckusrd_umount /sysroot/etc/rc0.d/S00ruckusrd_halt
+        ln -fs ../init.d/ruckusrd_umount /sysroot/etc/rc6.d/S00ruckusrd_reboot
+    fi
 
     # and finally, remount /sysroot read-only because most/all systems expect /
     # to be mounted ro prior to their init systems taking over.
