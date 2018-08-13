@@ -8,7 +8,15 @@
 #
 # This script is a utility for creating a self-extracting installer for a built
 # Linux kernel.  First run `kernel_builder`, then run this.
-
+#
+# FIXME: convert to extractenator usage...
+#
+#        - Split installer script into a standalone file?  Or embed it here as
+#          an additional here-doc.
+#
+#        - We will be untaring into a /tmp dir now, with a script that copies
+#          from there into the appropriate locations.
+#
 export SRP_ROOT=$PWD/FOO
 
 VERSION=$(basename $SRP_ROOT/lib/modules/*)
@@ -18,37 +26,21 @@ filename=$PWD/kernel-installer-$VERSION.sh
 echo VERSION: $VERSION
 echo filename: $filename
 
-# create the initial installer script
-cat > $filename <<EOF
-#!/bin/sh
-skip=__SKIP__
-VERSION=$VERSION
+# setup a tmpdir
+tmpdir=\`mktemp -dt \\\`basename \$0\\\`-XXXX\`
 
-echo -n "removing preexisting modules in \$PWD/lib/modules/$VERSION... "
-rm -rf \$PWD/lib/modules/$VERSION && echo DONE || { echo FAIL; exit 1; }
+# create the installer script
+cat > $tmpdir/installer <<EOF
+echo -n "removing preexisting modules in /lib/modules/$VERSION... "
+rm -rf /lib/modules/$VERSION && echo DONE || { echo FAIL; exit 1; }
 
 echo -n "extracting archive... "
-tail -n +\$skip \$0 | bzcat | tar -x --no-same-owner --no-same-permissions && echo DONE || { echo FAIL; exit 1; }
+tar -C FOO | tar -x --no-same-owner --no-same-permissions -C / && echo DONE || { echo FAIL; exit 1; }
 
 echo "!! don't forget to update your bootloader (e.g., grub, extlinux) !!"
-
-exit 0
 EOF
 
-# sed the actual length into it
-skip=$((`wc -l $filename | awk '{print $1}'`+1))
-echo skip: $skip
-sed -i "s|__SKIP__|$skip|" $filename
+extractenator $filename $tmpdir/installer FOO || exit 1
 
-# and now append the archive
-echo -n "appending kernel archive to $filename... "
-pushd $SRP_ROOT >/dev/null
-(tar -c . | bzip2 >> $filename) || { echo FAIL; exit 1; }
-popd >/dev/null
-echo DONE
-
-# and make it executable
-echo -n "making $filename executable... "
-chmod +x $filename && echo DONE || { echo FAIL; exit 1; }
-
+rm -rf $tmpdir
 exit 0
