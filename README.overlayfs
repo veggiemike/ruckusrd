@@ -192,7 +192,16 @@ will break old scripts.
 By default, won't overwrite an existing image file.  Default basedir is /.
 Default kernel version is currently running kernel.
 
-** ruckusrd commit
+** ruckusrd sqsh-convert
+ruckusrd sqsh-convert LAYERNAME
+
+Takes a running system's rootfs and converts it into a .sqsh file suitable for
+use as a =sqsh_layer=.
+
+mount --bind / /tmp/sqsh
+mksqshfs /tmp/sqsh LAYERNAME.sqsh -noappend
+
+** ruckusrd sqsh-commit
 ruckusrd commit [--append] [LAYERNAME]
 
 Commits run-time changes on a non-persistent setup (i.e., when using
@@ -205,7 +214,7 @@ NOTE: It's up to the user to actually modify the kernel command line arguments
 FIXME: could make the user commit and then merge in 2 steps... would simplify
        command line parsing here a little.
 
-** ruckusrd merge
+** ruckusrd sqsh-merge
 ruckusrd merge LAYER1 LAYER2 ...
 
 Merge the specified squashfs layers into a single filesystem layer.  This can
