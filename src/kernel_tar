@@ -23,11 +23,8 @@ VERSION=$(basename $SRP_ROOT/lib/modules/*)
 
 filename=$PWD/kernel-installer-$VERSION.sh
 
-echo VERSION: $VERSION
-echo filename: $filename
-
 # setup a tmpdir
-tmpdir=\`mktemp -dt \\\`basename \$0\\\`-XXXX\`
+tmpdir=`mktemp -dt \`basename $0\`-XXXX`
 
 # create the installer script
 cat > $tmpdir/installer <<EOF
@@ -35,9 +32,12 @@ echo -n "removing preexisting modules in /lib/modules/$VERSION... "
 rm -rf /lib/modules/$VERSION && echo DONE || { echo FAIL; exit 1; }
 
 echo -n "extracting archive... "
-tar -C FOO | tar -x --no-same-owner --no-same-permissions -C / && echo DONE || { echo FAIL; exit 1; }
+(tar -C FOO -c . | tar -x --no-same-owner --no-same-permissions -C /) && echo DONE || { echo FAIL; exit 1; }
 
+echo
 echo "!! don't forget to update your bootloader (e.g., grub, extlinux) !!"
+echo
+
 EOF
 
 extractenator $filename $tmpdir/installer FOO || exit 1
