@@ -8,18 +8,124 @@
 #
 # This script is a utility for creating a self extracting executable that runs
 # an install script after extracting to a temp directory.
+
+
+usage()
+{
+    if [ -n "$*" ]; then
+        echo ERROR: $*
+        echo
+    fi
+    echo "extractenator - a self-extracting installer creator"
+    echo
+    echo "usage: `basename $0` OPTIONS PAYLOAD..."
+    echo
+    echo "  -f, --filename EXEFILE    Specify output filename. (REQUIRED)"
+    echo
+    echo "  -s, --script SCRIPT       Specify installation script to be run after"
+    echo "                            extraction.  SCRIPT will be included as archive"
+    echo "                            content, you don't have to also specify it as"
+    echo "                            payload. (REQUIRED)"
+    echo
+    echo "  -c, --compressor COMP     Use COMP compressor in pipeline during archive"
+    echo "                            creation.  Valid compressors are 'gzip', 'bzip2',"
+    echo "                            'xz', or 'none' and the default is 'gzip'.  If"
+    echo "                            COMP is specified as 'none', no compressor is used"
+    echo "                            (e.g., if payload files are already compressed)."
+}
+
+
+# call getopt
 #
-# FIXME: fix lame command line parsing and add usage
+# NOTE: This handles spacing out arguments corrently for the case statement
+#       below and checks for unknown flags.  Required flags are checked for
+#       below.
 #
-# FIXME: add --compression=none|gzip|bzip2|xz
+# NOTE: The set -- command causes the resulting output of getopt to replace the
+#       current positional arguments (e.g, $1, $2).
 #
-filename=$1
-script=$2
-shift 2
+__opts=$(getopt -un $0 \
+    -o hf:s:c: \
+    --long help,filename:,script:,compressor: -- $@)
+if [ $? != 0 ]; then
+    echo
+    usage
+    exit 1
+fi
+set -- $__opts
+
+# defaults
+comp="gzip"
+decomp="zcat"
+
+# parse the new positional arguments
+while true; do
+    case "$1" in
+        -f|--filename)
+            filename=$2
+            shift 2
+            ;;
+	-s|--script)
+            script=$2
+            shift 2
+            ;;
+	-c|--compressor)
+            case $2 in
+                gzip)
+                    comp="gzip"
+                    decomp="zcat"
+                    ;;
+                bzip2)
+                    comp="bzip2"
+                    decomp="bzcat"
+                    ;;
+                xz)
+                    comp="xz"
+                    decomp="xzcat"
+                    ;;
+                none)
+                    comp="cat"
+                    decomp="cat"
+                    ;;
+                *)
+                    usage "invalid compressor specified: $2"
+                    exit 1
+                    ;;
+            esac
+            shift 2
+            ;;
+	--)
+            # done parsing
+            shift
+            break
+            ;;
+	*)
+            usage
+            exit 1
+            ;;
+    esac
+done
 payload=$*
+
+# check for required optionsn
+if [ -z "$filename" ]; then
+    usage "--filename required"
+    exit 1
+fi
+if [ -z "$script" ]; then
+    usage "--script required"
+    exit 1
+fi
+if [ -z "$payload" ]; then
+    usage "PAYLOAD required"
+    exit 1
+fi
+
 echo filename: $filename
 echo script: $script
+echo comp: $comp
 echo payload: $payload
+
 
 # create the initial installer script
 echo -n "creating $filename... "
@@ -30,7 +136,7 @@ skip=__SKIP__
 tmpdir=\`mktemp -dt \\\`basename \$0\\\`-XXXX\`
 
 echo -n "extracting archive to \$tmpdir... "
-(tail -n +\$skip \$0 | zcat | tar -x --no-same-owner --no-same-permissions -C \$tmpdir) && echo DONE || { echo FAIL; exit 1; }
+(tail -n +\$skip \$0 | $decomp | tar -x --no-same-owner --no-same-permissions -C \$tmpdir) && echo DONE || { echo FAIL; exit 1; }
 
 pushd \$tmpdir >/dev/null
 `cat $script`
@@ -50,7 +156,7 @@ sed -i "s|__SKIP__|$skip|" $filename
 
 # and now append the payload
 echo -n "appending payload... "
-(tar -c $payload | gzip >> $filename) || { echo FAIL; exit 1; }
+(tar -c $payload | $comp >> $filename) || { echo FAIL; exit 1; }
 echo DONE
 
 # and make it executable

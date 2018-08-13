@@ -9,14 +9,6 @@
 # This script is a utility for creating a self-extracting installer for a built
 # Linux kernel.  First run `kernel_builder`, then run this.
 #
-# FIXME: convert to extractenator usage...
-#
-#        - Split installer script into a standalone file?  Or embed it here as
-#          an additional here-doc.
-#
-#        - We will be untaring into a /tmp dir now, with a script that copies
-#          from there into the appropriate locations.
-#
 export SRP_ROOT=$PWD/FOO
 
 VERSION=$(basename $SRP_ROOT/lib/modules/*)
@@ -40,7 +32,10 @@ echo
 
 EOF
 
-extractenator $filename $tmpdir/installer FOO || exit 1
+# NOTE: $* is so we can pass additional arguments to extractenator (e.g.,
+#       --comp).
+#
+extractenator -f $filename -s $tmpdir/installer FOO $* || exit 1
 
 rm -rf $tmpdir
 exit 0
