@@ -864,7 +864,6 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     cp /sysroot/etc/rc.local{,.ruckusrdbak}
     cat <<EOF >> /sysroot/etc/rc.local
 # --- begin ruckusrd appendage ---
-echo rootfs / overlay $overlayflags 0 0 >> /etc/mtab
 EOF
 
     # move /squashdev into /sysroot
@@ -892,9 +891,8 @@ EOF
         decho "moving /sqsh_layer-$x to /sysroot/mnt/"
         mkdir -p /sysroot/mnt/sqsh_layer-$x
         mount --move /sqsh_layer-$x /sysroot/mnt/sqsh_layer-$x
-        cat <<EOF >> /sysroot/etc/rc.local
-echo /dev/sqsh_layer-$x /mnt/sqsh_layer-$x auto ro 0 0 >> /etc/mtab
-EOF
+        # NOTE: We don't forge mtab entries for these because it just clutters
+        #       df output needlessly.
     done
 
     # move ram layer if needed
@@ -902,9 +900,8 @@ EOF
         decho "moving /upper to /sysroot/mnt/"
         mkdir -p /sysroot/mnt/upper
         mount --move /upper /sysroot/mnt/upper
-        cat <<EOF >> /sysroot/etc/rc.local
-echo ram_layer /mnt/upper auto rw 0 0 >> /etc/mtab
-EOF
+        # NOTE: We don't forge an mtab entry for this because overlayfs is
+        #       smart enough to always show the stats of upperdir in df output.
     fi
 
     # Move the old sysroot into the new one, if needed.
@@ -917,6 +914,14 @@ EOF
     if [ -z "$to_ram" ]; then
         decho "moving /tmproot to /sysroot/mnt/root-true"
 	mount --move /tmproot /sysroot/mnt/root-true
+        # NOTE: I considered not adding this mtab entry when root-true is being
+        #       used for upperdir, because you essentially get root-true's
+        #       stats for both rootfs and root-true in df...  but that hides
+        #       the fact that our real root device (i.e., boot device) is still
+        #       mounted at /mnt/root-true.  Unlike the layers themselves, this
+        #       is important to know (e.g., so you can go muck with the
+        #       bootloader config).
+        #
 	cat <<EOF >> /sysroot/etc/rc.local
 echo /dev/root-true /mnt/root-true auto $root_true_rw 0 0 >> /etc/mtab
 EOF
