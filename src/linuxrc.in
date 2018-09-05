@@ -983,9 +983,16 @@ EOF
 
 # quietly umount rootfs dependencies that we left mounted on top of rootfs, so
 # that we can umount / eventually.
+
+mount -o remount,ro /mnt/root-true 2>/dev/null
 umount -l /mnt/root-true 2>/dev/null
+
+mount -o remount,ro /mnt/squashdev 2>/dev/null
 umount -l /mnt/squashdev 2>/dev/null
+
+mount -o remount,ro /mnt/sqsh_layerdev 2>/dev/null
 umount -l /mnt/sqsh_layerdev 2>/dev/null
+
 EOF
         for x in $sqsh_layers_ws; do
             cat <<EOF >> /sysroot/etc/init.d/ruckusrd_umount
