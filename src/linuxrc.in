@@ -680,6 +680,25 @@ if [ -n "$sqsh_layers" ]; then
     decho "upper: $upper"
     mount -t overlay -o $overlayflags rootfs /sysroot
 
+    # this leaves us with /boot containing the merged contents of the layers...
+    # but the ACTUAL boot files will end up living in /mnt/root-true/boot/...
+    # which is confusing.  so lets bind-mount that to /boot.
+    #
+    # NOTE: we do this unless we're booting to_ram, in which case the boot
+    #       files are no longer mounted anywhere once the system boots.
+    #
+    # FIXME: if to_ram, consider removing /boot (or it's contents) to make it
+    #        super obvious that whatever's in /boot wasn't actually used to
+    #        boot.
+    #
+    #        if we were to do that, we'd want to only do it if to_ram AND
+    #        ram_layer, otherwise we'll be recording that deletion in upper
+    #        (remember, we've got a rw overlay backed by /mnt/root-true/upper).
+    #
+    if [ -z "$to_ram" ]; then
+        mount --bind /tmproot/boot /sysroot/boot
+    fi
+
 elif [ -f $SQUASHED ]; then
     # NOTE: if $SQUASHED exists, the system we're attempting to boot has been
     #       set up with a squashfs read-only rootfs image to be used with a
@@ -983,6 +1002,8 @@ EOF
 
 # quietly umount rootfs dependencies that we left mounted on top of rootfs, so
 # that we can umount / eventually.
+
+umount -l /boot 2>/dev/null
 
 mount -o remount,ro /mnt/root-true 2>/dev/null
 umount -l /mnt/root-true 2>/dev/null
