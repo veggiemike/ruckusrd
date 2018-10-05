@@ -695,7 +695,7 @@ if [ -n "$sqsh_layers" ]; then
     #        ram_layer, otherwise we'll be recording that deletion in upper
     #        (remember, we've got a rw overlay backed by /mnt/root-true/upper).
     #
-    if [ -z "$to_ram" ]; then
+    if [ -z "$to_ram" && -d /tmproot/boot ]; then
         mount --bind /tmproot/boot /sysroot/boot
     fi
 
