@@ -617,6 +617,11 @@ if [ -n "$sqsh_layers" ]; then
     decho "setting up OverlayFS squashfs layers"
 
     # copy to ram if requested
+    #
+    # NOTE: We copy them to RAM, but then move the dir they're in to
+    #       /mnt/sqsh_layerdev later on so it's available via a visible filesys
+    #       for future usage (e.g., creating virtual machines, installing).
+    #
     if [ -n "$to_ram" ]; then
         echo -n "Copying squashfs layer(s) to RAM... "
         decho ""
@@ -625,11 +630,11 @@ if [ -n "$sqsh_layers" ]; then
         for x in $sqsh_layers_ws; do
             go+=" $sqsh_layerdir/$x.sqsh"
         done
-        go+=" /"
+        go+=" /sqsh_layerdev"
         decho $go
         eval $go
 	echo "done"
-        sqsh_layerdir=/
+        sqsh_layerdir=/sqsh_layerdev
     fi
 
     # mount individual layers
@@ -958,6 +963,14 @@ EOF
         # unmount it (so we can eject removable media)
         decho "unmounting /tmproot"
         umount /tmproot
+
+        # we copied sqsh_layers into RAM.  make them visible in the baby
+        # filesystem at /mnt/sqsh_layerdev
+        mkdir -p /sysroot/mnt/sqsh_layerdev
+        mount --bind $sqsh_layerdir /sysroot/mnt/sqsh_layerdev
+  cat <<EOF >> /sysroot/etc/rc.local
+echo /dev/sqsh_layerdev /mnt/sqsh_layerdev auto rw 0 0 >> /etc/mtab
+EOF
     fi
 
     # add some debug output
