@@ -122,6 +122,46 @@ do_raid_and_lvm()
 }
 
 
+# waits up to $1 seconds for $2 symlink to get created by udev.  if it takes
+# longer than that, something is wrong, but maybe the user can fix it.
+wait_for_udev_symlink()
+{
+    x=$1
+    dev=$2
+    msg="waiting up to $x seconds for $dev symlink..."
+    while [ ! -e $dev -a "$x" != "0" ]; do
+        if [ -n "$msg" ]; then
+            echo -n $msg
+            msg=""
+        else
+            echo -n "."
+        fi
+        x=$(($x-1))
+        sleep 1
+    done
+
+    # NOTE: At this point, either the symlink exists OR our waitloop timed out.
+    #       We'll give the user a chance to manually create the symlink if it's
+    #       missing.
+    #
+    if [ -b $dev ] ; then
+        [ -z "$msg" ] && echo " done"
+        decho "$dev symlink exists"
+    else
+        echo
+        echo
+        echo "--------------------------------------"
+        echo "WARNING: Cannot find device for $dev!"
+        echo "--------------------------------------"
+        echo
+        echo "Create symlink $dev and then exit this shell to continue"
+        echo "the boot sequence."
+        echo
+        bash
+    fi
+}
+
+
 emergency_shell()
 {
     echo "Bug in initramfs /init detected. Dropping to a shell. Good luck!"
@@ -474,42 +514,11 @@ if [ "$dmroot" != "0" ]; then
     do_raid_and_lvm 10
 fi
 
-# wait for root symlink
-#
-# NOTE: this loop waits up to 30 seconds for /dev/root symlink to get created.
-#       if it takes longer than that, something is wrong, but maybe the user can
-#       fix it.
-x=30
-msg="waiting up to $x seconds for /dev/root symlink..."
-while [ ! -e /dev/root -a "$x" != "0" ]; do
-    if [ -n "$msg" ]; then
-        echo -n $msg
-        msg=""
-    else
-        echo -n "."
-    fi
-    x=$(($x-1))
-    sleep 1
-done
+# wait for udev symlinks to get created
+wait_for_udev_symlink 30 /dev/root
 root_true=`readlink /dev/root`
-
-# NOTE: At this point, either /dev/root exists OR our waitloop timed out.  We'll
-#       give the user a chance to manually create the /dev/root symlink.
-if [ -b /dev/root ] ; then
-    [ -z "$msg" ] && echo " done"
-    decho "/dev/root symlink exists ($root_true)"
-else
-    echo
-    echo
-    echo "--------------------------------------"
-    echo "WARNING: Cannot find root file system!"
-    echo "--------------------------------------"
-    echo
-    echo "Create symlink /dev/root and then exit this shell to continue"
-    echo "the boot sequence."
-    echo
-    bash
-fi
+[ -n "$squashdev" ] && wait_for_udev_symlink 30 /dev/squashdev
+[ -n "$sqsh_layerdev" ] && wait_for_udev_symlink 30 /dev/sqsh_layerdev
 
 # run fsck on root dev
 #
