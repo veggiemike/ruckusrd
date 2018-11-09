@@ -7,10 +7,13 @@
 
  2. Use BusyBox instead of host system binaries for initramfs population
 
- 3. Use OverlayFS instead of device-mapper voodoo for sqaushfs and to_ram
-    support
+ 3. Remove old squashfs.img support now that we have new OverlayFS-based
+    sqsh_layers implemented.
 
  4. Maybe revamp command-line usage
+
+ 5. Add checksum verification of sqsh_layers to linuxrc.  If anything's been
+    modified, make a lot of noise and don't boot.
 
 
 * For whenever
