@@ -633,6 +633,7 @@ if [ -n "$sqsh_layers" ]; then
     #
     if [ -n "$to_ram" ]; then
         echo -n "Copying squashfs layer(s) to RAM... "
+        mkdir -p /sqsh_layerdev
         decho ""
         go="cp -a"
         [ "$quiet" != "1" ] && go+=" -v"
