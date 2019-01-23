@@ -116,9 +116,13 @@ cd initramfs_dir
 # Make directory structure 
 #
 # NOTE: We're just going to copy all our binaries into bin and ceate sbin as a
-#       compatability symlink incase something explicitly calls somethings from
-#       /sbin (e.g., /sbin/modprobe).
-mkdir -p bin dev sys proc $DESTMODDIR sysroot etc/udev/rules.d lib/udev/rules.d
+#       compatability symlink in case something explicitly calls somethings
+#       from /sbin (e.g., /sbin/modprobe).
+#
+# NOTE: Same goes for /usr/bin and /usr/sbin
+#
+mkdir -p bin dev sys proc usr run $DESTMODDIR sysroot \
+    etc/udev/rules.d lib/udev/rules.d
 
 # Copy host system's udev rules
 #
@@ -233,8 +237,10 @@ done
 decho '********** MAKING SYMLINKS *****************************************************'
 ln="ln"
 [ "$opt_verbose" != "0" ] && ln+=" -v"
-$ln -s bash bin/sh
-$ln -s bin sbin
+$ln -s bash bin/sh || exit 1
+$ln -s bin sbin || exit 1
+$ln -s ../bin usr/bin || exit 1
+$ln -s ../sbin usr/sbin || exit 1
 
 # Copy all required shared libs
 decho '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
