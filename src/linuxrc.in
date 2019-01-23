@@ -271,8 +271,10 @@ mount -n -t sysfs sysfs /sys
 # create /etc/mtab symlink
 ln -fs /proc/mounts /etc/mtab
 
-# setup hotplug
-echo "" > /proc/sys/kernel/hotplug
+# ensure hotplog script is disabled even if CONFIG_UEVENT_HELPER is enabled
+if [ -f /proc/sys/kernel/hotplug ]; then
+    echo "" > /proc/sys/kernel/hotplug
+fi
 
 # Declare all variables here.. mostly for housekeeping
 init="/sbin/init"
