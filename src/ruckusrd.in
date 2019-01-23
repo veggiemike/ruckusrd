@@ -102,7 +102,7 @@ fi
 
 echo "Building an initramfs at $INITRAMFS_TARGET for kernel $KERNEL"
 
-HOSTMODDIR=$BASEDIR/lib/modules/$KERNEL/kernel
+HOSTMODDIR=$BASEDIR/lib/modules/$KERNEL
 DESTMODDIR=lib/modules/$KERNEL
 
 original_pwd=$PWD
@@ -249,26 +249,36 @@ for f in $DEPLIBS; do
     $cp $f lib/ || exit 1
 done
 
+# Copy modules.order and modules.builtin
+#
+# NOTE: depmod complains that these files are missing when it's run below, so
+#       we copy them into the initramfs.
+#
+# FIXME: is it ok to leave modules.order full of modules that aren't being
+#        included in the initramfs?
+#
+$cp $HOSTMODDIR/modules.{order,builtin} $DESTMODDIR/ || exit 1
+
 # FIXME: should probably allow users to add more modules somehow, maybe a
 #        command line arg or a conf file...
 
 # Copy over ATA drivers
 decho '********** COPYING ATA DRIVERS TO INITRAMFS ************************************'
-find $HOSTMODDIR/drivers/ata -name \*.ko -exec $cp {} $DESTMODDIR/ \;
+find $HOSTMODDIR/kernel/drivers/ata -name \*.ko -exec $cp {} $DESTMODDIR/ \;
 
 # Copy over SCSI drivers
 decho '********** COPYING SCSI DRIVERS TO INITRAMFS ***********************************'
-find $HOSTMODDIR/drivers/scsi -name \*.ko -exec $cp {} $DESTMODDIR/ \;
+find $HOSTMODDIR/kernel/drivers/scsi -name \*.ko -exec $cp {} $DESTMODDIR/ \;
 
 # Copy over block drivers
 decho '********** COPYING BLOCK DRIVERS TO INITRAMFS **********************************'
-find $HOSTMODDIR/drivers/block -name \*.ko -exec $cp {} $DESTMODDIR/ \;
+find $HOSTMODDIR/kernel/drivers/block -name \*.ko -exec $cp {} $DESTMODDIR/ \;
 
 # NOTE: if we ever want to add DRM drivers as well (potentially for early KMS
 #       fbcon splash screen), just uncomment the following lines
 #
 #decho '********** COPYING DRM DRIVERS TO INITRAMFS ************************************'
-#find $HOSTMODDIR/drivers/gpu/drm -name \*.ko -exec $cp {} $DESTMODDIR/ \;
+#find $HOSTMODDIR/kernel/drivers/gpu/drm -name \*.ko -exec $cp {} $DESTMODDIR/ \;
 
 # Make sure none of the MODS we've installed have unmet dependencies
 decho '********** COPYING MODULE DEPS TO INITRAMFS ************************************'
