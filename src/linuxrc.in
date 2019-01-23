@@ -292,6 +292,7 @@ root_true_rw="ro"
 rootflags=""
 rootfstype="auto"
 to_ram=""
+shell=""
 maint=""
 hoststamp=""
 quiet=0
@@ -326,6 +327,9 @@ for o in `cat /proc/cmdline` ; do
     to_ram)
         to_ram=1
 	;;
+    shell)
+        shell=1
+        ;;
     maint)
 	maint=1
 	;;
@@ -416,6 +420,12 @@ decho "sqsh_layerdev=$sqsh_layerdev"
 decho "sqsh_layerdir=$sqsh_layerdir"
 decho "sqsh_layerdir_rel=$sqsh_layerdir_rel"
 decho "ram_layer=$ram_layer"
+
+if [ -n "$shell" ]; then
+    echo "Dropping directly into shell, as requested.  Enjoy!"
+    echo
+    bash
+fi
 
 echo -n "determining what to mount... "
 
