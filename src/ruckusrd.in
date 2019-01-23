@@ -241,6 +241,17 @@ $ln -s bash bin/sh || exit 1
 $ln -s bin sbin || exit 1
 $ln -s ../bin usr/bin || exit 1
 $ln -s ../sbin usr/sbin || exit 1
+# Fixup lib vs lib64
+#
+# NOTE: We symlink lib64->lib here to ensure that our runtime linker works on
+#       x86, x86_64 multilib, and pure64.  There does exist the possibility
+#       that we're copying in binaries with conflicting runtime libs, though
+#       (e.g., say mdadm is 32bit on host system, it will put the 32bit
+#       libc.so.6 in /lib which will break all the 64bi binaries...).
+#
+# FIXME: at least add a check for this to warn the user...
+#
+$ln -s lib lib64 || exit 1
 
 # Copy all required shared libs
 decho '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
