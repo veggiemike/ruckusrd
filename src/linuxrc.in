@@ -260,19 +260,9 @@ PATH=/sbin:/bin
 
 exec < /dev/console > /dev/console 2>&1
 
-# mount tmpfs for /dev
-mount -n -t tmpfs -o mode=0755 udev /dev
-
-# create initial device nodes
-mknod /dev/console c 5 1
-mknod /dev/null c 1 3
-mknod /dev/kmsg c 1 11
-mkdir /dev/pts
-mkdir -m 1777 /dev/shm
-ln -fs /proc/self/fd /dev/fd
-ln -fs fd/0 /dev/stdin
-ln -fs fd/1 /dev/stdout
-ln -fs fd/2 /dev/stderr
+# mount devtmpfs for /dev
+mount -n -t devtmpfs -o mode=0755 devtmpfs /dev || \
+    ( echo "is CONFIG_DEVTMPFS enabled in your kernel?"; emergency_shell )
 
 # mount virtual filesystems
 mount -n -t proc proc /proc
