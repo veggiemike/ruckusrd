@@ -35,6 +35,8 @@ AC_DEFUN([NEEDED_PROGS],
 	  fsck.ext3
 	  fsck.ext4
 	  grep
+	  gzip
+	  head
 	  insmod
 	  kill
 	  killall5
@@ -60,9 +62,11 @@ AC_DEFUN([NEEDED_PROGS],
 	  sleep
 	  sort
 	  switch_root
+	  tail
 	  udevd
 	  umount
 	  vi
+	  zcat
 	 ])
 
 m4_foreach_w([P], NEEDED_PROGS,
