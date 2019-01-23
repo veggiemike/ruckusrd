@@ -1,0 +1,226 @@
+-*- org -*-
+
+OverlayFS instead of device mapper voodoo
+
+* Overview
+As always, default behavior of linuxrc script will be to assemble a traditional
+root filesystem and switch over to it.
+
+Until we remove it, the old squashfs behavior (complete w/ autodetecting
+presence of squashfs.img at /) will remain.  Will probably wait a rev or so
+before removal.
+
+If =sqsh_layers=layer1:layer2= is provided on the kernel command line,
+=/layer1.sqsh= will be mounted at =/layer1=, =/layer2.sqsh= at =/layer2=, etc.
+These layers will be used as the "lower layers" for an OverlayFS mount.  Note
+that OverlayFS stacks lower layers from right to left (i.e., =layer1= is
+stacked on top of =layer2=).
+
+The "upper layer" is for read-write functionality.  Unless overriden via other
+parameters, =/upper= will be used.
+
+After switching root, this will result in the rootdev being at =/mnt/root-true=
+with each read-only squashfs layer being mounted at =/mnt/sqsh_layer-NAME=.
+Since the upper layer needs to be writable, the rootdev will be mounted
+read-write.
+
+* Additional parameters
+** ram_layer=SIZE
+Use RAM for the upper layer.  This will result in tmpfs of the requested SIZE
+mounted at =/upper=.  Any valid value for the tmpfs =size== option can be
+specified (e.g., 2G, 50%).  Since rootdev will no longer need to be writable,
+it will be mounted read-only.
+
+** sqsh_layerdev=DEV
+Use DEV as an alternate device for locating the sqsh layers.  DEV will be
+mounted read-only.  This is primarily for supporting sharing of a read-only
+device between multiple virtual machines which all have their own dedicated
+rootdev for the upper layer.
+
+NOTE: This option cannot be used along with =to_ram= because... why would you
+      do that?  The point of =to_ram= is allowing for removal of the root
+      device after boot.  To use =to_ram= with a separate sqshdev would work in
+      theory, as long as we copy layers from the correct path, but how many
+      different pieces of removable media are really going to require at
+      bootup?  More than 1?  I see no use-case for that.
+
+** sqsh_layerdir=DIR
+Use DIR as the relative path to the images provided via =sqsh_layers=.  This is
+so that the layers can be located somewhere other than at the root of the
+specified device.
+
+* Kernel command line examples
+** read-write upper on rootdev
+root=/dev/sda1 sqsh_layers=extra:server:base
+
+** read-write upper on rootdev but sqsh_layers on alternate read-only device
+root=/dev/xvda1 sqsh_layerdev=/dev/xvdb1 sqsh_layers=extra:server:base
+
+** read-only rootdev, RAM upper layer
+root=/dev/sda1 sqsh_layers=extra:server:base ram_layer=50%
+
+** unmounted/removable rootdev, RAM upper layer
+root=/dev/sda1 sqsh_layers=extra:server:base ram_layer=50% to_ram
+
+* Making changes persistent when using ram_layer
+At any point, while running with =ram_layer=, changes can be made persistent by
+doing:
+
+: # mksquashfs /mnt/root-true/upper/upper \
+:      /mnt/root-true/newlayer.sqsh
+
+and preppending =newlayer:= to =sqsh_layers= on the kernel command line.
+
+How to merge a couple squashfs layers into a single one...?
+
+Say you've got =new3:new2:new1:server:base= and you want to merge all the new
+layers together:
+
+copy contents of new1, new2, and new3 into a new tmpfs mount, then mksquashfs
+and modify kernel params
+
+: # cd /mnt/root-true
+: # mkdir supernew
+: # mount -t tmpfs none supernew
+: # cp -a new[123]/* supernew
+: # mksquashfs supernew supernew.sqsh
+: # umount supernew
+
+or combine new1,2,3 with a secondary overlayfs mount?
+
+: # cd /mnt/root-true
+: # mkdir supernew
+: # mount -t overlayfs -o lowerdir=new3,new2,new1 none supernew
+: # mksquashfs supernew supernew.sqsh
+: # umount supernew
+
+* Filesystem creation example
+** base (using tmpfs as a dumping zone)
+mkdir -p merged
+mount -t tmpfs none merged
+
+pushd merged
+restore -rly -f path/to/base.img
+popd
+
+mksquashfs merged base.sqsh
+
+umount merged
+
+mkdir base
+mount -o loop base.sqsh base
+
+** server (via overlayfs)
+mount -t tmpfs none upper
+mkdir -p upper/{upper,work}
+
+mkdir merged
+mount -t overlay -o lowerdir=base,upperdir=upper/upper,workdir=upper/work \
+    none merged
+
+pushd merged
+restore -rly -f path/to/server.img
+popd
+
+umount merged
+
+mksquashfs upper/upper server.sqsh
+
+umount upper
+
+mkdir server
+mount -o loop server.sqsh server
+
+** extra (via overlayfs)
+mount -t tmpfs none upper
+mkdir -p upper/{upper,work}
+
+mkdir -p merged
+mount -t overlay -o \
+    lowerdir=server:base,upperdir=upper/upper,workdir=upper/work \
+    none merged
+
+pushd merged
+restore -ly path/to/extra.img
+popd
+
+umount merged
+
+mksquashfs upper/upper extra.sqsh
+
+umount upper
+
+mkdir extra
+mount -o loop extra.sqsh extra
+
+** config (via overlayfs)
+mount -t tmpfs none upper
+mkdir -p upper/{upper,work}
+
+mkdir -p merged
+mount -t overlay -o \
+    lowerdir=extra:server:base,upperdir=upper/upper,workdir=upper/work \
+    none merged
+
+pushd merged
+--- do manager stuff ---
+popd
+
+umount merged
+
+mksquashfs upper/upper config.sqsh
+
+umount upper
+
+mkdir config
+mount -o loop config.sqsh config
+
+* Possible ruckusrd usage changes and new functionality
+** global flags
+--verbose
+--force
+--dry-run
+--version
+
+** ruckusrd create
+ruckusrd create [--base=DIR] [--kernel=VERSION] IMGNAME
+
+Create an initramfs image.  This is the basic replacement for mkinitrd.  Note
+that we are now deviating from the old Fedora-ish 'mkinitrd' usage, so this
+will break old scripts.
+
+By default, won't overwrite an existing image file.  Default basedir is /.
+Default kernel version is currently running kernel.
+
+** ruckusrd sqsh-convert
+ruckusrd sqsh-convert LAYERNAME
+
+Takes a running system's rootfs and converts it into a .sqsh file suitable for
+use as a =sqsh_layer=.
+
+mount --bind / /tmp/sqsh
+mksqshfs /tmp/sqsh LAYERNAME.sqsh -noappend
+
+** ruckusrd sqsh-commit
+ruckusrd commit [--append] [LAYERNAME]
+
+Commits run-time changes on a non-persistent setup (i.e., when using
+=ram_layer=) by creating a new sqsh_layer to be added to the kernel command
+line.  If desired, changes can be merged into the topmost sqsh_layer.
+
+NOTE: It's up to the user to actually modify the kernel command line arguments
+      in their bootloader config file.
+
+FIXME: could make the user commit and then merge in 2 steps... would simplify
+       command line parsing here a little.
+
+** ruckusrd sqsh-merge
+ruckusrd merge LAYER1 LAYER2 ...
+
+Merge the specified squashfs layers into a single filesystem layer.  This can
+be done periodically to keep things from getting too crazy (i.e., because I'm
+assuming that having a dozen lower layers in an overlayfs is probably pretty
+slow).
+
+NOTE: It's up to the user to actually make similar changes to the kernel
+      command line in the bootloader config file.

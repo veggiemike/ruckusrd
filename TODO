@@ -2,7 +2,18 @@
 
 * For 1.0.0
 
- 1. Iron out the kinks using new versions of udev and systemd (and update README)
+ 1. Iron out the kinks using new versions of udev and systemd (and update
+    README)
+
+ 2. Use BusyBox instead of host system binaries for initramfs population
+
+ 3. Remove old squashfs.img support now that we have new OverlayFS-based
+    sqsh_layers implemented.
+
+ 4. Maybe revamp command-line usage
+
+ 5. Add checksum verification of sqsh_layers to linuxrc.  If anything's been
+    modified, make a lot of noise and don't boot.
 
 
 * For whenever
@@ -12,8 +23,3 @@
  2. test with DM udev events turned on, document results
 
  3. documentation (html, man)
-
- 4. conf removal mechanism (i.e., list of files/dirs to be removed prior to
-    conf population)
-
- 5. conf= flag to specify confdir
