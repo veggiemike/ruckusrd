@@ -44,6 +44,11 @@ differently than your run-of-the-mill mkinitrd.
     needed to boot from CD-ROM or USB flash drive should be compiled into the
     kernel.
 
+    FIXME: lets make this work for distro kernels... i think it
+           practically already does.  we're already using udev to
+           magically pick the right modules to load, we just have to
+           include more types of modules (or all?) in the initramfs
+
  2. Instead of selecting only the needed modules to support mounting the rootfs
     of the host system running the script, ruckusrd sticks ALL the compiled ATA
     modules (and their dependencies) in the initialramfs.  This is an attempt

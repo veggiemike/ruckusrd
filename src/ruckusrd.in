@@ -121,26 +121,20 @@ cd initramfs_dir
 #
 # NOTE: Same goes for /usr/bin and /usr/sbin
 #
-mkdir -p bin dev sys proc usr run $DESTMODDIR sysroot \
-    etc/udev/rules.d lib/udev/rules.d
+mkdir -p bin dev sys proc usr run $DESTMODDIR sysroot etc lib
 
 # Copy host system's udev rules
 #
-# NOTE: We're copying the rules in /lib/udev, NOT the ones in /etc/udev.
+# NOTE: Per CLFS, /etc/udev is for config files and and rules and /lib/udev is
+#       for helper programs... so we copy them both in their entirety.
 #
-# FIXME: I did this because I THINK that lib/udev is installed by udev
-#        and /etc/ isn't, but that's a wild assumption.
-#
-# FIXME: this was needed to get things working on avlinux 6 (debian
-#        squeeze)... but I don't know what version of udev causes our
-#        injected modprobe.rule (in linuxrc) to no longer work.
-#
-# FIXME: the rules use users/groups that aren't defined unless we also
-#        copy over passwd and group... not sure I like that... :-/
-if [ -d /lib/udev/rules.d ]; then
-    cp="cp -a"
-    [ "$opt_verbose" != "0" ] && cp+=" -v"
-    $cp /lib/udev/rules.d/* lib/udev/rules.d || exit 1
+cp="cp -a"
+[ "$opt_verbose" != "0" ] && cp+=" -v"
+if [ -d /lib/udev ]; then
+    $cp /lib/udev lib/ || exit 1
+fi
+if [ -d /etc/udev ]; then
+    $cp /etc/udev etc/ || exit 1
 fi
 
 # Generate a list of binaries to copy into our filesystem
@@ -210,6 +204,7 @@ PROGS+=" @SED@"
 PROGS+=" @SLEEP@"
 PROGS+=" @SORT@"
 PROGS+=" @SWITCH_ROOT@"
+PROGS+=" @SYSTEMD_UDEVD@"
 PROGS+=" @TAIL@"
 PROGS+=" @TREE@"
 PROGS+=" @UDEVADM@"
@@ -223,14 +218,11 @@ PROGS+=" @ZCAT@"
 
 # Copy all the PROGS into the initramfs
 decho '********** COPYING PROGS TO INITRAMFS ******************************************'
-# FIXME: This doesn't preserve hard-links.  I always want to deref symlinks,
-#        but it would be nice if we could NOT deref hardlinks.  Or,
-#        conditionally not deref any link if what it pointed to has also been
-#        added to the initramfs...?
-cp="cp"
-[ "$opt_verbose" != "0" ] && cp+=" -v"
+# NOTE: We want to deref symlinks here to make absolutely sure we're really
+#       getting a binary and not just a broken symlink.
+cp_deref="$cp --dereference"
 for x in $PROGS; do
-    $cp $x bin/ || exit 1
+    $cp_deref $x bin/ || exit 1
 done
 
 # Make a couple symlinks
@@ -255,26 +247,28 @@ $ln -s lib lib64 || exit 1
 
 # Copy all required shared libs
 decho '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
-for i in bin/*; do 
-    ldd $i | sed 's|.*=>||g' | awk '/\// { print $1 }' >> libs 2>/dev/null
+for i in bin/* lib/udev/*; do
+    ldd $i 2>/dev/null | sed 's|.*=>||g' | awk '/\// { print $1 }' >> libs
 done
 
 DEPLIBS=`cat libs | sort -u`
 rm -f libs
 
+# NOTE: Deref symlinks, otherwise we'll end up with a bunch of broken symlinks
+#       instead of actual libraries for every single lib.
 for f in $DEPLIBS; do
-    $cp $f lib/ || exit 1
+    $cp_deref $f lib/ || exit 1
 done
 
-# Copy modules.order and modules.builtin
+# Copy modules.order, modules.builtin, and other KBuild generated files
 #
-# NOTE: depmod complains that these files are missing when it's run below, so
-#       we copy them into the initramfs.
+# NOTE: The depmod call below updates modules.dep and relatives, which needn't
+#       be copied here... but we don't bother weeding them out.
 #
 # FIXME: is it ok to leave modules.order full of modules that aren't being
 #        included in the initramfs?
 #
-$cp $HOSTMODDIR/modules.{order,builtin} $DESTMODDIR/ || exit 1
+$cp $HOSTMODDIR/modules.* $DESTMODDIR/ || exit 1
 
 # FIXME: should probably allow users to add more modules somehow, maybe a
 #        command line arg or a conf file...
@@ -291,11 +285,29 @@ find $HOSTMODDIR/kernel/drivers/scsi -name \*.ko -exec $cp {} $DESTMODDIR/ \;
 decho '********** COPYING BLOCK DRIVERS TO INITRAMFS **********************************'
 find $HOSTMODDIR/kernel/drivers/block -name \*.ko -exec $cp {} $DESTMODDIR/ \;
 
+# FIXME: driver/{md,nvdimm,nvme}, fs/*, ??
+
 # NOTE: if we ever want to add DRM drivers as well (potentially for early KMS
 #       fbcon splash screen), just uncomment the following lines
 #
 #decho '********** COPYING DRM DRIVERS TO INITRAMFS ************************************'
 #find $HOSTMODDIR/kernel/drivers/gpu/drm -name \*.ko -exec $cp {} $DESTMODDIR/ \;
+
+# FIXME: for now, until i get things working, copy ALL kernel modules...  and
+#        make sure to snag .ko.xz and .ko
+#
+find $HOSTMODDIR/kernel \( -name \*.ko.xz -o -name \*.ko \) \
+    -exec $cp {} $DESTMODDIR/ \;
+
+xz="xz"
+[ "$opt_verbose" != "0" ] && xz+=" -v"
+
+# NOTE: I was originally decompressing each .ko.xz file so that I could xz the
+#       entire initramfs at the end more optimally, but that leads to kernel
+#       taint w/ kernel signing turned on... so, i guess i won't do this.
+#
+#find $DESTMODDIR -name \*.xz -exec $xz -d {} \;
+
 
 # Make sure none of the MODS we've installed have unmet dependencies
 decho '********** COPYING MODULE DEPS TO INITRAMFS ************************************'
@@ -357,15 +369,26 @@ go="find bin lib -type f -exec strip --strip-unneeded {} \;"
 decho $go
 eval $go
 
+# Warn if we've created any broken symlinks
+decho '********** CHECKING FOR BROKEN SYMLINKS ****************************************'
+go="find . -xtype l -printf '%p '"
+decho $go
+blarg=$(eval $go)
+if [ -n "$blarg" ]; then
+    echo "WARNING: broken link(s) detected: $blarg"
+fi
+
 # Create the compressed image
 decho '********** CREATING COMPRESSED CPIO IMAGE **************************************'
 cpio="cpio"
 [ "$opt_verbose" != "1" ] && cpio+=" --quiet"
-find . | $cpio -o -H newc | gzip -9 > ../initramfs || exit 1
+find . | $cpio -o -H newc | $xz -zc --check=crc32 > ../initramfs || exit 1
 
 cd $original_pwd
 rm -f $INITRAMFS_TARGET
-$cp $TEMPDIR/initramfs $INITRAMFS_TARGET
+mv="mv"
+[ "$opt_verbose" != "0" ] && mv+=" -v"
+$mv $TEMPDIR/initramfs $INITRAMFS_TARGET
 rm -rf $TEMPDIR
 
 echo "Done; initramfs is $(du -h $INITRAMFS_TARGET | awk '{print $1}')."

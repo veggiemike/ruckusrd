@@ -459,10 +459,14 @@ if [ -z "$(ls -A /lib/udev/rules.d)" ]; then
 fi
 
 decho "starting udevd"
-# FIXME: when did --resolve-names get added?  I know my old fedora 9
-#        box didn't have that flag...
-/sbin/udevd --daemon --resolve-names=never || \
-    /sbin/udevd --daemon
+if [ -f /bin/systemd-udevd ]; then
+    /sbin/systemd-udevd --daemon --resolve-names=never
+else
+    # FIXME: when did --resolve-names get added?  I know my old fedora 9 box
+    #        didn't have that flag...
+    /sbin/udevd --daemon --resolve-names=never || \
+        /sbin/udevd --daemon
+fi
 
 # load loop module (if not built-in)
 if [ -d /sys/module/loop ]; then
@@ -1084,7 +1088,7 @@ fi
 
 # Leave initramfs and transition to rootfs
 #
-kill `pidof udevd`
+kill `pidof udevd systemd-udevd`
 
 decho "switching to real rootfs..."
 go="exec switch_root /sysroot $init $initargs"

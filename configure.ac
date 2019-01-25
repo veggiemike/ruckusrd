@@ -63,7 +63,6 @@ AC_DEFUN([NEEDED_PROGS],
 	  sort
 	  switch_root
 	  tail
-	  udevd
 	  umount
 	  vi
 	  zcat
@@ -101,6 +100,23 @@ m4_foreach_w([P], OPTIONAL_PROGS,
    AC_ARG_VAR(m4_bpatsubst(m4_toupper(P), [\.], [_]), Path to P)
   ])
 
+
+# We need either udevd or systemd-udevd
+have_udevd=0
+have_systemd_udevd=0
+AC_PATH_PROG(UDEVD, [udevd])
+AS_IF([test "$UDEVD" != ""],
+  [have_udevd=1],
+  [AC_PATH_PROG(SYSTEMD_UDEVD, [systemd-udevd], [], [$PATH:/usr/lib/systemd])
+   AS_IF([test "$SYSTEMD_UDEVD" != ""],
+     [have_systemd_udevd=1],
+     [AC_MSG_ERROR([Either udevd or systemd-udevd are required])
+     ])
+  ])
+AC_SUBST(have_udevd)
+AC_SUBST(have_systemd_udevd)
+AC_ARG_VAR(UDEVD, [Path to udevd])
+AC_ARG_VAR(SYSTEMD_UDEVD, [Path to systemd_udevd (udevd is prefered)])
 
 # We need either udevadm or udevstart
 #
