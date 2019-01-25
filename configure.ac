@@ -40,6 +40,7 @@ AC_DEFUN([NEEDED_PROGS],
 	  insmod
 	  kill
 	  killall5
+	  kmod
 	  ldd
 	  less
 	  ln

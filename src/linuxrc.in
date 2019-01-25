@@ -92,7 +92,11 @@ do_raid_and_lvm()
 
     if [ "$have_mdadm" != "0" ]; then
         # autogen mdadm.conf
-	echo 'DEVICE /dev/sd*[0-9]' > /etc/mdadm.conf
+        cat <<EOF > /etc/mdadm.conf
+AUTO +imsm +1.x -all
+DEVICE /dev/sd*[0-9]
+EOF
+
 	mdadm --examine --scan | sed 's|/dev/.tmp.|/dev/|' >> /etc/mdadm.conf
 	[ "$quiet" != "1" ] && cat /etc/mdadm.conf
 

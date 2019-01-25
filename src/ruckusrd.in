@@ -180,6 +180,7 @@ PROGS+=" @HEAD@"
 PROGS+=" @INSMOD@"
 PROGS+=" @KILL@"
 PROGS+=" @KILLALL5@"
+PROGS+=" @KMOD@"
 PROGS+=" @LDD@"
 PROGS+=" @LESS@"
 PROGS+=" @LN@"
@@ -270,34 +271,18 @@ done
 #
 $cp $HOSTMODDIR/modules.* $DESTMODDIR/ || exit 1
 
+# copy in boot-related kernel modules
+#
 # FIXME: should probably allow users to add more modules somehow, maybe a
 #        command line arg or a conf file...
-
-# Copy over ATA drivers
-decho '********** COPYING ATA DRIVERS TO INITRAMFS ************************************'
-find $HOSTMODDIR/kernel/drivers/ata -name \*.ko -exec $cp {} $DESTMODDIR/ \;
-
-# Copy over SCSI drivers
-decho '********** COPYING SCSI DRIVERS TO INITRAMFS ***********************************'
-find $HOSTMODDIR/kernel/drivers/scsi -name \*.ko -exec $cp {} $DESTMODDIR/ \;
-
-# Copy over block drivers
-decho '********** COPYING BLOCK DRIVERS TO INITRAMFS **********************************'
-find $HOSTMODDIR/kernel/drivers/block -name \*.ko -exec $cp {} $DESTMODDIR/ \;
-
-# FIXME: driver/{md,nvdimm,nvme}, fs/*, ??
-
+#
 # NOTE: if we ever want to add DRM drivers as well (potentially for early KMS
-#       fbcon splash screen), just uncomment the following lines
+#       fbcon splash screen), add drivers/gpu to the find statement below.
 #
-#decho '********** COPYING DRM DRIVERS TO INITRAMFS ************************************'
-#find $HOSTMODDIR/kernel/drivers/gpu/drm -name \*.ko -exec $cp {} $DESTMODDIR/ \;
-
-# FIXME: for now, until i get things working, copy ALL kernel modules...  and
-#        make sure to snag .ko.xz and .ko
-#
-find $HOSTMODDIR/kernel \( -name \*.ko.xz -o -name \*.ko \) \
-    -exec $cp {} $DESTMODDIR/ \;
+find $HOSTMODDIR/kernel/drivers/{ata,block,cdrom,md,nvme,scsi,usb} \
+    $HOSTMODDIR/kernel/fs \
+    \( -name \*.ko.xz -o -name \*.ko \) \
+    -exec $cp {} $DESTMODDIR/ \; 2>/dev/null
 
 xz="xz"
 [ "$opt_verbose" != "0" ] && xz+=" -v"
@@ -382,7 +367,7 @@ fi
 decho '********** CREATING COMPRESSED CPIO IMAGE **************************************'
 cpio="cpio"
 [ "$opt_verbose" != "1" ] && cpio+=" --quiet"
-find . | $cpio -o -H newc | $xz -zc --check=crc32 > ../initramfs || exit 1
+find . | $cpio -o -H newc | $xz -vzc --check=crc32 > ../initramfs || exit 1
 
 cd $original_pwd
 rm -f $INITRAMFS_TARGET
