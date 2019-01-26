@@ -13,6 +13,7 @@ AC_DEFUN([NEEDED_PROGS],
 	 [dnl all progs are copied into the initramfs
 	  basename
 	  blockdev
+	  busybox
 	  cat
 	  chmod
 	  chroot
@@ -64,6 +65,7 @@ AC_DEFUN([NEEDED_PROGS],
 	  sort
 	  switch_root
 	  tail
+	  touch
 	  umount
 	  vi
 	  zcat

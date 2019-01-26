@@ -276,9 +276,12 @@ mount -n -t sysfs sysfs /sys
 ln -fs /proc/mounts /etc/mtab
 
 # ensure hotplog script is disabled even if CONFIG_UEVENT_HELPER is enabled
-if [ -f /proc/sys/kernel/hotplug ]; then
-    echo "" > /proc/sys/kernel/hotplug
+if [ ! -f /proc/sys/kernel/hotplug ]; then
+    echo "is CONFIG_UEVENT_HELPER_PATH configured in your kernel?"
+    emergency_shell
 fi
+echo "/sbin/mdev" > /proc/sys/kernel/hotplug
+
 
 # Declare all variables here.. mostly for housekeeping
 init="/sbin/init"
@@ -423,6 +426,9 @@ if [ -n "$shell" ]; then
     bash
 fi
 
+# load loop module (if not built-in)
+modprobe loop
+
 echo -n "determining what to mount... "
 
 generate_udev_rules root $root
@@ -432,6 +438,19 @@ generate_udev_rules root $root
 
 echo "$thingtomount (dmroot=$dmroot)"
 
+if [ -f /bin/busybox ]; then
+    decho "starting mdev"
+    ln -s /bin/busybox /sbin/mdev
+    cat > /etc/mdev.conf <<"EOF"
+# support module loading on hotplug
+$MODALIAS=.*	root:root 660 @modprobe "$MODALIAS"
+EOF
+    mdev -s
+    sleep 1
+
+else
+
+decho "starting udevd"
 echo "udev_log=\"error\"" >> /etc/udev/udev.conf
 
 # rules for loading modules
@@ -457,12 +476,16 @@ echo "udev_log=\"error\"" >> /etc/udev/udev.conf
 # FIXME: No 1 is bad... if i have blkid, i don't even check for vol_id.  and
 #        having blkid actually has no correlation with the version of udev
 #        we're using.
-if [ -z "$(ls -A /lib/udev/rules.d)" ]; then
-    echo -n "ACTION==\"add\", SUBSYSTEM==\"?*\", ENV{MODALIAS}==\"?*\", RUN+=\"/sbin/modprobe $" >> /etc/udev/rules.d/10-modprobe.rules
-    echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
-fi
+#
+# FIXME: this is biting me again... i can't get modules to autoload on CentOS7
+#        right now... the distro's modprobe rule used builtin kmod instead of
+#        modprobe and doesn't seem to ever get triggered...
+#
+#if [ -z "$(ls -A /lib/udev/rules.d)" ]; then
+#    echo -n "ACTION==\"add\", SUBSYSTEM==\"?*\", ENV{MODALIAS}==\"?*\", RUN+=\"/sbin/modprobe $" >> /etc/udev/rules.d/10-modprobe.rules
+#    echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
+#fi
 
-decho "starting udevd"
 if [ -f /bin/systemd-udevd ]; then
     /sbin/systemd-udevd --daemon --resolve-names=never
 else
@@ -472,13 +495,12 @@ else
         /sbin/udevd --daemon
 fi
 
-# load loop module (if not built-in)
-if [ -d /sys/module/loop ]; then
-    loop_builtin=1
-else
-    loop_builtin=0
-    modprobe loop
-fi
+#if [ -d /sys/module/loop ]; then
+#    loop_builtin=1
+#else
+#    loop_builtin=0
+#    modprobe loop
+#fi
 
 # tell udevd to start processing its queue
 #
@@ -489,29 +511,34 @@ fi
 # FIXME: should I also "settle" in here?  that would wait until udev is done
 #        emptying its queue... but we already have a timer loop later on.
 if [ "$have_udevadm" != "0" ]; then
-    /sbin/udevadm trigger
+    /sbin/udevadm trigger --action=add --type=subsystems
+    /sbin/udevadm trigger --action=add --type=devices
+    /sbin/udevadm settle
 
-    if [ "$loop_builtin" != 0 ]; then
-        # create loop devices
-        #
-        # NOTE: If loop was compiled in, then the module didn't get loaded,
-        #       which means udev won't ever create the /dev/loop* device
-        #       nodes.
-        #
-        # FIXME: This assumes that the device minor numbers increment by 1 per
-        #        loop device, which can be untrue if loop was compiled with
-        #        support for partitions.  I don't care right now.  Anyone
-        #        actually building loop into their kernels AND changing the
-        #        defaults will have to change the following for loop.
-        for ((x=0; x<8; x++)); do
-            mknod -m 660 /dev/loop$x b 7 $x
-        done
-    fi
+# FIXME: this whole thing is solved by CONFIG_DEVTMPFS, which we now require
+#
+#    if [ "$loop_builtin" != 0 ]; then
+#        # create loop devices
+#        #
+#        # NOTE: If loop was compiled in, then the module didn't get loaded,
+#        #       which means udev won't ever create the /dev/loop* device
+#        #       nodes.
+#        #
+#        # FIXME: This assumes that the device minor numbers increment by 1 per
+#        #        loop device, which can be untrue if loop was compiled with
+#        #        support for partitions.  I don't care right now.  Anyone
+#        #        actually building loop into their kernels AND changing the
+#        #        defaults will have to change the following for loop.
+#        for ((x=0; x<8; x++)); do
+#            mknod -m 660 /dev/loop$x b 7 $x
+#        done
+#    fi
 else
     /sbin/udevstart
 
     # NOTE: Testing on old hardware with loop compiled into the kernel
     #       indicates that udevstart creates /dev/loop1-8 for us.
+fi
 fi
 
 # initialize LVM if needed now
