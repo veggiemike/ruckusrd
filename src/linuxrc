@@ -277,10 +277,7 @@ shell=""
 maint=""
 hoststamp=""
 quiet=0
-overlay_size="512M"
 dmroot=0
-squashfs="squashfs.img"
-squashdev=""
 sqsh_layers=""
 sqsh_layerdev=""
 sqsh_layerdir="/tmproot"
@@ -336,15 +333,6 @@ for o in `cat /proc/cmdline` ; do
     rootfstype=*)
         rootfstype=${o#rootfstype=}
         ;;
-    overlay_size=*)
-        overlay_size=${o#overlay_size=}
-        ;;
-    squashfs=*)
-        squashfs=${o#squashfs=}
-        ;;
-    squashdev=*)
-        squashdev=${o#squashdev=}
-        ;;
     sqsh_layers=*)
         sqsh_layers=${o#sqsh_layers=}
         # make layers space-delimited for iterating
@@ -393,9 +381,6 @@ decho "rootfstype=$rootfstype"
 decho "to_ram=$to_ram"
 decho "maint=$maint"
 decho "hoststamp=$hoststamp"
-decho "overlay_size=$overlay_size"
-decho "squashfs=$squashfs"
-decho "squashdev=$squashdev"
 decho "sqsh_layers=$sqsh_layers"
 decho "sqsh_layerdev=$sqsh_layerdev"
 decho "sqsh_layerdir=$sqsh_layerdir"
@@ -414,7 +399,6 @@ modprobe loop
 echo -n "determining what to mount... "
 
 generate_udev_rules root $root
-[ -n "$squashdev" ] && generate_udev_rules squashdev $squashdev
 [ -n "$sqsh_layerdev" ] && generate_udev_rules sqsh_layerdev $sqsh_layerdev
 
 
@@ -495,7 +479,6 @@ fi
 # wait for udev symlinks to get created
 wait_for_udev_symlink 30 /dev/root
 root_true=`readlink /dev/root`
-[ -n "$squashdev" ] && wait_for_udev_symlink 30 /dev/squashdev
 [ -n "$sqsh_layerdev" ] && wait_for_udev_symlink 30 /dev/sqsh_layerdev
 
 # run fsck on root dev
@@ -539,17 +522,6 @@ if [ "$RES" != "0" ] ; then
     bash
 fi
 
-# look for squashdev
-if [ -h /dev/squashdev ]; then
-    # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
-    go="mkdir -p /squashdev && mount -t auto -o ro /dev/squashdev /squashdev"
-    decho $go
-    eval $go
-    SQUASHED="/squashdev/$squashfs"
-else
-    SQUASHED="/sysroot/$squashfs"
-fi
-
 # look for sqsh_layerdev
 if [ -h /dev/sqsh_layerdev ]; then
     # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
@@ -581,7 +553,7 @@ fi
 
 # do prep for squashfs magic common to both old device-mapper and new overlayfs
 # implementations
-if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
+if [ -n "$sqsh_layers" ]; then
     decho "doing common squashfs prep"
 
     ln -s $root_true /dev/root-true
@@ -590,12 +562,6 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     mkdir /tmproot
     decho "moving /sysroot to /tmproot"
     mount --move /sysroot /tmproot
-
-    # update this variable to point into /tmproot (unless we're using a
-    # squashdev)
-    if [ -z "$squashdev" ]; then
-        SQUASHED="/tmproot/$squashfs"
-    fi
 fi
 
 # squashfs magic time
@@ -691,144 +657,11 @@ if [ -n "$sqsh_layers" ]; then
     if [ -z "$to_ram" ] && [ -d /tmproot/boot ]; then
         mount --bind /tmproot/boot /sysroot/boot
     fi
-
-elif [ -f $SQUASHED ]; then
-    # NOTE: if $SQUASHED exists, the system we're attempting to boot has been
-    #       set up with a squashfs read-only rootfs image to be used with a
-    #       writable overlay using some device mapper voodoo
-    #
-    # NOTE: additionally, $SQUASHED can be loaded into RAM to free up the
-    #       underlying root device (excellent for booting off removable media
-    #       on systems with enough RAM to handle such a thing.
-    #
-    decho "setting up squashfs device mapper voodoo"
-
-    if [ -n "$to_ram" ]; then
-	echo -n "Copying compressed rootfs image to RAM... "
-	dd if=$SQUASHED of=/squashed.img bs=512 2> /dev/null
-	echo "done"
-	SQUASHED="/squashed.img"
-    fi
-
-    SQUASHED_LOOPDEV=$( losetup -f )
-    losetup $SQUASHED_LOOPDEV $SQUASHED
-    mkdir -p /squashfs
-    mount -t squashfs -o ro $SQUASHED_LOOPDEV /squashfs
-
-    BASE_LOOPDEV=$( losetup -f )
-    losetup $BASE_LOOPDEV /squashfs/rootfs.img
-
-    umount -l /squashfs
-
-    # create a sparse file for the overlay
-    #
-    # NOTE: this uses our overlay_size variable, which can be set on the command
-    #       line. we do no syntax checking here, just assuming that an invalid
-    #       argument will cause dd to bail.
-    decho "creating overlay image (size=$overlay_size)"
-    dd if=/dev/null of=/overlay bs=1 count=0 seek=$overlay_size 2> /dev/null
-    decho "losetup for overlay"
-    OVERLAY_LOOPDEV=$( losetup -f )
-    decho "device: $OVERLAY_LOOPDEV"
-    losetup $OVERLAY_LOOPDEV /overlay
-
-    # set up the snapshot
-    #
-    # NOTE: start_sector num_sectors target_type target_args
-    #
-    # NOTE: manpage doesn't describe snapshot's args...
-    decho "setting up snapshot device (root-rw)"
-    echo 0 `blockdev --getsz $BASE_LOOPDEV` snapshot $BASE_LOOPDEV $OVERLAY_LOOPDEV p 8 | dmsetup create root-rw
-    decho "done"
-
-    # set up new /dev/root symlink
-    ln -fs /dev/mapper/root-rw /dev/root
-
-    # mount the final rootfs
-    decho "mounting final rootfs at /sysroot"
-    mount /dev/root /sysroot
-
-    # populate sysroot with config files
-    #
-    # NOTE: We used to create symlinks unless we were loading the rootfs.img
-    #       into RAM, but that leads to problems with some applications that
-    #       expect a file to be a normal file (e.g., /etc/sudoers) and was also
-    #       causing all kinds of regressions (e.g., What if the file exists
-    #       already in rootfs?  What if the config file you want to cp into
-    #       rootfs needs to actually be a symlink?).  Additionally, the
-    #       conditional code was getting a bit messy.  So, regardless, we now
-    #       always recursively copy the files.
-    #
-    # NOTE: This would be much easier via rsync, but I didn't want to require
-    #       adding rsync (and its required libs) to the initramfs.  Here's a
-    #       list of the gotchas we have to address when overlaying the contents
-    #       of the rootfs with the contents of conf:
-    #
-    #       1. Replacing a dir in rootfs w/ a symlink in conf.  If you don't
-    #          handle this case specially, you end up with a symlink getting
-    #          copied into the existing rootfs dir instead of replacing it.
-    #          Problem can be avoided by removing the target dir in rootfs
-    #          prior to doing a recursive copy.
-    if [ -d /tmproot/conf ]; then
-        echo -n "installing files from conf dir..."
-        pushd /tmproot/conf >/dev/null
-        find . -type l -exec mv /sysroot/{} /sysroot/{}.ruckusrd 2>/dev/null \;
-        cp -dpR . /sysroot/
-        popd >/dev/null
-        echo " done"
-    fi
-
-    # update ld
-    #
-    # NOTE: we'll need to do this if the config area had any shared libs,
-    #       otherwise our system could be unstable once booted.
-    #
-    # NOTE: we do this chrooted, so we only need to copy chroot into the
-    #       initramfs.
-    #
-    # NOTE: while we do care if this fails, it really shouldn't make the
-    #       system unbootable, so we'll ignore failure.
-    #
-    # NOTE: instead of hardcoding the path to ldconfig (which would be assuming
-    #       too much about the system we're trying to boot, regardless of path
-    #       standards), we setup an env with PATH set super-inclusively then let
-    #       bash use PATH to find ldconfig inside the chrooted system.
-    #
-    # FIXME: this really only NEEDS to be done if we have a conf dir..., and
-    #        there's a conditional for that right above.
-    #
-    decho "updating ld"
-    CHROOTPATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
-    chroot /sysroot /usr/bin/env -i PATH=$CHROOTPATH /bin/bash -c ldconfig \
-        || echo -n
-
-    # ensure the /dev/root symlink exists on the target system once udev is done
-    # doing its thing
-    #
-    # FIXME: what if /dev on the real rootfs already has a /dev/root symlink
-    #        (e.g., from the last time we booted)?  i want to let udev do
-    #        it's thing... but if an old /dev/root exists and points to the
-    #        wrong device, won't boot...  i can't guarantee that the
-    #        /dev/root we created has been removed by the host system's init
-    #        scripts on shutdown.
-    #
-    # FIXME: why were we doing this?  is there anything post initramfs that
-    #        REQUIRES a /dev/root symlink?
-    #
-    decho "adding squashfs /dev/root tweak to rc.local"
-    cat <<EOF >> /sysroot/etc/rc.local
-
-if [ ! -f /dev/root ]; then
-    ln -fs `readlink /dev/root` /dev/root 2>/dev/null
 fi
-EOF
-
-fi
-
 
 # do extra squashfs magic common to both old device-mapper and new overlayfs
 # implementations
-if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
+if [ -n "$sqsh_layers" ]; then
     decho "doing common squashfs finalization"
 
     # copy over module options
@@ -839,7 +672,7 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     #
     # NOTE: but we don't want this if sqsh_layers w/out ram_overlay
     #
-    if [ -z "$ram_layer" ] || [ -f $SQUASHED ]; then
+    if [ -z "$ram_layer" ]; then
         [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
     fi
 
@@ -871,22 +704,12 @@ if [ -n "$sqsh_layers" ] || [ -f $SQUASHED ]; then
     #        work w/ systemd.
     #
     # NOTE: We always have the rc.local appendage, but the content changes
-    #       depending on other params (e.g., squashdev, to_ram).
+    #       depending on other params (e.g., sqsh_layerdev, to_ram).
     #
     cp /sysroot/etc/rc.local{,.ruckusrdbak}
     cat <<EOF >> /sysroot/etc/rc.local
 # --- begin ruckusrd appendage ---
 EOF
-
-    # move /squashdev into /sysroot
-    if [ -h /dev/squashdev ]; then
-        decho "moving /squashdev to /sysroot/mnt/"
-        mkdir -p /sysroot/mnt/squashdev
-	mount --move /squashdev /sysroot/mnt/squashdev
-	cat <<EOF >> /sysroot/etc/rc.local
-echo /dev/squashdev /mnt/squashdev auto ro 0 0 >> /etc/mtab
-EOF
-    fi
 
     # move /sqsh_layerdev into /sysroot
     if [ -h /dev/sqsh_layerdev ]; then
@@ -986,8 +809,8 @@ EOF
     #
     # NOTE: If not to_ram, the device(s) required to assemble the rootfs end up
     #       getting moved to mountpoints on top of the rootfs in the final
-    #       system.  This leaves us with a can't unmount /mnt/squashdev w/out
-    #       unmounting / first dilemma leading to potential errors and
+    #       system.  This leaves us with a can't unmount /mnt/sqsh_layerdev
+    #       w/out unmounting / first dilemma leading to potential errors and
     #       time-outs during shutdown.  The easy fix is to lazy-unmount the
     #       troublesome devices.  The messy part is how to do it w/out making
     #       assumptions about the system being booted.  We have to register
@@ -1008,9 +831,6 @@ umount -l /boot 2>/dev/null
 
 mount -o remount,ro /mnt/root-true 2>/dev/null
 umount -l /mnt/root-true 2>/dev/null
-
-mount -o remount,ro /mnt/squashdev 2>/dev/null
-umount -l /mnt/squashdev 2>/dev/null
 
 mount -o remount,ro /mnt/sqsh_layerdev 2>/dev/null
 umount -l /mnt/sqsh_layerdev 2>/dev/null
