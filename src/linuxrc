@@ -443,7 +443,7 @@ if [ -f /bin/busybox ]; then
     ln -s /bin/busybox /sbin/mdev
     cat > /etc/mdev.conf <<"EOF"
 # support module loading on hotplug
-$MODALIAS=.*	root:root 660 @modprobe "$MODALIAS"
+$MODALIAS=.*	0:0 660 @/sbin/modprobe "$MODALIAS"
 EOF
     mdev -s
     sleep 1

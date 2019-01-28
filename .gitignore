@@ -8,7 +8,3 @@ autom4te.cache/
 config.log
 config.status
 configure
-
-# built files
-src/ruckusrd
-src/linuxrc
