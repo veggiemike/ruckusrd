@@ -44,15 +44,6 @@
 # - bash var+=
 
 
-# a couple substitutions
-have_mdadm=@have_mdadm@
-have_lvm=@have_lvm@
-have_blkid=@have_blkid@
-have_vol_id=@have_vol_id@
-have_udevadm=@have_udevadm@
-have_udevstart=@have_udevstart@
-
-
 decho()
 {
     if [ "$quiet" != "1" ]; then
@@ -90,39 +81,35 @@ do_raid_and_lvm()
     #       /dev/sdb has been created.
     [ "$1" != "0" ] && sleep 1
 
-    if [ "$have_mdadm" != "0" ]; then
-        # autogen mdadm.conf
-        cat <<EOF > /etc/mdadm.conf
+    # autogen mdadm.conf
+    cat <<EOF > /etc/mdadm.conf
 AUTO +imsm +1.x -all
 DEVICE /dev/sd*[0-9]
 EOF
 
-	mdadm --examine --scan | sed 's|/dev/.tmp.|/dev/|' >> /etc/mdadm.conf
-	[ "$quiet" != "1" ] && cat /etc/mdadm.conf
+    mdadm --examine --scan | sed 's|/dev/.tmp.|/dev/|' >> /etc/mdadm.conf
+    [ "$quiet" != "1" ] && cat /etc/mdadm.conf
 
-	grep ARRAY /etc/mdadm.conf >/dev/null && raid=1 || raid=0
-	if [ "$raid" != "0" ]; then
-            echo "initializing RAID devices..."
-            go="mdadm --assemble --scan"
-            [ "$quiet" != "1" ] && go="$go -v"
-            decho $go
-            eval $go || echo "WARNING: RAID initialization failed"
-	fi
+    grep ARRAY /etc/mdadm.conf >/dev/null && raid=1 || raid=0
+    if [ "$raid" != "0" ]; then
+        echo "initializing RAID devices..."
+        go="mdadm --assemble --scan"
+        [ "$quiet" != "1" ] && go="$go -v"
+        decho $go
+        eval $go || echo "WARNING: RAID initialization failed"
     fi
 
-    if [ "$have_lvm" != "0" ]; then
-	echo "initializing LVM..."
+    echo "initializing LVM..."
 
-	go="lvm vgscan --mknodes"
-	[ "$quiet" != "1" ] && go="$go -v"
-	decho $go
-	eval $go || echo "WARNING: LVM initialization failed"
+    go="lvm vgscan --mknodes"
+    [ "$quiet" != "1" ] && go="$go -v"
+    decho $go
+    eval $go || echo "WARNING: LVM initialization failed"
 
-	go="lvm vgchange -a y"
-	[ "$quiet" != "1" ] && go="$go -v"
-	decho $go
-	eval $go || echo "WARNING: LVM initialization failed"
-    fi
+    go="lvm vgchange -a y"
+    [ "$quiet" != "1" ] && go="$go -v"
+    decho $go
+    eval $go || echo "WARNING: LVM initialization failed"
 }
 
 
@@ -191,14 +178,9 @@ generate_udev_rules()
     name=$1
     str=$2
 
-    # blkid vs vol_id compatibility
-    if [ "$have_blkid" != "0" ]; then
-	get_label="/sbin/blkid -o value -s LABEL"
-	get_uuid="/sbin/blkid -o value -s UUID"
-    else
-	get_label="/sbin/vol_id -l"
-	get_uuid="/sbin/vol_id -u"
-    fi
+    # blkid commands
+    get_label="/sbin/blkid -o value -s LABEL"
+    get_uuid="/sbin/blkid -o value -s UUID"
 
     # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA, USB, and
     #       SCSI should all be using them.
@@ -495,51 +477,10 @@ else
         /sbin/udevd --daemon
 fi
 
-#if [ -d /sys/module/loop ]; then
-#    loop_builtin=1
-#else
-#    loop_builtin=0
-#    modprobe loop
-#fi
-
 # tell udevd to start processing its queue
-#
-# NOTE: We're maintaining (for now) compatibility for realy old versions of
-#       udev, circa FC5, that used udevstart instead of udevadm (and had
-#       slightly different behavior).
-#
-# FIXME: should I also "settle" in here?  that would wait until udev is done
-#        emptying its queue... but we already have a timer loop later on.
-if [ "$have_udevadm" != "0" ]; then
-    /sbin/udevadm trigger --action=add --type=subsystems
-    /sbin/udevadm trigger --action=add --type=devices
-    /sbin/udevadm settle
-
-# FIXME: this whole thing is solved by CONFIG_DEVTMPFS, which we now require
-#
-#    if [ "$loop_builtin" != 0 ]; then
-#        # create loop devices
-#        #
-#        # NOTE: If loop was compiled in, then the module didn't get loaded,
-#        #       which means udev won't ever create the /dev/loop* device
-#        #       nodes.
-#        #
-#        # FIXME: This assumes that the device minor numbers increment by 1 per
-#        #        loop device, which can be untrue if loop was compiled with
-#        #        support for partitions.  I don't care right now.  Anyone
-#        #        actually building loop into their kernels AND changing the
-#        #        defaults will have to change the following for loop.
-#        for ((x=0; x<8; x++)); do
-#            mknod -m 660 /dev/loop$x b 7 $x
-#        done
-#    fi
-else
-    /sbin/udevstart
-
-    # NOTE: Testing on old hardware with loop compiled into the kernel
-    #       indicates that udevstart creates /dev/loop1-8 for us.
-fi
-fi
+/sbin/udevadm trigger --action=add --type=subsystems
+/sbin/udevadm trigger --action=add --type=devices
+/sbin/udevadm settle
 
 # initialize LVM if needed now
 #
