@@ -58,9 +58,10 @@ do_raid_and_lvm()
     #
     # NOTE: this is needed because this method might be called before we can
     #       guarantee that udev has finished loading modules.
+    #
     x=$1
     msg="waiting up to $x seconds for at least one hdd to appear..."
-    while [ ! -e /dev/sda -a "$x" != "0" ]; do
+    while [ ! -e /dev/sda -a ! -e /dev/nvme0n1 -a "$x" != "0" ]; do
         if [ -n "$msg" ]; then
             echo -n $msg
             msg=""
@@ -85,6 +86,7 @@ do_raid_and_lvm()
     cat <<EOF > /etc/mdadm.conf
 AUTO +imsm +1.x -all
 DEVICE /dev/sd*[0-9]
+DEVICE /dev/nvme[0-9]n[0-9]p[0-9]
 EOF
 
     mdadm --examine --scan | sed 's|/dev/.tmp.|/dev/|' >> /etc/mdadm.conf
@@ -182,10 +184,10 @@ generate_udev_rules()
     get_label="/sbin/blkid -o value -s LABEL"
     get_uuid="/sbin/blkid -o value -s UUID"
 
-    # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA, USB, and
-    #       SCSI should all be using them.
     case $str in
         CDLABEL=*)
+            # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA,
+            #       USB, and SCSI should all be using them.
             CDLABEL=${str#CDLABEL=}
             echo "KERNEL==\"sr[0-9]\", PROGRAM=\"$get_label %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-cdlabel.rules
             echo "KERNEL==\"scd[0-9]\", PROGRAM=\"$get_label %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-cdlabel.rules
