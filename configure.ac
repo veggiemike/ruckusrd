@@ -8,67 +8,29 @@ AC_PROG_MKDIR_P
 AC_PROG_LN_S
 
 
+# Needed to BUILD ruckusrd
+#
+# mksquashfs*
+#
+
+# Needed to RUN ruckusrd
+#
+# ldd, bash, tree*, cpio, cp, mv, find, mkdir, xz*, zcat*
+#
+
+# Needed on the initramfs
+#
 # these programs are required on the host system
 AC_DEFUN([NEEDED_PROGS],
 	 [dnl all progs are copied into the initramfs
-	  basename
-	  blockdev
 	  busybox
-	  cat
-	  chmod
-	  chroot
-	  cp
-	  cpio
-	  cut
-	  date
-	  dd
-	  depmod
-	  dirname
-	  dmesg
-	  dmsetup
+	  dmsetup dnl only used for old squashfs.img support
 	  e2fsck
-	  echo
-	  env
-	  fdisk
-	  find
 	  fsck
 	  fsck.ext2
 	  fsck.ext3
 	  fsck.ext4
-	  grep
-	  gzip
-	  head
-	  insmod
-	  kill
-	  killall5
-	  kmod
-	  ldd
-	  less
-	  ln
 	  losetup
-	  ls
-	  lsmod
-	  mkdir
-	  mknod
-	  mksquashfs
-	  modinfo
-	  modprobe
-	  mount
-	  mv
-	  pidof
-	  ps
-	  readlink
-	  rm
-	  rmmod
-	  sed
-	  sleep
-	  sort
-	  switch_root
-	  tail
-	  touch
-	  umount
-	  vi
-	  zcat
 	 ])
 
 m4_foreach_w([P], NEEDED_PROGS,

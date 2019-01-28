@@ -1,0 +1,124 @@
+-*- mode: org -*-
+
+* Provide built-in binaries instead of slurping host system utils
+
+To make this easier, we're going to use BusyBox for the majority of the
+required initramfs utils.  In addition we'll need eudev (so we can dynamically
+load modules during system boot), lvm2 (for LVM and any other device mapper
+voodoo), mdadm (for raid support), and possibly utils for whatever filesystems
+we want to support (e2fsprogs, xfs-utils, squashfstool, etc, if busybox
+versions are less than adequate).
+
+We'll use git submodules or wget to use specific versions of all of these, so
+that we can upgrade our init scripts when we want to instead of when they get
+broken by host system upgrades.
+
+We should provide --use-system-whatever flags for each as well, for use on
+systems that already have appropriate versions of any of them.
+
+Pro:
+ + Fewer conditional blocks
+ + Smaller initramfs image (by a lot, I think)
+ + Faster boot time (because of smaller initramfs?)
+ + Less (no?) dependence on host sytem
+ + Ability to cross-compile
+ + Much more featureful maint environment for fixing boot problems
+ + Usable w/ distro kernels
+
+Con:
+ - Need to make sure we're not using any bash-isms that aren't in ash (or add
+   bash if we really can't live w/out it)
+
+
+
+* where to install them
+
+When we build and install ruckusrd, we'll have to build any configured bundled
+software install them into pkgdatadir or libexecdir
+
+
+* prepopulate initramfs template?
+
+Should we prepulate a template dir for the initramfs when we install ruckusrd?
+Could make a initramfs.sqsh file lacking only the kernel modules.  Then at
+run-time, we just mount initramfs.sqsh via overlayfs, add kernel modules, and
+turn the results into a compresses cpio archive to install.
+
+NOTE: Could keep template as a cpio archive...  that way we wouldn't require a
+      kernel w/ overlayfs support.  Not that that's realy a hardship, but we do
+      already require cpio.  Same goes for squashfs...
+
+Pro:
+ + Faster initramfs generation once installed
+
+Con:
+ - Running out of the source tree would become problematic
+
+
+* does busybox have everything we need?
+
+I think so, but what about:
+  - lvm, dm (nope)
+  - mdadm (nope)
+  - blockdev (nope, we use it for dm voodoo)
+  - blkid (yes, but just lists all)
+  - fsck (yes, but what fstypes?)
+  - mksquashfs (maybe, but what versions)
+  - mkfs.ext4, tune2fs, e2fsck, etc (yes, but how featureful)
+  - ldd (nope, but do we really need it)
+  - losetup (yes, but no crypto)
+
+lvm includes device mapper and is available at
+https://git.fedorahosted.org/cgit/lvm2.git/ or
+git://git.fedorahosted.org/git/lvm2.git
+
+mdadm: https://github.com/neilbrown/mdadm.git
+
+blockdev is a part of util-linux... might need to lookup size a different way.
+
+
+* ash behavior?
+trap, set, exec, variable substrings, $() subshell, $(()) arithmetic,
+pushd/popd, here docs
+
+
+* mdev instead of eudev?
+
+Originally, I thought I would use mdev for this instead of the system's udev.
+I've had tons of problems getting a single linuxrc scfipt to work w/ multiple
+versions of udev and it's config files.
+
+I don't think mdev is going to work, though.  It looks like it can be used for
+some hotplug module loading, but only via the frowned on CONFIG_UEVENT_HELPER
+infrastructure, and even then my testing doesn't quite show it working 100%
+correctly.  In order to work w/ distro kernels (which is something I'd really
+like), we'd need to be able to do MODALIAS based on-demand module loading at
+bootup.  I've looked at the mdev sources, and it currently iterates over
+/sys/class looking for MODALIAS entries, but doesn't seem to work well enough
+for what I'm looking for.
+
+Even if we did get MODALIAS stuff working, mdev won't do the rootfs
+CDLABEL=|LABEL=|UUID= udev rules for us, so we'd have to write something to do
+those lookups.
+
+
+* linuxrc.in ruckusrd.in no longer?
+
+If we're building/installing our own specificly configured busybox binary
+for use on the initramfs, will we still need to substitute anything in the
+linuxrc or ruckusrd scripts?
+
+If there's only a couple things being substituted, we could do it via a build
+or install hook instead of via configure.  That would make more sense, and is
+actually what's recommended in the autotools manuals.  Could also have both
+ruckusrd and linuxrc parse a generated config file (and make sure it gets
+included in the initramfs).
+
+** ruckusrd.in
+VERSION, path to LINUXRC, have_tree.  Will need path to busybox and links
+file instead of all the host binary substitutions for the progs list.
+
+** linuxrc.in
+nothing will need to be substituted anymore, unless we want to be able to
+track what version of ruckusrd built the initramfs... which might actually
+be a good idea regardless.
