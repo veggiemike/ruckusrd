@@ -12,25 +12,19 @@
 #       symlink if it doesn't exist later on in case something explicitly calls
 #       somethings from /sbin (e.g., /sbin/modprobe).
 #
-# NOTE: Same goes for /usr/bin and /usr/sbin.
+# NOTE: Same goes for /usr/bin, /usr/sbin, and /usr/lib.
 #
+echo '********** MAKING DIRECTORIES **************************************************'
 mkdir -vp initramfs/{bin,dev,sys,proc,usr,run,sysroot,etc,lib} || exit 1
-
-
-# Copy all the PROGS into the initramfs
-echo '********** COPYING PROGS TO INITRAMFS ******************************************'
-tar -C initramfs -vxf ../subprojects/busybox.tar
-#tar -C initramfs -vxf ../subprojects/mdadm.tar
-#tar -C initramfs -vxf ../subprojects/lvm2.tar
-#tar -C initramfs -vxf ../subprojects/eudev.tar
 
 
 # Make a couple symlinks
 echo '********** MAKING SYMLINKS *****************************************************'
-[ ! -d initramfs/bin/bsh ] && (ln -vs sh initramfs/bin/bash || exit 1)
-[ ! -d initramfs/sbin ] && (ln -vs bin initramfs/sbin || exit 1)
-[ ! -d initramfs/usr/bin ] && (ln -vs ../bin initramfs/usr/bin || exit 1)
-[ ! -d initramfs/usr/sbin ] && (ln -vs ../sbin initramfs/usr/sbin || exit 1)
+ln -vs bin initramfs/sbin &&
+ln -vs ../bin initramfs/usr/bin &&
+ln -vs ../sbin initramfs/usr/sbin &&
+ln -vs ../lib initramfs/usr/lib &&
+ln -vs ../lib64 initramfs/usr/lib64 &&
 # Fixup lib vs lib64
 #
 # NOTE: We symlink lib64->lib here to ensure that our runtime linker works on
@@ -45,7 +39,16 @@ echo '********** MAKING SYMLINKS ***********************************************
 #        to do the symlink, because our built-in binaries are probably linked
 #        against host system libs that might be in either dir...
 #
-[ ! -d initramfs/lib64 ] && (ln -vs lib initramfs/lib64 || exit 1)
+ln -vs lib initramfs/lib64 || exit 1
+
+
+# Copy all the PROGS into the initramfs
+echo '********** COPYING PROGS TO INITRAMFS ******************************************'
+for x in ../subprojects/{busybox,mdadm}.tar; do
+    tar -C initramfs --keep-old-files -vxf $x || exit 1
+done
+#tar -C initramfs --no-overwrite-dir -vxf ../subprojects/lvm2.tar
+#tar -C initramfs --no-overwrite-dir -vxf ../subprojects/eudev.tar
 
 
 # Copy all required shared libs
@@ -61,6 +64,49 @@ for f in $DEPLIBS; do
 done
 
 
+# Strip debug info
+echo '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
+go="find initramfs -type f -exec strip --strip-unneeded {} \;"
+echo $go
+eval $go
+
+
+# Copy modprobe.conf and friends over
+#
+# FIXME: Most mkinitrd scripts I've looked at copy /etc/modprobe.conf and
+#        /etc/modprobe.d from the host system to the initramfs...  My initial
+#        testing indicates that this is not necesary, so I'm not going to do it.
+#
+#echo '********** COPYING HOST SYSTEM MODPROBE CONFIG *********************************'
+#if [ -e /etc/modprobe.conf ] ; then
+#    cp /etc/modprobe.conf initramfs/etc
+#fi
+#cp -R /etc/modprobe.d initramfs/etc
+
+
+# Write fstab
+echo '********** GENERATING FSTAB ****************************************************'
+cat > initramfs/etc/fstab <<EOF
+/dev/root  /         auto    defaults,noatime  0 0
+devpts     /dev/pts  devpts  gid=5,mode=620    0 0
+tmpfs      /dev/shm  tmpfs   defaults          0 0
+proc       /proc     proc    defaults          0 0
+sysfs      /sys      sysfs   defaults          0 0
+EOF
+
+
+# Install our initramfs init script
+echo '********** COPYING LINUXRC TO INITRAMFS ****************************************'
+cp -va linuxrc initramfs/init &&
+chmod -v a+x initramfs/init &&
+cp -va ruckusrd.conf initramfs/ || exit 1
+
+
+# Make a couple extra symlinks, if needed
+echo '********** MAKING CONDITIONAL SYMLINKS *****************************************'
+[ ! -d initramfs/bin/bash ] && (ln -vs sh initramfs/bin/bash || exit 1)
+
+
 # Bail if we've created any broken symlinks
 echo '********** CHECKING FOR BROKEN SYMLINKS ****************************************'
 go="find initramfs -xtype l -printf '%p '"
@@ -72,42 +118,6 @@ if [ -n "$blarg" ]; then
 fi
 
 
-# Strip debug info
-echo '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
-go="find initramfs -type f -exec strip --strip-unneeded {} \;"
-echo $go
-eval $go
-
-
-# Install our iniramfs' init script
-echo '********** COPYING LINUXRC TO INITRAMFS ****************************************'
-cp -va linuxrc initramfs/init &&
-chmod -v a+x initramfs/init || exit 1
-
-
-# FIXME: Most mkinitrd scripts I've looked at copy /etc/modprobe.conf and
-#        /etc/modprobe.d from the host system to the initramfs...  My initial
-#        testing indicates that this is not necesary, so I'm not going to do it.
-#
-# Copy modprobe.conf and friends over
-#if [ -e /etc/modprobe.conf ] ; then
-#    cp /etc/modprobe.conf initramfs/etc
-#fi
-#cp -R /etc/modprobe.d initramfs/etc
-
-
-# Write fstab
-cat > initramfs/etc/fstab <<EOF
-/dev/root  /         auto    defaults,noatime  0 0
-devpts     /dev/pts  devpts  gid=5,mode=620    0 0
-tmpfs      /dev/shm  tmpfs   defaults          0 0
-proc       /proc     proc    defaults          0 0
-sysfs      /sys      sysfs   defaults          0 0
-EOF
-
-
-# Install ruckusrd.conf
-cp -va ruckusrd.conf initramfs/ || exit 1
-
 # Create sqsh file
+echo '********** CREATING SQUASHFS ***************************************************'
 mksquashfs initramfs lower.sqsh -noappend || exit 1
