@@ -5,7 +5,9 @@ dist_bin_SCRIPTS += kernel_installer
 dist_bin_SCRIPTS += kernel_tar
 dist_bin_SCRIPTS += ruckusrd
 
-pkgdata_DATA = linuxrc
+pkgdata_DATA =
+pkgdata_DATA += linuxrc
+pkgdata_DATA += ruckusrd.conf
 
 install-exec-hook:
 	$(RM) -f $(DESTDIR)$(bindir)/mkinitrd

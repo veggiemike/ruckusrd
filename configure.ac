@@ -156,5 +156,6 @@ AC_PROG_LN_S
 
 AC_CONFIG_FILES([Makefile
 		 docs/Makefile
-		 src/Makefile])
+		 src/Makefile
+		 src/ruckusrd.conf])
 AC_OUTPUT

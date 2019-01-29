@@ -44,6 +44,9 @@
 # - bash var+=
 
 
+. /ruckusrd.conf
+
+
 decho()
 {
     if [ "$quiet" != "1" ]; then
@@ -247,6 +250,8 @@ set -e
 PATH=/sbin:/bin
 
 exec < /dev/console > /dev/console 2>&1
+
+decho "initramfs created with RuckusRD v$VERSION"
 
 # mount devtmpfs for /dev
 mount -n -t devtmpfs -o mode=0755 devtmpfs /dev || \
