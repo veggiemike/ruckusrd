@@ -74,11 +74,11 @@ busybox/FOO:
 #        conditionally replace this rule w/ one that copies files from
 #        the host system.
 #
-# FIXME: this installs udev rules in usr/lib/udev...  double check
-#        that path once i've added eudev subproject.
+# FIXME: since this installs a bunch of udev rules, maybe we shouldn't
+#        allow --with-system-mdadm?
 #
-# FIXME: if this is mucking w/ udev rules, maybe we shouldn't allow
-#        --with-system-mdadm?
+# NOTE: We let udev rules get installed in /usr/lib/udev, which just
+#       ends up being the right place in initramfs via symlinks.
 #
 # NOTE: We remove manpages here because we don't want them on the
 #       initramfs.
@@ -95,34 +95,30 @@ mdadm/FOO:
 #        conditionally replace this rule w/ one that copies files from
 #        the host system.
 #
-# FIXME: this installs /etc/lvm which might conflict w/ what's
-#        currently in our linuxrc script
+# NOTE: We need to make sure nothing else we're installing links
+#       against the host sytem's libdevmapper... otherwise we have a
+#       library conflict on the initramfs.
 #
-# FIXME: make sure nothing else we're installing links against the
-#        host sytem's libdevmapper... otherwise we have a library
-#        conflict on the initramfs.
+# NOTE: We remove manpages here because we don't want them on the
+#       initramfs.
 #
-# NOTE: We remove manpages and header files here because we don't want
-#       them on the initramfs.
+# NOTE: We disable systemd bits, but enable udev stuff and point to
+#       our eudev subproject.
 #
-# FIXME: shoot, this is linking against host sytem's libudev... which
-#        is going to cause library conflicts in initramfs once we add
-#        eudev.  --disable-udev_sync and --disable-udev-rules?
-#        built-in blkid?  both check libudev via pkgconfig...
-#
-#        don't use systemd: --disable-notify-dbus
-#        --disable-udev-systemd-background-jobs
-#
-#        hmm... i can't seem to keep this from linking against udev,
-#        even w/ all that stuff disabled...  and I can't see where
-#        it's getting linked in lvm's build systems... or included
-#        libs... blarg.  maybe set UDEV_LIBS, UDEV_CFLAGS, etc during
-#        build?
+# NOTE: We disable blkid_wiping because the build system is looking at
+#       the host system's libblkid... but we install busybox's version
+#       of blkid in initramfs.
 #
 lvm2/FOO:
 	pushd lvm2 && \
-	./configure --prefix=/usr && \
+	./configure --prefix=/usr --disable-notify-dbus \
+	  --disable-udev-systemd-background-jobs --disable-selinux \
+	  --enable-udev_sync --enable-udev_rules \
+	  --enable-udev-rule-exec-detection --disable-blkid_wiping \
+	  UDEV_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
+	  UDEV_LIBS="-L$$PWD/../eudev/FOO/lib/ -ludev" \
+	  PKG_CONFIG_PATH=$PWD/../eudev/FOO/lib/pkgconfig:$PWD/../eudev/FOO/usr/share/pkgconfig && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
-	rm -rf FOO/usr/{include,share} && \
+	rm -rf FOO/usr/share && \
 	popd || exit 1
