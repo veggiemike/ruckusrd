@@ -1,0 +1,190 @@
+#!/bin/bash
+
+# Make directory structure
+#
+# NOTE: We're just going to copy all our binaries into bin and ceate sbin as a
+#       compatability symlink in case something explicitly calls somethings
+#       from /sbin (e.g., /sbin/modprobe).
+#
+# NOTE: Same goes for /usr/bin and /usr/sbin
+#
+mkdir -p bin dev sys proc usr run sysroot etc lib
+
+
+# Generate a list of binaries to copy into our filesystem
+#
+# NOTE: We have configure check for all these binaries and substitute their
+#       paths into this list.  The upside to this is that we already know
+#       exactly which binaries are on the system and where they're located.
+#       The downside of this is that new versions of programs installed in
+#       different locations will not get pulled into the initrd, even if they
+#       come first in PATH.
+#
+# NOTE: We're just going to copy all of these into bin.  There's really no point
+#       in differentiating between /bin and /sbin in the initramfs.
+PROGS=""
+PROGS+=" @BASENAME@"
+PROGS+=" @BASH_SHELL@"
+PROGS+=" @BLKID@"
+PROGS+=" @BLOCKDEV@"
+PROGS+=" @BUSYBOX@"
+PROGS+=" @CAT@"
+PROGS+=" @CHMOD@"
+PROGS+=" @CHROOT@"
+PROGS+=" @CP@"
+PROGS+=" @CPIO@"
+PROGS+=" @CUT@"
+PROGS+=" @DATE@"
+PROGS+=" @DD@"
+PROGS+=" @DEPMOD@"
+PROGS+=" @DIRNAME@"
+PROGS+=" @DMESG@"
+PROGS+=" @DMSETUP@"
+PROGS+=" @E2FSCK@"
+PROGS+=" @ECHO@"
+PROGS+=" @ENV@"
+PROGS+=" @FDISK@"
+PROGS+=" @FIND@"
+PROGS+=" @FSCK@"
+PROGS+=" @FSCK_EXT2@"
+PROGS+=" @FSCK_EXT3@"
+PROGS+=" @FSCK_EXT4@"
+PROGS+=" @GREP@"
+PROGS+=" @GZIP@"
+PROGS+=" @HEAD@"
+PROGS+=" @INSMOD@"
+PROGS+=" @KILL@"
+PROGS+=" @KILLALL5@"
+PROGS+=" @KMOD@"
+PROGS+=" @LDD@"
+PROGS+=" @LESS@"
+PROGS+=" @LN@"
+PROGS+=" @LOSETUP@"
+PROGS+=" @LS@"
+PROGS+=" @LSMOD@"
+PROGS+=" @LVM@"
+PROGS+=" @MDADM@"
+PROGS+=" @MKDIR@"
+PROGS+=" @MKNOD@"
+PROGS+=" @MKSQUASHFS@"
+PROGS+=" @MODINFO@"
+PROGS+=" @MODPROBE@"
+PROGS+=" @MOUNT@"
+PROGS+=" @MV@"
+PROGS+=" @PIDOF@"
+PROGS+=" @PS@"
+PROGS+=" @READLINK@"
+PROGS+=" @RM@"
+PROGS+=" @RMMOD@"
+PROGS+=" @SED@"
+PROGS+=" @SLEEP@"
+PROGS+=" @SORT@"
+PROGS+=" @SWITCH_ROOT@"
+PROGS+=" @SYSTEMD_UDEVD@"
+PROGS+=" @TAIL@"
+PROGS+=" @TREE@"
+PROGS+=" @UDEVADM@"
+PROGS+=" @UDEVD@"
+PROGS+=" @UDEVSTART@"
+PROGS+=" @UMOUNT@"
+PROGS+=" @TOUCH@"
+PROGS+=" @VI@"
+PROGS+=" @VOL_ID@"
+PROGS+=" @ZCAT@"
+
+
+# Copy all the PROGS into the initramfs
+decho '********** COPYING PROGS TO INITRAMFS ******************************************'
+# NOTE: We want to deref symlinks here to make absolutely sure we're really
+#       getting a binary and not just a broken symlink.
+cp_deref="$cp --dereference"
+for x in $PROGS; do
+    $cp_deref $x bin/ || exit 1
+done
+
+# Make a couple symlinks
+decho '********** MAKING SYMLINKS *****************************************************'
+ln="ln"
+[ "$opt_verbose" != "0" ] && ln+=" -v"
+$ln -s bash bin/sh || exit 1
+$ln -s bin sbin || exit 1
+$ln -s ../bin usr/bin || exit 1
+$ln -s ../sbin usr/sbin || exit 1
+# Fixup lib vs lib64
+#
+# NOTE: We symlink lib64->lib here to ensure that our runtime linker works on
+#       x86, x86_64 multilib, and pure64.  There does exist the possibility
+#       that we're copying in binaries with conflicting runtime libs, though
+#       (e.g., say mdadm is 32bit on host system, it will put the 32bit
+#       libc.so.6 in /lib which will break all the 64bi binaries...).
+#
+# FIXME: at least add a check for this to warn the user...
+#
+$ln -s lib lib64 || exit 1
+
+# Copy all required shared libs
+decho '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
+for i in bin/* lib/udev/*; do
+    ldd $i 2>/dev/null | sed 's|.*=>||g' | awk '/\// { print $1 }' >> libs
+done
+
+DEPLIBS=`cat libs | sort -u`
+rm -f libs
+
+# NOTE: Deref symlinks, otherwise we'll end up with a bunch of broken symlinks
+#       instead of actual libraries for every single lib.
+for f in $DEPLIBS; do
+    $cp_deref $f lib/ || exit 1
+done
+
+
+# Warn if we've created any broken symlinks
+decho '********** CHECKING FOR BROKEN SYMLINKS ****************************************'
+go="find $TEMPDIR/initramfs -xtype l -printf '%p '"
+decho $go
+blarg=$(eval $go)
+if [ -n "$blarg" ]; then
+    echo "WARNING: broken link(s) detected: $blarg"
+fi
+
+
+# Strip debug info
+decho '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
+go="find $TEMPDIR/initramfs/{bin,lib} -type f -exec strip --strip-unneeded {} \;"
+[ "$opt_verbose" != "1" ] && go+=" 2>/dev/null"
+decho $go
+eval $go
+
+
+# Install our iniramfs' init script
+decho '********** COPYING LINUXRC TO INITRAMFS ****************************************'
+$cp $LINUXRC $TEMPDIR/initramfs/init &&
+$chmod a+x $TEMPDIR/initramfs/init || exit 1
+
+
+# FIXME: Most mkinitrd scripts I've looked at copy /etc/modprobe.conf and
+#        /etc/modprobe.d from the host system to the initramfs...  My initial
+#        testing indicates that this is not necesary, so I'm not going to do it.
+#
+# Copy modprobe.conf and friends over
+#if [ -e /etc/modprobe.conf ] ; then
+#    cp /etc/modprobe.conf $TEMPDIR/initramfs/etc
+#fi
+#cp -R /etc/modprobe.d $TEMPDIR/initramfs/etc
+
+
+# Write fstab
+cat > $TEMPDIR/initramfs/etc/fstab <<EOF
+/dev/root  /         auto    defaults,noatime  0 0
+devpts     /dev/pts  devpts  gid=5,mode=620    0 0
+tmpfs      /dev/shm  tmpfs   defaults          0 0
+proc       /proc     proc    defaults          0 0
+sysfs      /sys      sysfs   defaults          0 0
+EOF
+
+
+# Install ruckusrd.conf
+cp $LIBDIR/ruckusrd.conf $TEMPDIR/initramfs/
+
+# Create sqsh file
+mksquashfs $TEMPDIR/initramfs $LIBDIR/lower.sqsh
