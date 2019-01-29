@@ -8,53 +8,29 @@
 
 # Make directory structure
 #
-# NOTE: We're just going to copy all our binaries into bin and ceate sbin as a
-#       compatability symlink in case something explicitly calls somethings
-#       from /sbin (e.g., /sbin/modprobe).
+# NOTE: We're just going to create bin and ceate sbin as a compatability
+#       symlink if it doesn't exist later on in case something explicitly calls
+#       somethings from /sbin (e.g., /sbin/modprobe).
 #
-# NOTE: Same goes for /usr/bin and /usr/sbin
+# NOTE: Same goes for /usr/bin and /usr/sbin.
 #
 mkdir -vp initramfs/{bin,dev,sys,proc,usr,run,sysroot,etc,lib} || exit 1
 
 
-# Generate a list of binaries to copy into our filesystem
-#
-# NOTE: We have configure check for all these binaries and substitute their
-#       paths into this list.  The upside to this is that we already know
-#       exactly which binaries are on the system and where they're located.
-#       The downside of this is that new versions of programs installed in
-#       different locations will not get pulled into the initrd, even if they
-#       come first in PATH.
-#
-# NOTE: We're just going to copy all of these into bin.  There's really no point
-#       in differentiating between /bin and /sbin in the initramfs.
-PROGS=""
-PROGS+=" $BUSYBOX"
-PROGS+=" $MDADM"
-PROGS+=" $LVM"
-PROGS+=" $UDEV"
-
-
 # Copy all the PROGS into the initramfs
 echo '********** COPYING PROGS TO INITRAMFS ******************************************'
-# NOTE: We want to deref symlinks here to make absolutely sure we're really
-#       getting a binary and not just a broken symlink.
-#
-# FIXME: might not need to do this anymore... since we're not using host
-#        binaries, we can assume some knowledge regarding symlinks...
-#
-cp_deref="cp -va --dereference"
-for x in $PROGS; do
-    cp -va $x initramfs/bin/ || exit 1
-done
+tar -C initramfs -vxf ../subprojects/busybox.tar
+#tar -C initramfs -vxf ../subprojects/mdadm.tar
+#tar -C initramfs -vxf ../subprojects/lvm2.tar
+#tar -C initramfs -vxf ../subprojects/eudev.tar
 
 
 # Make a couple symlinks
 echo '********** MAKING SYMLINKS *****************************************************'
-#$ln -vs sh initramfs/bin/bash || exit 1
-$ln -vs bin initramfs/sbin || exit 1
-$ln -vs ../bin initramfs/usr/bin || exit 1
-$ln -vs ../sbin initramfs/usr/sbin || exit 1
+[ ! -d initramfs/bin/bsh ] && (ln -vs sh initramfs/bin/bash || exit 1)
+[ ! -d initramfs/sbin ] && (ln -vs bin initramfs/sbin || exit 1)
+[ ! -d initramfs/usr/bin ] && (ln -vs ../bin initramfs/usr/bin || exit 1)
+[ ! -d initramfs/usr/sbin ] && (ln -vs ../sbin initramfs/usr/sbin || exit 1)
 # Fixup lib vs lib64
 #
 # NOTE: We symlink lib64->lib here to ensure that our runtime linker works on
@@ -69,26 +45,23 @@ $ln -vs ../sbin initramfs/usr/sbin || exit 1
 #        to do the symlink, because our built-in binaries are probably linked
 #        against host system libs that might be in either dir...
 #
-$ln -s lib initramfs/lib64 || exit 1
+[ ! -d initramfs/lib64 ] && (ln -vs lib initramfs/lib64 || exit 1)
 
 
 # Copy all required shared libs
 echo '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
-for i in initramfs/{bin,lib/udev}/*; do
-    ldd $i 2>/dev/null | sed 's|.*=>||g' | awk '/\// { print $1 }' >> .tmplibs
-done
-
-DEPLIBS=`cat .tmplibs | sort -u`
-rm -f .tmplibs
-
+DEPLIBS=$(find initramfs -type f -exec ldd {} 2>/dev/null \; \
+    | sed 's|.*=>||g' | awk '/\// { print $1 }' | sort | uniq)
+#
 # NOTE: Deref symlinks, otherwise we'll end up with a bunch of broken symlinks
 #       instead of actual libraries for every single lib.
+#
 for f in $DEPLIBS; do
-    $cp_deref $f initramfs/lib/ || exit 1
+    cp -va --dereference $f initramfs/lib/ || exit 1
 done
 
 
-# Warn if we've created any broken symlinks
+# Bail if we've created any broken symlinks
 echo '********** CHECKING FOR BROKEN SYMLINKS ****************************************'
 go="find initramfs -xtype l -printf '%p '"
 echo $go
@@ -101,7 +74,7 @@ fi
 
 # Strip debug info
 echo '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
-go="find initramfs/{bin,lib} -type f -exec strip --strip-unneeded {} \;"
+go="find initramfs -type f -exec strip --strip-unneeded {} \;"
 echo $go
 eval $go
 
@@ -137,4 +110,4 @@ EOF
 cp -va ruckusrd.conf initramfs/ || exit 1
 
 # Create sqsh file
-mksquashfs initramfs lower.sqsh || exit 1
+mksquashfs initramfs lower.sqsh -noappend || exit 1
