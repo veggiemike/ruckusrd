@@ -9,22 +9,16 @@
 # This script is a derivative of fedora's livecd-creator's mayflower script,
 # written by David Zeuthen <davidz@redhat.com>.
 #
-# It's been largely rewritten to be a mkinitrd replacement that can be used on
-# embedded systems, flash drives, live CDs, and normal desktop Linux systems.
-# See the file README for details.
+# It's been largely rewritten (multiple times now) to be a mkinitrd replacement
+# that can be used on embedded systems, flash drives, live CDs, and normal
+# desktop Linux systems.  See the file README for details.
 
-VERSION="@VERSION@"
 
-# check cwd so we don't accidentally use an installed version while we're
-# developing
+# assume we're in the source tree if $PWD/linuxrc exists
 if [ -f linuxrc ]; then
-    LINUXRC=$PWD/linuxrc
-else
-    LINUXRC=@LINUXRC@
+    LIBEXECDIR=$PWD
+    LIBDIR=$PWD
 fi
-
-# a couple substitutions
-have_tree=@have_tree@
 
 
 decho()
@@ -35,12 +29,23 @@ decho()
 }
 
 
-usage() {
+usage()
+{
     echo "ruckusrd v$VERSION - a super awesome, yet simple, mkinitrd replacement"
     echo
     echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] [-b basedir] <out-initrd-image> <kernel-version>"
     echo
     echo "example: $(basename $0) /boot/myinitramfs.img \`uname -r\`"
+}
+
+
+cleanup()
+{
+    retcode=$1
+    umount $TEMPDIR/initramfs 2>/dev/null
+    umount $TEMPDIR/lower 2>/dev/null
+    rm -rf $TEMPDIR
+    exit $retcode
 }
 
 
@@ -102,166 +107,40 @@ fi
 
 echo "Building an initramfs at $INITRAMFS_TARGET for kernel $KERNEL"
 
-HOSTMODDIR=$BASEDIR/lib/modules/$KERNEL
-DESTMODDIR=lib/modules/$KERNEL
 
 original_pwd=$PWD
 
-TEMPDIR=`mktemp -d` || exit 1
-decho TEMPDIR: $TEMPDIR
-cd $TEMPDIR > /dev/null
-mkdir initramfs_dir
-cd initramfs_dir
-
-# Make directory structure 
-#
-# NOTE: We're just going to copy all our binaries into bin and ceate sbin as a
-#       compatability symlink in case something explicitly calls somethings
-#       from /sbin (e.g., /sbin/modprobe).
-#
-# NOTE: Same goes for /usr/bin and /usr/sbin
-#
-mkdir -p bin dev sys proc usr run $DESTMODDIR sysroot etc lib
-
-# Copy host system's udev rules
-#
-# NOTE: Per CLFS, /etc/udev is for config files and and rules and /lib/udev is
-#       for helper programs... so we copy them both in their entirety.
-#
 cp="cp -a"
-[ "$opt_verbose" != "0" ] && cp+=" -v"
-if [ -d /lib/udev ]; then
-    $cp /lib/udev lib/ || exit 1
+cpio="cpio"
+mkdir="mkdir -p"
+mv="mv"
+xz="xz"
+if [ "$opt_verbose" != "0" ]; then
+    cp+=" -v"
+    mkdir+=" -v"
+    mv+=" -v"
+    xz+=" -v"
+else
+    cpio+=" --quiet"
 fi
-if [ -d /etc/udev ]; then
-    $cp /etc/udev etc/ || exit 1
-fi
 
-# Generate a list of binaries to copy into our filesystem
-#
-# NOTE: We have configure check for all these binaries and substitute their
-#       paths into this list.  The upside to this is that we already know
-#       exactly which binaries are on the system and where they're located.
-#       The downside of this is that new versions of programs installed in
-#       different locations will not get pulled into the initrd, even if they
-#       come first in PATH.
-#
-# NOTE: We're just going to copy all of these into bin.  There's really no point
-#       in differentiating between /bin and /sbin in the initramfs.
-PROGS=""
-PROGS+=" @BASENAME@"
-PROGS+=" @BASH_SHELL@"
-PROGS+=" @BLKID@"
-PROGS+=" @BLOCKDEV@"
-PROGS+=" @BUSYBOX@"
-PROGS+=" @CAT@"
-PROGS+=" @CHMOD@"
-PROGS+=" @CHROOT@"
-PROGS+=" @CP@"
-PROGS+=" @CPIO@"
-PROGS+=" @CUT@"
-PROGS+=" @DATE@"
-PROGS+=" @DD@"
-PROGS+=" @DEPMOD@"
-PROGS+=" @DIRNAME@"
-PROGS+=" @DMESG@"
-PROGS+=" @DMSETUP@"
-PROGS+=" @E2FSCK@"
-PROGS+=" @ECHO@"
-PROGS+=" @ENV@"
-PROGS+=" @FDISK@"
-PROGS+=" @FIND@"
-PROGS+=" @FSCK@"
-PROGS+=" @FSCK_EXT2@"
-PROGS+=" @FSCK_EXT3@"
-PROGS+=" @FSCK_EXT4@"
-PROGS+=" @GREP@"
-PROGS+=" @GZIP@"
-PROGS+=" @HEAD@"
-PROGS+=" @INSMOD@"
-PROGS+=" @KILL@"
-PROGS+=" @KILLALL5@"
-PROGS+=" @KMOD@"
-PROGS+=" @LDD@"
-PROGS+=" @LESS@"
-PROGS+=" @LN@"
-PROGS+=" @LOSETUP@"
-PROGS+=" @LS@"
-PROGS+=" @LSMOD@"
-PROGS+=" @LVM@"
-PROGS+=" @MDADM@"
-PROGS+=" @MKDIR@"
-PROGS+=" @MKNOD@"
-PROGS+=" @MKSQUASHFS@"
-PROGS+=" @MODINFO@"
-PROGS+=" @MODPROBE@"
-PROGS+=" @MOUNT@"
-PROGS+=" @MV@"
-PROGS+=" @PIDOF@"
-PROGS+=" @PS@"
-PROGS+=" @READLINK@"
-PROGS+=" @RM@"
-PROGS+=" @RMMOD@"
-PROGS+=" @SED@"
-PROGS+=" @SLEEP@"
-PROGS+=" @SORT@"
-PROGS+=" @SWITCH_ROOT@"
-PROGS+=" @SYSTEMD_UDEVD@"
-PROGS+=" @TAIL@"
-PROGS+=" @TREE@"
-PROGS+=" @UDEVADM@"
-PROGS+=" @UDEVD@"
-PROGS+=" @UDEVSTART@"
-PROGS+=" @UMOUNT@"
-PROGS+=" @TOUCH@"
-PROGS+=" @VI@"
-PROGS+=" @VOL_ID@"
-PROGS+=" @ZCAT@"
+decho '********** PREPPING TEMPDIR ****************************************************'
+# setup our working tempdir
+TEMPDIR=`mktemp -dt ruckusrd-XXXX` &&
+$mkdir $TEMPDIR/{initramfs,lower,upper} || cleanup 1
+
+# mount overlay in TEMPDIR
+pushd $TEMPDIR &&
+mount $LIBDIR/lower.sqsh lower &&
+mount -t overlay -o lowerdir=lower,upperdir=upper,workdir=work \
+    overlay initramfs &&
+popd || cleanup 1
 
 
-# Copy all the PROGS into the initramfs
-decho '********** COPYING PROGS TO INITRAMFS ******************************************'
-# NOTE: We want to deref symlinks here to make absolutely sure we're really
-#       getting a binary and not just a broken symlink.
-cp_deref="$cp --dereference"
-for x in $PROGS; do
-    $cp_deref $x bin/ || exit 1
-done
-
-# Make a couple symlinks
-decho '********** MAKING SYMLINKS *****************************************************'
-ln="ln"
-[ "$opt_verbose" != "0" ] && ln+=" -v"
-$ln -s bash bin/sh || exit 1
-$ln -s bin sbin || exit 1
-$ln -s ../bin usr/bin || exit 1
-$ln -s ../sbin usr/sbin || exit 1
-# Fixup lib vs lib64
-#
-# NOTE: We symlink lib64->lib here to ensure that our runtime linker works on
-#       x86, x86_64 multilib, and pure64.  There does exist the possibility
-#       that we're copying in binaries with conflicting runtime libs, though
-#       (e.g., say mdadm is 32bit on host system, it will put the 32bit
-#       libc.so.6 in /lib which will break all the 64bi binaries...).
-#
-# FIXME: at least add a check for this to warn the user...
-#
-$ln -s lib lib64 || exit 1
-
-# Copy all required shared libs
-decho '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
-for i in bin/* lib/udev/*; do
-    ldd $i 2>/dev/null | sed 's|.*=>||g' | awk '/\// { print $1 }' >> libs
-done
-
-DEPLIBS=`cat libs | sort -u`
-rm -f libs
-
-# NOTE: Deref symlinks, otherwise we'll end up with a bunch of broken symlinks
-#       instead of actual libraries for every single lib.
-for f in $DEPLIBS; do
-    $cp_deref $f lib/ || exit 1
-done
+decho '********** PREPPING INITRAMFS KERNEL DIR ***************************************'
+HOSTMODDIR=$BASEDIR/lib/modules/$KERNEL
+DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$KERNEL
+$mkdir $DESTMODDIR || cleanup 1
 
 # Copy modules.order, modules.builtin, and other KBuild generated files
 #
@@ -271,7 +150,7 @@ done
 # FIXME: is it ok to leave modules.order full of modules that aren't being
 #        included in the initramfs?
 #
-$cp $HOSTMODDIR/modules.* $DESTMODDIR/ || exit 1
+$cp $HOSTMODDIR/modules.* $DESTMODDIR/ || cleanup 1
 
 # copy in boot-related kernel modules
 #
@@ -286,9 +165,6 @@ find $HOSTMODDIR/kernel/drivers/{ata,block,cdrom,md,nvme,scsi,usb} \
     \( -name \*.ko.xz -o -name \*.ko \) \
     -exec $cp {} $DESTMODDIR/ \; 2>/dev/null
 
-xz="xz"
-[ "$opt_verbose" != "0" ] && xz+=" -v"
-
 # NOTE: I was originally decompressing each .ko.xz file so that I could xz the
 #       entire initramfs at the end more optimally, but that leads to kernel
 #       taint w/ kernel signing turned on... so, i guess i won't do this.
@@ -298,86 +174,33 @@ xz="xz"
 
 # Make sure none of the MODS we've installed have unmet dependencies
 decho '********** COPYING MODULE DEPS TO INITRAMFS ************************************'
-for m in $DESTMODDIR/*.ko ; do
+for m in $DESTMODDIR/*.ko{,.xz} ; do
     /sbin/modprobe --set-version $KERNEL --show-depends $m >> modules 2>/dev/null
 done
 
 DEPMODS=`cat modules | awk '{ print $2 }' | sort -u`
-rm -f modules
-
 for f in $DEPMODS; do
-    $cp $f $DESTMODDIR/ || exit 1
+    $cp $f $DESTMODDIR/ || cleanup 1
 done
+
 
 # Build module deps file so we can use modprobe
 decho '********** RUNNING DEPMOD ******************************************************'
-go="/sbin/depmod -b `pwd` -v $KERNEL"
+go="/sbin/depmod -b $TEMPDIR/initramfs -v $KERNEL"
 [ "$opt_verbose" != "1" ] && go+=" > /dev/null"
 decho $go
-eval $go || exit 1
+eval $go || cleanup 1
 
-# Write fstab
-cat > etc/fstab <<EOF
-/dev/root  /         auto    defaults,noatime  0 0
-devpts     /dev/pts  devpts  gid=5,mode=620    0 0
-tmpfs      /dev/shm  tmpfs   defaults          0 0
-proc       /proc     proc    defaults          0 0
-sysfs      /sys      sysfs   defaults          0 0
-EOF
-
-# FIXME: Most mkinitrd scripts I've looked at copy /etc/modprobe.conf and
-#        /etc/modprobe.d from the host system to the initramfs...  My initial
-#        testing indicates that this is not necesary, so I'm not going to do it.
-#
-# Copy modprobe.conf and friends over
-#if [ -e /etc/modprobe.conf ] ; then
-#    cp /etc/modprobe.conf etc
-#fi
-#cp -R /etc/modprobe.d etc
-
-
-# Install our iniramfs' init script
-decho '********** COPYING LINUXRC TO INITRAMFS ****************************************'
-$cp $LINUXRC init || exit 1
-chmod a+x init
-
-if [ "$opt_verbose" != "0" ]; then
-    if [ "$have_tree" != "0" ]; then
-	tree -psugDFCa .
-    else
-	find . | sort
-    fi
-fi
-
-# Strip debug info
-decho '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
-go="find bin lib -type f -exec strip --strip-unneeded {} \;"
-[ "$opt_verbose" != "1" ] && go+=" 2>/dev/null"
-decho $go
-eval $go
-
-# Warn if we've created any broken symlinks
-decho '********** CHECKING FOR BROKEN SYMLINKS ****************************************'
-go="find . -xtype l -printf '%p '"
-decho $go
-blarg=$(eval $go)
-if [ -n "$blarg" ]; then
-    echo "WARNING: broken link(s) detected: $blarg"
-fi
 
 # Create the compressed image
 decho '********** CREATING COMPRESSED CPIO IMAGE **************************************'
-cpio="cpio"
-[ "$opt_verbose" != "1" ] && cpio+=" --quiet"
-find . | $cpio -o -H newc | $xz -vzc --check=crc32 > ../initramfs || exit 1
+pushd initramfs &&
+find . | $cpio -o -H newc | $xz -vzc --check=crc32 > ../initramfs.img &&
+popd || cleanup 1
 
-cd $original_pwd
 rm -f $INITRAMFS_TARGET
-mv="mv"
-[ "$opt_verbose" != "0" ] && mv+=" -v"
-$mv $TEMPDIR/initramfs $INITRAMFS_TARGET
-rm -rf $TEMPDIR
+$mv $TEMPDIR/initramfs.img $INITRAMFS_TARGET
 
 echo "Done; initramfs is $(du -h $INITRAMFS_TARGET | awk '{print $1}')."
 echo
-exit 0
+cleanup 0
