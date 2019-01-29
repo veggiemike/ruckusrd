@@ -12,6 +12,7 @@ configure
 # built files
 subprojects/busybox.tar
 subprojects/mdadm.tar
+subprojects/lvm2.tar
 src/initramfs
 src/lower.sqsh
 src/ruckusrd.conf
