@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/ash
 #
 # Copyright 2012-2019 Michael D Labriola <michael.d.labriola@gmail.com>
 #
@@ -8,9 +8,10 @@
 # (flexible mkinitrd replacement used originally by fedora's livecd-creator,
 # David Zeuthen <davidz@redhat.com>).
 #
-# It's been largely rewritten to be used as the initramfs /init script for a
-# mkinitrd replacement that can be used on embedded systems, flash drives, live
-# CDs, and normal desktop Linux systems.  See the file README for details.
+# It's been largely rewritten (multiple times now) to be used as the initramfs
+# /init script for a mkinitrd replacement that can be used on embedded systems,
+# flash drives, live CDs, and normal desktop Linux systems.  See the file
+# README for details.
 #
 # NOTE: At the moment, and this might change, we're not loading KMS video
 #       drivers in here.  I was planning on doing just that, but I couldn't
