@@ -1,3 +1,4 @@
+# -*- sh -*-
 *~
 
 # autotools files
@@ -10,9 +11,10 @@ config.status
 configure
 
 # built files
-subprojects/busybox.tar
-subprojects/mdadm.tar
-subprojects/lvm2.tar
 src/initramfs
 src/lower.sqsh
 src/ruckusrd.conf
+subprojects/busybox.tar
+subprojects/eudev.tar
+subprojects/lvm2.tar
+subprojects/mdadm.tar
