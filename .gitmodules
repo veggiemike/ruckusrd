@@ -1,0 +1,3 @@
+[submodule "subprojects/busybox"]
+	path = subprojects/busybox
+	url = git://busybox.net/busybox.git
