@@ -4,3 +4,6 @@
 [submodule "subprojects/mdadm"]
 	path = subprojects/mdadm
 	url = https://github.com/neilbrown/mdadm.git
+[submodule "subprojects/lvm2"]
+	path = subprojects/lvm2
+	url = git://sourceware.org/git/lvm2.git
