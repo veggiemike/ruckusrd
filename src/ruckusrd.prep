@@ -44,10 +44,9 @@ ln -vs lib initramfs/lib64 || exit 1
 
 # Copy all the PROGS into the initramfs
 echo '********** COPYING PROGS TO INITRAMFS ******************************************'
-for x in ../subprojects/{busybox,mdadm,lvm2}.tar; do
+for x in ../subprojects/{eudev,busybox,mdadm,lvm2}.tar; do
     tar -C initramfs --keep-old-files -vxf $x || exit 1
 done
-#tar -C initramfs --no-overwrite-dir -vxf ../subprojects/eudev.tar
 
 
 # Copy all required shared libs
