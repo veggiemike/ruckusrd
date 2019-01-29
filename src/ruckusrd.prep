@@ -44,10 +44,9 @@ ln -vs lib initramfs/lib64 || exit 1
 
 # Copy all the PROGS into the initramfs
 echo '********** COPYING PROGS TO INITRAMFS ******************************************'
-for x in ../subprojects/{busybox,mdadm}.tar; do
+for x in ../subprojects/{busybox,mdadm,lvm2}.tar; do
     tar -C initramfs --keep-old-files -vxf $x || exit 1
 done
-#tar -C initramfs --no-overwrite-dir -vxf ../subprojects/lvm2.tar
 #tar -C initramfs --no-overwrite-dir -vxf ../subprojects/eudev.tar
 
 
@@ -60,15 +59,23 @@ DEPLIBS=$(find initramfs -type f -exec ldd {} 2>/dev/null \; \
 #       instead of actual libraries for every single lib.
 #
 for f in $DEPLIBS; do
-    cp -va --dereference $f initramfs/lib/ || exit 1
+    if [ ! -f initramfs/lib/$(basename $f) ]; then
+        cp -va --dereference $f initramfs/lib/ || exit 1
+    fi
 done
 
 
 # Strip debug info
+#
+# NOTE: We have to chmod a couple files to allow strip to work.  We re-chmod to
+#       original settings afterwards.
+#
 echo '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
-go="find initramfs -type f -exec strip --strip-unneeded {} \;"
+chmod +w initramfs/bin/{dmsetup,lvm} initramfs/lib/libdevmapper.so.*
+go="find initramfs \( -type f -a -perm /111 \) -exec strip --strip-unneeded {} \;"
 echo $go
 eval $go
+chmod -w initramfs/bin/{dmsetup,lvm} initramfs/lib/libdevmapper.so.*
 
 
 # Copy modprobe.conf and friends over
@@ -97,14 +104,13 @@ EOF
 
 # Install our initramfs init script
 echo '********** COPYING LINUXRC TO INITRAMFS ****************************************'
-cp -va linuxrc initramfs/init &&
-chmod -v a+x initramfs/init &&
+install -vp linuxrc initramfs/init &&
 cp -va ruckusrd.conf initramfs/ || exit 1
 
 
 # Make a couple extra symlinks, if needed
 echo '********** MAKING CONDITIONAL SYMLINKS *****************************************'
-[ ! -d initramfs/bin/bash ] && (ln -vs sh initramfs/bin/bash || exit 1)
+[ ! -f initramfs/bin/bash ] && (ln -vs sh initramfs/bin/bash || exit 1)
 
 
 # Bail if we've created any broken symlinks
