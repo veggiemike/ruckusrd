@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# This script should get executed by the build system to create lower.sqsh,
+# which should get installed by the install target.
+
+. ruckusrd.conf
+
 
 # Make directory structure
 #
@@ -8,7 +14,7 @@
 #
 # NOTE: Same goes for /usr/bin and /usr/sbin
 #
-mkdir -p bin dev sys proc usr run sysroot etc lib
+mkdir -vp initramfs/{bin,dev,sys,proc,usr,run,sysroot,etc,lib} || exit 1
 
 
 # Generate a list of binaries to copy into our filesystem
@@ -23,93 +29,32 @@ mkdir -p bin dev sys proc usr run sysroot etc lib
 # NOTE: We're just going to copy all of these into bin.  There's really no point
 #       in differentiating between /bin and /sbin in the initramfs.
 PROGS=""
-PROGS+=" @BASENAME@"
-PROGS+=" @BASH_SHELL@"
-PROGS+=" @BLKID@"
-PROGS+=" @BLOCKDEV@"
-PROGS+=" @BUSYBOX@"
-PROGS+=" @CAT@"
-PROGS+=" @CHMOD@"
-PROGS+=" @CHROOT@"
-PROGS+=" @CP@"
-PROGS+=" @CPIO@"
-PROGS+=" @CUT@"
-PROGS+=" @DATE@"
-PROGS+=" @DD@"
-PROGS+=" @DEPMOD@"
-PROGS+=" @DIRNAME@"
-PROGS+=" @DMESG@"
-PROGS+=" @DMSETUP@"
-PROGS+=" @E2FSCK@"
-PROGS+=" @ECHO@"
-PROGS+=" @ENV@"
-PROGS+=" @FDISK@"
-PROGS+=" @FIND@"
-PROGS+=" @FSCK@"
-PROGS+=" @FSCK_EXT2@"
-PROGS+=" @FSCK_EXT3@"
-PROGS+=" @FSCK_EXT4@"
-PROGS+=" @GREP@"
-PROGS+=" @GZIP@"
-PROGS+=" @HEAD@"
-PROGS+=" @INSMOD@"
-PROGS+=" @KILL@"
-PROGS+=" @KILLALL5@"
-PROGS+=" @KMOD@"
-PROGS+=" @LDD@"
-PROGS+=" @LESS@"
-PROGS+=" @LN@"
-PROGS+=" @LOSETUP@"
-PROGS+=" @LS@"
-PROGS+=" @LSMOD@"
-PROGS+=" @LVM@"
-PROGS+=" @MDADM@"
-PROGS+=" @MKDIR@"
-PROGS+=" @MKNOD@"
-PROGS+=" @MKSQUASHFS@"
-PROGS+=" @MODINFO@"
-PROGS+=" @MODPROBE@"
-PROGS+=" @MOUNT@"
-PROGS+=" @MV@"
-PROGS+=" @PIDOF@"
-PROGS+=" @PS@"
-PROGS+=" @READLINK@"
-PROGS+=" @RM@"
-PROGS+=" @RMMOD@"
-PROGS+=" @SED@"
-PROGS+=" @SLEEP@"
-PROGS+=" @SORT@"
-PROGS+=" @SWITCH_ROOT@"
-PROGS+=" @SYSTEMD_UDEVD@"
-PROGS+=" @TAIL@"
-PROGS+=" @TREE@"
-PROGS+=" @UDEVADM@"
-PROGS+=" @UDEVD@"
-PROGS+=" @UDEVSTART@"
-PROGS+=" @UMOUNT@"
-PROGS+=" @TOUCH@"
-PROGS+=" @VI@"
-PROGS+=" @VOL_ID@"
-PROGS+=" @ZCAT@"
+PROGS+=" $BUSYBOX"
+PROGS+=" $MDADM"
+PROGS+=" $LVM"
+PROGS+=" $UDEV"
 
 
 # Copy all the PROGS into the initramfs
-decho '********** COPYING PROGS TO INITRAMFS ******************************************'
+echo '********** COPYING PROGS TO INITRAMFS ******************************************'
 # NOTE: We want to deref symlinks here to make absolutely sure we're really
 #       getting a binary and not just a broken symlink.
-cp_deref="$cp --dereference"
+#
+# FIXME: might not need to do this anymore... since we're not using host
+#        binaries, we can assume some knowledge regarding symlinks...
+#
+cp_deref="cp -va --dereference"
 for x in $PROGS; do
-    $cp_deref $x bin/ || exit 1
+    cp -va $x initramfs/bin/ || exit 1
 done
 
+
 # Make a couple symlinks
-decho '********** MAKING SYMLINKS *****************************************************'
-ln="ln"
-[ "$opt_verbose" != "0" ] && ln+=" -v"
-$ln -s bash bin/sh || exit 1
-$ln -s bin sbin || exit 1
-$ln -s ../bin usr/bin || exit 1
-$ln -s ../sbin usr/sbin || exit 1
+echo '********** MAKING SYMLINKS *****************************************************'
+#$ln -vs sh initramfs/bin/bash || exit 1
+$ln -vs bin initramfs/sbin || exit 1
+$ln -vs ../bin initramfs/usr/bin || exit 1
+$ln -vs ../sbin initramfs/usr/sbin || exit 1
 # Fixup lib vs lib64
 #
 # NOTE: We symlink lib64->lib here to ensure that our runtime linker works on
@@ -120,46 +65,51 @@ $ln -s ../sbin usr/sbin || exit 1
 #
 # FIXME: at least add a check for this to warn the user...
 #
-$ln -s lib lib64 || exit 1
+# FIXME: much less of an issue w/out host system binaries... we do still have
+#        to do the symlink, because our built-in binaries are probably linked
+#        against host system libs that might be in either dir...
+#
+$ln -s lib initramfs/lib64 || exit 1
+
 
 # Copy all required shared libs
-decho '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
-for i in bin/* lib/udev/*; do
-    ldd $i 2>/dev/null | sed 's|.*=>||g' | awk '/\// { print $1 }' >> libs
+echo '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
+for i in initramfs/{bin,lib/udev}/*; do
+    ldd $i 2>/dev/null | sed 's|.*=>||g' | awk '/\// { print $1 }' >> .tmplibs
 done
 
-DEPLIBS=`cat libs | sort -u`
-rm -f libs
+DEPLIBS=`cat .tmplibs | sort -u`
+rm -f .tmplibs
 
 # NOTE: Deref symlinks, otherwise we'll end up with a bunch of broken symlinks
 #       instead of actual libraries for every single lib.
 for f in $DEPLIBS; do
-    $cp_deref $f lib/ || exit 1
+    $cp_deref $f initramfs/lib/ || exit 1
 done
 
 
 # Warn if we've created any broken symlinks
-decho '********** CHECKING FOR BROKEN SYMLINKS ****************************************'
-go="find $TEMPDIR/initramfs -xtype l -printf '%p '"
-decho $go
+echo '********** CHECKING FOR BROKEN SYMLINKS ****************************************'
+go="find initramfs -xtype l -printf '%p '"
+echo $go
 blarg=$(eval $go)
 if [ -n "$blarg" ]; then
-    echo "WARNING: broken link(s) detected: $blarg"
+    echo "ERROR: broken link(s) detected: $blarg"
+    exit 1
 fi
 
 
 # Strip debug info
-decho '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
-go="find $TEMPDIR/initramfs/{bin,lib} -type f -exec strip --strip-unneeded {} \;"
-[ "$opt_verbose" != "1" ] && go+=" 2>/dev/null"
-decho $go
+echo '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
+go="find initramfs/{bin,lib} -type f -exec strip --strip-unneeded {} \;"
+echo $go
 eval $go
 
 
 # Install our iniramfs' init script
-decho '********** COPYING LINUXRC TO INITRAMFS ****************************************'
-$cp $LINUXRC $TEMPDIR/initramfs/init &&
-$chmod a+x $TEMPDIR/initramfs/init || exit 1
+echo '********** COPYING LINUXRC TO INITRAMFS ****************************************'
+cp -va linuxrc initramfs/init &&
+chmod -v a+x initramfs/init || exit 1
 
 
 # FIXME: Most mkinitrd scripts I've looked at copy /etc/modprobe.conf and
@@ -168,13 +118,13 @@ $chmod a+x $TEMPDIR/initramfs/init || exit 1
 #
 # Copy modprobe.conf and friends over
 #if [ -e /etc/modprobe.conf ] ; then
-#    cp /etc/modprobe.conf $TEMPDIR/initramfs/etc
+#    cp /etc/modprobe.conf initramfs/etc
 #fi
-#cp -R /etc/modprobe.d $TEMPDIR/initramfs/etc
+#cp -R /etc/modprobe.d initramfs/etc
 
 
 # Write fstab
-cat > $TEMPDIR/initramfs/etc/fstab <<EOF
+cat > initramfs/etc/fstab <<EOF
 /dev/root  /         auto    defaults,noatime  0 0
 devpts     /dev/pts  devpts  gid=5,mode=620    0 0
 tmpfs      /dev/shm  tmpfs   defaults          0 0
@@ -184,7 +134,7 @@ EOF
 
 
 # Install ruckusrd.conf
-cp $LIBDIR/ruckusrd.conf $TEMPDIR/initramfs/
+cp -va ruckusrd.conf initramfs/ || exit 1
 
 # Create sqsh file
-mksquashfs $TEMPDIR/initramfs $LIBDIR/lower.sqsh
+mksquashfs initramfs lower.sqsh || exit 1
