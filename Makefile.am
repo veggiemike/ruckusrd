@@ -1,4 +1,5 @@
 SUBDIRS =
+SUBDIRS += subprojects
 SUBDIRS += src
 SUBDIRS += docs
 

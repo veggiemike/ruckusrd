@@ -1,7 +1,7 @@
 AC_PREREQ([2.65])
-AC_INIT([ruckusrd], [0.11.2], [michael.d.labriola@gmail.com])
+AC_INIT([ruckusrd], [0.12.0-dev], [michael.d.labriola@gmail.com])
 
-AM_INIT_AUTOMAKE(dist-bzip2 no-dist-gzip)
+AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip foreign])
 
 AC_PROG_INSTALL
 AC_PROG_MKDIR_P
@@ -154,8 +154,17 @@ AC_PROG_LN_S
 #done
 #AC_SUBST(LINUXRC)
 
+
+CPUCOUNT=$(grep ^vendor_id /proc/cpuinfo | wc -l)
+JOBCOUNT=$((CPUCOUNT+1))
+JOBCOUNT_KBUILD=$((CPUCOUNT*4))
+AC_SUBST(CPUCOUNT)
+AC_SUBST(JOBCOUNT)
+AC_SUBST(JOBCOUNT_KBUILD)
+
 AC_CONFIG_FILES([Makefile
 		 docs/Makefile
 		 src/Makefile
+		 subprojects/Makefile
 		 src/ruckusrd.conf])
 AC_OUTPUT

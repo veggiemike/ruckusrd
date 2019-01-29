@@ -10,4 +10,7 @@ config.status
 configure
 
 # built files
+subprojects/busybox.tar
+src/initramfs
+src/lower.sqsh
 src/ruckusrd.conf
