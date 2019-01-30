@@ -14,6 +14,9 @@
 # desktop Linux systems.  See the file README for details.
 
 
+shopt -s nullglob
+
+
 # assume we're in the source tree if $PWD/linuxrc exists
 if [ -f linuxrc ]; then
     LIBEXECDIR=$PWD
@@ -178,13 +181,15 @@ find $HOSTMODDIR/kernel/drivers/{ata,block,cdrom,md,nvme,scsi,usb} \
 # Make sure none of the MODS we've installed have unmet dependencies
 decho '********** COPYING MODULE DEPS TO INITRAMFS ************************************'
 for m in $DESTMODDIR/*.ko{,.xz} ; do
-    /sbin/modprobe --set-version $KERNEL --show-depends $m \
-        >> $TEMPDIR/modules 2>/dev/null
+    /sbin/modprobe --set-version $KERNEL --show-depends $(basename ${m//.ko*/}) \
+        | head --lines=-1 >> $TEMPDIR/modules 2>/dev/null
 done
 
-DEPMODS=`cat $TEMPDIR/modules | awk '{ print $2 }' | sort -u`
+DEPMODS=`cat $TEMPDIR/modules | awk '/^insmod/ { print $2 }' | sort -u`
 for f in $DEPMODS; do
-    $cp $f $DESTMODDIR/ || cleanup 1
+    if [ ! -f $DESTMODDIR/$(basename $f) ]; then
+        $cp $f $DESTMODDIR/ || cleanup 1
+    fi
 done
 
 
