@@ -136,11 +136,11 @@ TEMPDIR=`mktemp -dt ruckusrd-XXXX` &&
 $mkdir $TEMPDIR/{initramfs,lower,upper,work} || cleanup 1
 
 # mount overlay in TEMPDIR
-pushd $TEMPDIR &&
+pushd >/dev/null $TEMPDIR &&
 mount $LIBDIR/lower.sqsh lower &&
 mount -t overlay -o lowerdir=lower,upperdir=upper,workdir=work \
     overlay initramfs &&
-popd || cleanup 1
+popd >/dev/null || cleanup 1
 
 
 decho '********** PREPPING INITRAMFS KERNEL DIR ***************************************'
@@ -201,11 +201,20 @@ decho $go
 eval $go || cleanup 1
 
 
+# Prepping udev's hwdb
+decho '********** PREPPING UDEV HWDB **************************************************'
+go="chroot $TEMPDIR/initramfs /bin/udevadm"
+[ "$opt_verbose" != "0" ] && go+=" --debug"
+go+=" hwdb --update"
+decho $go
+eval $go || exit 1
+
+
 # Create the compressed image
 decho '********** CREATING COMPRESSED CPIO IMAGE **************************************'
-pushd $TEMPDIR/initramfs &&
+pushd >/dev/null $TEMPDIR/initramfs &&
 find . | $cpio -o -H newc | $xz -vzc --check=crc32 > ../initramfs.img &&
-popd || cleanup 1
+popd >/dev/null || cleanup 1
 
 rm -f $INITRAMFS_TARGET
 $mv $TEMPDIR/initramfs.img $INITRAMFS_TARGET
