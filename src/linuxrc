@@ -131,18 +131,21 @@ generate_udev_rules()
     #        220).
     #
     case $str in
-        CDLABEL=*)
-            # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA,
-            #       USB, and SCSI should all be using them.
-            CDLABEL=${str#CDLABEL=}
-            cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
-ENV{ID_CDROM}==1, ENV{ID_FS_LABEL_ENC}==$CDLABEL, SYMLINK+="$name"
-EOF
-            echo "Added udev rule for CDLABEL=='$CDLABEL'"
-            if [ "$name" = "root" ]; then
-                thingtomount=/dev/root
-            fi
-            ;;
+# FIXME: why do we need to differentiate between CDLABEL and LABEL...?  seems
+#        like an arbitrary forced difference...
+#
+#        CDLABEL=*)
+#            # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA,
+#            #       USB, and SCSI should all be using them.
+#            CDLABEL=${str#CDLABEL=}
+#            cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
+#ENV{ID_CDROM}==1, ENV{ID_FS_LABEL_ENC}==$CDLABEL, SYMLINK+="$name"
+#EOF
+#            echo "Added udev rule for CDLABEL=='$CDLABEL'"
+#            if [ "$name" = "root" ]; then
+#                thingtomount=/dev/root
+#            fi
+#            ;;
         LABEL=*)
             LABEL=${str#LABEL=}
             cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
@@ -342,11 +345,19 @@ modprobe loop
 echo -n "determining what to mount... "
 
 cat <<EOF > etc/udev/rules.d/99-ruckusrd.rules
+ACTION!="add|change", GOTO="ruckusrd_end"
+SUBSYSTEM!="block", GOTO="ruckusrd_end"
 IMPORT{builtin}="blkid"
 
 EOF
+
 generate_udev_rules root $root
 [ -n "$sqsh_layerdev" ] && generate_udev_rules sqsh_layerdev $sqsh_layerdev
+
+cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
+
+LABEL="ruckusrd_end"
+EOF
 
 echo "$thingtomount"
 
