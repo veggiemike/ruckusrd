@@ -37,12 +37,12 @@
 # So far, this script uses the following non-basic features that I should
 # double-check for busybox applet compatibility moving forward:
 #
-# - sed -i
-# - bash ${param#word} and ${param//#pattern/string} expansions
-# - bash trap
-# - bash $() command subst
-# - bash {} globbing (e.g., cp foo{,bak})
-# - bash var+=
+# - sed -i (yes!)
+# - bash ${param#word} and ${param//pattern/string} expansions (?? and yes!)
+# - bash trap (maybe...)
+# - bash $() command subst (yes!)
+# - bash {} globbing (e.g., cp foo{,bak}) (NOPE)
+# - bash var+= (NOPE)
 
 
 . /ruckusrd.conf
@@ -266,11 +266,9 @@ mount -n -t sysfs sysfs /sys
 ln -fs /proc/mounts /etc/mtab
 
 # ensure hotplog script is disabled even if CONFIG_UEVENT_HELPER is enabled
-if [ ! -f /proc/sys/kernel/hotplug ]; then
-    echo "is CONFIG_UEVENT_HELPER_PATH configured in your kernel?"
-    emergency_shell
+if [ -f /proc/sys/kernel/hotplug ]; then
+    echo "" > /proc/sys/kernel/hotplug
 fi
-echo "/sbin/mdev" > /proc/sys/kernel/hotplug
 
 
 # Declare all variables here.. mostly for housekeeping
@@ -412,66 +410,13 @@ generate_udev_rules root $root
 
 echo "$thingtomount (dmroot=$dmroot)"
 
-if [ -f /bin/busybox ]; then
-    decho "starting mdev"
-    ln -s /bin/busybox /sbin/mdev
-    cat > /etc/mdev.conf <<"EOF"
-# support module loading on hotplug
-$MODALIAS=.*	0:0 660 @/sbin/modprobe "$MODALIAS"
-EOF
-    mdev -s
-    sleep 1
-
-else
-
 decho "starting udevd"
-echo "udev_log=\"error\"" >> /etc/udev/udev.conf
-
-# rules for loading modules
-#
-# FIXME: Originally (i.e., when I was using an ancient version of
-#        udev), we were configuring udev to load modules right here by
-#        injecting a single globular rule into /etc/udev/rules.d.
-#        This was working fine until I started playing with a system
-#        that used a version of udev that no longer installed
-#        vol_id...  I've got a few options here.
-#
-#        1. Inject this rule if have_vol_id.  This will mimick what I
-#           was already doing, but might conflict with the newly
-#           populated /lib/udev/rules.d
-#
-#        2. Only inject if we haven't populated /lib/udev/rules.d.
-#           This will ensure that we don't clobber the new rules, but
-#           I know things were working before with the injected
-#           modprobe rule...
-#
-# FIXME: I'm going with #2 for now.
-#
-# FIXME: No 1 is bad... if i have blkid, i don't even check for vol_id.  and
-#        having blkid actually has no correlation with the version of udev
-#        we're using.
-#
-# FIXME: this is biting me again... i can't get modules to autoload on CentOS7
-#        right now... the distro's modprobe rule used builtin kmod instead of
-#        modprobe and doesn't seem to ever get triggered...
-#
-#if [ -z "$(ls -A /lib/udev/rules.d)" ]; then
-#    echo -n "ACTION==\"add\", SUBSYSTEM==\"?*\", ENV{MODALIAS}==\"?*\", RUN+=\"/sbin/modprobe $" >> /etc/udev/rules.d/10-modprobe.rules
-#    echo "env{MODALIAS}\"" >> /etc/udev/rules.d/10-modprobe.rules
-#fi
-
-if [ -f /bin/systemd-udevd ]; then
-    /sbin/systemd-udevd --daemon --resolve-names=never
-else
-    # FIXME: when did --resolve-names get added?  I know my old fedora 9 box
-    #        didn't have that flag...
-    /sbin/udevd --daemon --resolve-names=never || \
-        /sbin/udevd --daemon
-fi
+/sbin/udevd --daemon --resolve-names=never
 
 # tell udevd to start processing its queue
 /sbin/udevadm trigger --action=add --type=subsystems
 /sbin/udevadm trigger --action=add --type=devices
+/sbin/udevadm trigger --action=change --type=devices
 /sbin/udevadm settle
 
 # initialize LVM if needed now
