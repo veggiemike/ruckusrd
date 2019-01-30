@@ -31,15 +31,46 @@ clean-local:
 # FIXME: LFS has you run 'udevadm hwdb --update' after install... do i
 #        need to?
 #
+# FIXME: compilation failure on CentOS7 with eudev-3.2.5...
+#        BLKID_SUBLKS_BADCSUM undeclared.  Offending code was
+#        introduced prior to v3.0 by
+#        c93ec252df0a0a0bb499031f92b240063e17fc12 "blkid: Warn when
+#        rejecting a superblock with a bad csum".  The commit mentions
+#        that the libblkid requirement should get bumped from 2.20 to
+#        2.24 and that util-linux 2.25 is already required since
+#        fdbbad981cc5da8bb4ed7e9b6646e7a114745ec5.
+#
+#        configure.ac still checks for 2.20 though.
+#
+#        CentOS7 has libblkid-2.23.2 and util-linux-2.23.2
+#
+#        the 2nd commit mentioned doesn't apear anywhere in the eudev
+#        history, i suspect it was a general systemd commit being
+#        referenced...?  the rest of eudev 3.2.5 compiles fine.
+#
+#        for now, i'm reverting the commit so we can continue to use
+#        3.2.5 (upstream 220)... although i could downgrade to v2.1.1
+#        (upstream 217)...  lvm2 does a bunch of udev and systemd
+#        pkg-config checking, but all the minimum versions it looks
+#        for are much older than 217.
+#
+#        so that works, but i don't think i really need to go that
+#        far.  if i set BLKID_SUBLKS_BADCSUM=0, the code in question
+#        will just never happen...
+#
+#        or even better, i'll conditionally set it to 0 if not
+#        defined.  :-)
+#
 eudev/FOO:
 	pushd eudev && \
 	rm -rf FOO && \
+	sed -i '/^#include <blkid\/blkid.h>/a #ifndef BLKID_SUBLKS_BADCSUM\n#define BLKID_SUBLKS_BADCSUM 0\n#endif' src/udev/udev-builtin-blkid.c && \
 	autoreconf -v --install && \
 	./configure --prefix=/usr --bindir=/sbin --sbindir=/sbin \
 	  --libdir=/lib --sysconfdir=/etc --libexecdir=/lib \
 	  --with-rootprefix= --with-rootlibdir=/lib --disable-manpages \
 	  --disable-static --disable-introspection --disable-selinux \
-	  --disable-blkid && \
+	  --enable-blkid --enable-kmod && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
@@ -118,7 +149,7 @@ lvm2/FOO: eudev.tar
 	./configure --prefix=/usr --disable-notify-dbus \
 	  --disable-udev-systemd-background-jobs --disable-selinux \
 	  --enable-udev_sync --enable-udev_rules \
-	  --enable-udev-rule-exec-detection --disable-blkid_wiping \
+	  --enable-udev-rule-exec-detection \
 	  UDEV_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
 	  UDEV_LIBS="-L$$PWD/../eudev/FOO/lib/ -ludev" \
 	  PKG_CONFIG_PATH=$PWD/../eudev/FOO/lib/pkgconfig:$PWD/../eudev/FOO/usr/share/pkgconfig && \
