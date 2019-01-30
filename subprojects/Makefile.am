@@ -33,6 +33,7 @@ clean-local:
 #
 eudev/FOO:
 	pushd eudev && \
+	rm -rf FOO && \
 	autoreconf -v --install && \
 	./configure --prefix=/usr --bindir=/sbin --sbindir=/sbin \
 	  --libdir=/lib --sysconfdir=/etc --libexecdir=/lib \
@@ -60,8 +61,9 @@ eudev/FOO:
 #        final initramfs by .1M and our build time by ~10
 #        seconds... not sure that's worth it.
 #
-busybox/FOO: eudev.tar
+busybox/FOO:
 	pushd busybox && \
+	rm -rf FOO && \
 	make mrproper && \
 	cp ../busybox.config .config && \
 	make oldconfig && \
@@ -85,6 +87,7 @@ busybox/FOO: eudev.tar
 #
 mdadm/FOO: eudev.tar
 	pushd mdadm && \
+	rm -rf FOO && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf FOO/usr/share && \
@@ -111,6 +114,7 @@ mdadm/FOO: eudev.tar
 #
 lvm2/FOO: eudev.tar
 	pushd lvm2 && \
+	rm -rf FOO && \
 	./configure --prefix=/usr --disable-notify-dbus \
 	  --disable-udev-systemd-background-jobs --disable-selinux \
 	  --enable-udev_sync --enable-udev_rules \

@@ -16,7 +16,7 @@ install-exec-hook:
 	(cd $(DESTDIR)$(bindir) && $(LN_S) ruckusrd mkinitrd)
 	sed -i 's|__LIBDIR__|$(pkgdatadir)|' $(DESTDIR)$(bindir)/ruckusrd
 
-lower.sqsh:
+lower.sqsh: ruckusrd.prep linuxrc ../subprojects/busybox.tar ../subprojects/eudev.tar ../subprojects/mdadm.tar ../subprojects/lvm2.tar
 	./ruckusrd.prep
 
 

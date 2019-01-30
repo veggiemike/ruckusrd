@@ -5,6 +5,8 @@
 
 . ruckusrd.conf
 
+# make sure we're starting clean
+rm -rf initramfs lower.sqsh
 
 # Make directory structure
 #
