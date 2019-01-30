@@ -3,12 +3,12 @@
 # in here for each subproject.
 
 
-all: eudev.tar busybox.tar mdadm.tar lvm2.tar
+all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
 
-clean:
+clean-local:
 	rm -fv {eudev,busybox,mdadm,lvm2}.tar
 	cd eudev && git clean -dfx
 	cd busybox && git clean -dfx
@@ -60,7 +60,7 @@ eudev/FOO:
 #        final initramfs by .1M and our build time by ~10
 #        seconds... not sure that's worth it.
 #
-busybox/FOO:
+busybox/FOO: eudev.tar
 	pushd busybox && \
 	make mrproper && \
 	cp ../busybox.config .config && \
@@ -83,7 +83,7 @@ busybox/FOO:
 # NOTE: We remove manpages here because we don't want them on the
 #       initramfs.
 #
-mdadm/FOO:
+mdadm/FOO: eudev.tar
 	pushd mdadm && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
@@ -109,7 +109,7 @@ mdadm/FOO:
 #       the host system's libblkid... but we install busybox's version
 #       of blkid in initramfs.
 #
-lvm2/FOO:
+lvm2/FOO: eudev.tar
 	pushd lvm2 && \
 	./configure --prefix=/usr --disable-notify-dbus \
 	  --disable-udev-systemd-background-jobs --disable-selinux \

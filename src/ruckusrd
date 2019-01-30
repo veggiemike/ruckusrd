@@ -18,6 +18,8 @@
 if [ -f linuxrc ]; then
     LIBEXECDIR=$PWD
     LIBDIR=$PWD
+else
+    LIBDIR=__LIBDIR__
 fi
 . $LIBDIR/ruckusrd.conf
 

@@ -10,7 +10,7 @@ EXTRA_DIST += $(top_docs)
 
 install-data-local:
 	$(MKDIR_P) $(DESTDIR)$(docdir)
-	$(CP) -r $(top_docs:%=$(srcdir)/%) $(DESTDIR)$(docdir)
+	cp -r $(top_docs:%=$(srcdir)/%) $(DESTDIR)$(docdir)
 
 uninstall-local:
-	$(RM) -f $(top_docs:%=$(DESTDIR)$(docdir)/%)
+	rm -f $(top_docs:%=$(DESTDIR)$(docdir)/%)

@@ -1,20 +1,21 @@
 # -*- sh -*-
 *~
+/FOO
 
 # autotools files
 Makefile
 Makefile.in
-aclocal.m4
-autom4te.cache/
-config.log
-config.status
-configure
+/aclocal.m4
+/autom4te.cache/
+/config.log
+/config.status
+/configure
 
 # built files
-src/initramfs
-src/lower.sqsh
-src/ruckusrd.conf
-subprojects/busybox.tar
-subprojects/eudev.tar
-subprojects/lvm2.tar
-subprojects/mdadm.tar
+/src/initramfs
+/src/lower.sqsh
+/src/ruckusrd.conf
+/subprojects/busybox.tar
+/subprojects/eudev.tar
+/subprojects/lvm2.tar
+/subprojects/mdadm.tar
