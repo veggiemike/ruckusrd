@@ -36,6 +36,9 @@ Con:
 When we build and install ruckusrd, we'll have to build any configured bundled
 software install them into pkgdatadir or libexecdir
 
+DONE: They go prepopulated into pkgdatadir/lower.sqsh, which gets used as the
+      bottom layer while generating the initramfs when ruckusrd gets invoked.
+
 
 * prepopulate initramfs template?
 
@@ -54,13 +57,16 @@ Pro:
 Con:
  - Running out of the source tree would become problematic
 
+DONE: We now use lower.sqsh as a lower layer of an overlayfs mount.  Kernel
+      modules get installed on top, depmod, etc, then we cpio the resulting fs
+      hierarchy and unmount everything.
+
 
 * does busybox have everything we need?
 
 I think so, but what about:
   - lvm, dm (nope)
   - mdadm (nope)
-  - blockdev (nope, we use it for dm voodoo)
   - blkid (yes, but just lists all)
   - fsck (yes, but what fstypes?)
   - mksquashfs (maybe, but what versions)
@@ -75,6 +81,12 @@ git://git.fedorahosted.org/git/lvm2.git
 mdadm: https://github.com/neilbrown/mdadm.git
 
 blockdev is a part of util-linux... might need to lookup size a different way.
+
+DONE: Busybox, eudev, lvm2, and mdadm gives us everything we need and more.
+      We've pretty much got a fully functional embedded system pre switch_root.
+
+      The only things we're missing are advanced fs utils, and those really
+      aren't needed.  Could always add them later if we wanted, though.
 
 
 * ash behavior?
@@ -101,6 +113,8 @@ Even if we did get MODALIAS stuff working, mdev won't do the rootfs
 CDLABEL=|LABEL=|UUID= udev rules for us, so we'd have to write something to do
 those lookups.
 
+DONE: I've got eudev installed and working.
+
 
 * linuxrc.in ruckusrd.in no longer?
 
@@ -114,6 +128,10 @@ actually what's recommended in the autotools manuals.  Could also have both
 ruckusrd and linuxrc parse a generated config file (and make sure it gets
 included in the initramfs).
 
+DONE: We install ruckusrd.conf w/ config information in it and parse it from
+      both ruckusrd and linuxrc.  At install time we sed __LIBDIR__ into
+      ruckusrd.
+
 ** ruckusrd.in
 VERSION, path to LINUXRC, have_tree.  Will need path to busybox and links
 file instead of all the host binary substitutions for the progs list.
@@ -122,3 +140,23 @@ file instead of all the host binary substitutions for the progs list.
 nothing will need to be substituted anymore, unless we want to be able to
 track what version of ruckusrd built the initramfs... which might actually
 be a good idea regardless.
+
+
+* migrate linuxrc udev rules
+** IMPORT{builtin}="blkid"
+** get rid of old dmroot raid/lvm init code
+udev does it all now!
+
+* mdmon usage
+do we need to do this?
+
+mdmon --all-active-arrays --takeover
+
+
+* audit rc.local usage
+systemd uses rc.local, but it's at /etc/rc.d/rc.local and it needs to be chmod
++x
+
+and it runs in parallel w/ other services...
+
+maybe we need to write a ruckusrd.service file instead...?

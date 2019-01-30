@@ -38,11 +38,11 @@
 # double-check for busybox applet compatibility moving forward:
 #
 # - sed -i (yes!)
-# - bash ${param#word} and ${param//pattern/string} expansions (?? and yes!)
-# - bash trap (maybe...)
+# - bash ${param#word} and ${param//pattern/string} expansions (yes and yes!)
+# - bash trap and set -e (maybe... testing now)
 # - bash $() command subst (yes!)
-# - bash {} globbing (e.g., cp foo{,bak}) (NOPE)
-# - bash var+= (NOPE)
+# - bash {} globbing (e.g., cp foo{,bak}) (NOPE, but fixed already)
+# - bash var+= (NOPE, but fixed already)
 
 
 . /ruckusrd.conf
@@ -53,69 +53,6 @@ decho()
     if [ "$quiet" != "1" ]; then
         echo "$*"
     fi
-}
-
-
-do_raid_and_lvm()
-{
-    # wait for at least one harddisk to be handled by udev
-    #
-    # NOTE: this is needed because this method might be called before we can
-    #       guarantee that udev has finished loading modules.
-    #
-    x=$1
-    msg="waiting up to $x seconds for at least one hdd to appear..."
-    while [ ! -e /dev/sda -a ! -e /dev/nvme0n1 -a "$x" != "0" ]; do
-        if [ -n "$msg" ]; then
-            echo -n $msg
-            msg=""
-        else
-            echo -n "."
-        fi
-        x=$(($x-1))
-        sleep 1
-    done
-    [ -z "$msg" ] && echo " done"
-
-    # if we were asked to wait, wait another second
-    #
-    # NOTE: this should make it almost impossible to fail to detect devices due
-    #       to concurrency problems.  the only way for it to happen now is if
-    #       /dev/sda *JUST* got created when the previous waitloop started (so
-    #       we don't wait at all), but we get to this 2nd conditional before
-    #       /dev/sdb has been created.
-    [ "$1" != "0" ] && sleep 1
-
-    # autogen mdadm.conf
-    cat <<EOF > /etc/mdadm.conf
-AUTO +imsm +1.x -all
-DEVICE /dev/sd*[0-9]
-DEVICE /dev/nvme[0-9]n[0-9]p[0-9]
-EOF
-
-    mdadm --examine --scan | sed 's|/dev/.tmp.|/dev/|' >> /etc/mdadm.conf
-    [ "$quiet" != "1" ] && cat /etc/mdadm.conf
-
-    grep ARRAY /etc/mdadm.conf >/dev/null && raid=1 || raid=0
-    if [ "$raid" != "0" ]; then
-        echo "initializing RAID devices..."
-        go="mdadm --assemble --scan"
-        [ "$quiet" != "1" ] && go="$go -v"
-        decho $go
-        eval $go || echo "WARNING: RAID initialization failed"
-    fi
-
-    echo "initializing LVM..."
-
-    go="lvm vgscan --mknodes"
-    [ "$quiet" != "1" ] && go="$go -v"
-    decho $go
-    eval $go || echo "WARNING: LVM initialization failed"
-
-    go="lvm vgchange -a y"
-    [ "$quiet" != "1" ] && go="$go -v"
-    decho $go
-    eval $go || echo "WARNING: LVM initialization failed"
 }
 
 
@@ -171,72 +108,70 @@ emergency_shell()
 # that points to the device specified by $2, which can be CDLABEL, LABEL, UUID,
 # or an actual device name (e.g., /dev/sda1, /dev/md0, /dev/mapper/vg0_lv1).
 #
-# NOTE: We try to depend on the hotplug implementation as little as possible in
-#       here (i.e., we're leaving the door open for mdev as much as possible).
-#
 # NOTE: This method modifies the following important global variables:
 #
 #       thingtomount: argument to be mounted for root filesys
 #
-#       dmroot: set to 1 if thingtomount requires device mapper
 generate_udev_rules()
 {
     name=$1
     str=$2
 
     # blkid commands
-    get_label="/sbin/blkid -o value -s LABEL"
-    get_uuid="/sbin/blkid -o value -s UUID"
+    #
+    # FIXME: ditch this and use builtin blkid!
+    #
+    # IMPORT{builtin}="blkid"
+    # then just use ENV{ID_FS_UUID_ENC} ENV{ID_FS_LABEL_ENC}
+    #
+    #get_label="/sbin/blkid -o value -s LABEL"
+    #get_uuid="/sbin/blkid -o value -s UUID"
 
+    # FIXME: probably want to entirely rewrite these rules for eudev (upstream
+    #        220).
+    #
     case $str in
         CDLABEL=*)
             # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA,
             #       USB, and SCSI should all be using them.
             CDLABEL=${str#CDLABEL=}
-            echo "KERNEL==\"sr[0-9]\", PROGRAM=\"$get_label %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-cdlabel.rules
-            echo "KERNEL==\"scd[0-9]\", PROGRAM=\"$get_label %N\", RESULT==\"$CDLABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-cdlabel.rules
-            decho "Added udev rule for CDLABEL=='$CDLABEL'"
+            cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
+ENV{ID_CDROM}==1, ENV{ID_FS_LABEL_ENC}==$CDLABEL, SYMLINK+="$name"
+EOF
+            echo "Added udev rule for CDLABEL=='$CDLABEL'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root
-                dmroot=0
             fi
             ;;
         LABEL=*)
             LABEL=${str#LABEL=}
-            echo "SUBSYSTEM==\"block\", PROGRAM=\"$get_label %N\", RESULT==\"$LABEL\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/00-label.rules
-            decho "Added udev rule for LABEL=='$LABEL'"
+            cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
+SUBSYSTEM=="block", ENV{ID_FS_LABEL_ENC}=="$LABEL", SYMLINK+="$name"
+EOF
+            echo "Added udev rule for LABEL=='$LABEL'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root
-                dmroot=1
             fi
             ;;
         UUID=*)
             UUID=${str#UUID=}
-            echo "SUBSYSTEM==\"block\", PROGRAM=\"$get_uuid %N\", RESULT==\"$UUID\", SYMLINK+=\"$name\"" >> /etc/udev/rules.d/01-uuid.rules
-            decho "Added udev rule for UUID=='$UUID'"
+            cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
+SUBSYSTEM=="block", ENV{ID_FS_UUID_ENC}=="$UUID", SYMLINK+="$name"
+EOF
+            echo "Added udev rule for UUID=='$UUID'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root
-                dmroot=1
-            fi
-            ;;
-        /dev/md*|/dev/V*|/dev/mapper/*)
-            ln -fs $str /dev/$name
-            if [ "$name" = "root" ]; then
-                thingtomount=$str
-                dmroot=1
             fi
             ;;
         /dev/*)
             ln -fs $str /dev/$name
             if [ "$name" = "root" ]; then
                 thingtomount=$str
-                dmroot=0
             fi
             ;;
         *)
             if [ "$name" = "root" ]; then
                 thingtomount=$str
-                dmroot=0
             fi
             ;;
     esac
@@ -246,6 +181,9 @@ generate_udev_rules()
 trap "emergency_shell" 0 2
 
 # exit immediately if a command fails
+#
+# FIXME: does this work in ash?
+#
 set -e
 
 PATH=/sbin:/bin
@@ -283,7 +221,6 @@ shell=""
 maint=""
 hoststamp=""
 quiet=0
-dmroot=0
 sqsh_layers=""
 sqsh_layerdev=""
 sqsh_layerdir="/tmproot"
@@ -404,30 +341,30 @@ modprobe loop
 
 echo -n "determining what to mount... "
 
+cat <<EOF > etc/udev/rules.d/99-ruckusrd.rules
+IMPORT{builtin}="blkid"
+
+EOF
 generate_udev_rules root $root
 [ -n "$sqsh_layerdev" ] && generate_udev_rules sqsh_layerdev $sqsh_layerdev
 
+echo "$thingtomount"
 
-echo "$thingtomount (dmroot=$dmroot)"
+boinkyboink
 
 decho "starting udevd"
 /sbin/udevd --daemon --resolve-names=never
 
 # tell udevd to start processing its queue
+#
+# NOTE: I used to just trigger and settle...  LFS does these 3 triggers and
+#       then conditionally settles.  Not 100% sure of the rationale, but I'll
+#       follow LFS on this one.
+#
 /sbin/udevadm trigger --action=add --type=subsystems
 /sbin/udevadm trigger --action=add --type=devices
 /sbin/udevadm trigger --action=change --type=devices
 /sbin/udevadm settle
-
-# initialize LVM if needed now
-#
-# NOTE: We're asking the init method to wait up to 10 seconds for udev to load
-#       modules for drive controllers before we kick off initialization of LVM.
-#       Withouth the sleep, vgscan might run prior to the kernel noticing the
-#       existance of the harddrive that contains the volgroup...
-if [ "$dmroot" != "0" ]; then
-    do_raid_and_lvm 10
-fi
 
 # wait for udev symlinks to get created
 wait_for_udev_symlink 30 /dev/root
@@ -448,6 +385,9 @@ root_true=`readlink /dev/root`
 #
 # FIXME: We should really do better fsck error checking (see fsck(8) for exit
 #        codes).
+#
+# FIXME: does this work w/ bb fsck?
+#
 if ! (echo $root | grep -q CDLABEL); then
     go="fsck -TC $thingtomount"
     decho $go
@@ -456,7 +396,7 @@ fi
 
 mountoptions=" -o ro"
 if [ -n "$rootflags" ]; then
-    mountoptions+=",$rootflags"
+    mountoptions="$mountoptions,$rootflags"
 fi
 
 go="mount -t $rootfstype $mountoptions $thingtomount /sysroot"
@@ -490,20 +430,6 @@ else
     initargs=""
 fi
 
-# initialize device mapper and LVM
-#
-# NOTE: This was already done at the very beginning if root was specified as
-#       /dev/mapper/*.  We're going to do it now if it hasn't already been done,
-#       just so we can assume from here on out that the device mapper and LVM
-#       have been initialized.
-#
-# NOTE: We tell the init method to not wait for devices at this point, assuming
-#       that udev has had plenty of time to create device nodes.
-if [ "$dmroot" != "1" ]; then
-    do_raid_and_lvm 0
-fi
-
-
 # do prep for squashfs magic common to both old device-mapper and new overlayfs
 # implementations
 if [ -n "$sqsh_layers" ]; then
@@ -533,11 +459,11 @@ if [ -n "$sqsh_layers" ]; then
         mkdir -p /sqsh_layerdev
         decho ""
         go="cp -a"
-        [ "$quiet" != "1" ] && go+=" -v"
+        [ "$quiet" != "1" ] && go="$go -v"
         for x in $sqsh_layers_ws; do
-            go+=" $sqsh_layerdir/$x.sqsh"
+            go="$go $sqsh_layerdir/$x.sqsh"
         done
-        go+=" /sqsh_layerdev"
+        go="$go /sqsh_layerdev"
         decho $go
         eval $go
 	echo "done"
@@ -571,13 +497,13 @@ if [ -n "$sqsh_layers" ]; then
         decho "creating ram_layer w/ size=$ram_layer"
         mkdir -p /upper
         mount -t tmpfs -o size=$ram_layer ram_layer /upper
-        mkdir -p /upper/{upper,work}
+        mkdir -p /upper/upper /upper/work
         upper=upper
     else
         # need to remount rootfs rw so we can write into upper layer
         decho "remounting /tmproot rw"
         mount -o remount,rw /tmproot
-        mkdir -p /tmproot/upper/{upper,work}
+        mkdir -p /tmproot/upper/upper /tmproot/upper/work
         upper=/tmproot/upper
         # if we're not using ram_layer, we cannot remount sysroot ro later on,
         # so we must change this flag to rw
@@ -621,7 +547,8 @@ if [ -n "$sqsh_layers" ]; then
     #
     # NOTE: we really want to do this. without it there's no way to update
     #       modeprobe.conf before modules get loaded... can't exactly edit
-    #       modprobe.conf and reboot, as our changes get lost.
+    #       modprobe.conf and reboot, as our changes get lost.  (e.g., module
+    #       blacklisting or module options on kernel command line)
     #
     # NOTE: but we don't want this if sqsh_layers w/out ram_overlay
     #
@@ -659,7 +586,7 @@ if [ -n "$sqsh_layers" ]; then
     # NOTE: We always have the rc.local appendage, but the content changes
     #       depending on other params (e.g., sqsh_layerdev, to_ram).
     #
-    cp /sysroot/etc/rc.local{,.ruckusrdbak}
+    cp /sysroot/etc/rc.local /sysroot/etc/rc.local.ruckusrdbak
     cat <<EOF >> /sysroot/etc/rc.local
 # --- begin ruckusrd appendage ---
 EOF
@@ -755,7 +682,7 @@ EOF
     #       executing our extra lines.
     #
     cat <<EOF >> /sysroot/etc/rc.local
-cp /etc/rc.local{.ruckusrdbak,}
+cp /etc/rc.local.ruckusrdbak /etc/rc.local
 EOF
 
     # fix unmount chicken-and-the-egg problem
@@ -833,7 +760,9 @@ fi
 
 # Leave initramfs and transition to rootfs
 #
-kill `pidof udevd systemd-udevd`
+# FIXME: mdmon?
+#
+kill `pidof udevd`
 
 decho "switching to real rootfs..."
 go="exec switch_root /sysroot $init $initargs"
