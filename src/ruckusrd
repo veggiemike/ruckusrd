@@ -130,7 +130,7 @@ fi
 decho '********** PREPPING TEMPDIR ****************************************************'
 # setup our working tempdir
 TEMPDIR=`mktemp -dt ruckusrd-XXXX` &&
-$mkdir $TEMPDIR/{initramfs,lower,upper} || cleanup 1
+$mkdir $TEMPDIR/{initramfs,lower,upper,work} || cleanup 1
 
 # mount overlay in TEMPDIR
 pushd $TEMPDIR &&
@@ -178,10 +178,11 @@ find $HOSTMODDIR/kernel/drivers/{ata,block,cdrom,md,nvme,scsi,usb} \
 # Make sure none of the MODS we've installed have unmet dependencies
 decho '********** COPYING MODULE DEPS TO INITRAMFS ************************************'
 for m in $DESTMODDIR/*.ko{,.xz} ; do
-    /sbin/modprobe --set-version $KERNEL --show-depends $m >> modules 2>/dev/null
+    /sbin/modprobe --set-version $KERNEL --show-depends $m \
+        >> $TEMPDIR/modules 2>/dev/null
 done
 
-DEPMODS=`cat modules | awk '{ print $2 }' | sort -u`
+DEPMODS=`cat $TEMPDIR/modules | awk '{ print $2 }' | sort -u`
 for f in $DEPMODS; do
     $cp $f $DESTMODDIR/ || cleanup 1
 done
@@ -197,7 +198,7 @@ eval $go || cleanup 1
 
 # Create the compressed image
 decho '********** CREATING COMPRESSED CPIO IMAGE **************************************'
-pushd initramfs &&
+pushd $TEMPDIR/initramfs &&
 find . | $cpio -o -H newc | $xz -vzc --check=crc32 > ../initramfs.img &&
 popd || cleanup 1
 
