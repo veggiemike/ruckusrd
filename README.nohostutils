@@ -18,7 +18,7 @@ systems that already have appropriate versions of any of them.
 
 Pro:
  + Fewer conditional blocks
- + Smaller initramfs image (by a lot, I think)
+ + Smaller initramfs image (by a lot, I think) (not looking like it...)
  + Faster boot time (because of smaller initramfs?)
  + Less (no?) dependence on host sytem
  + Ability to cross-compile

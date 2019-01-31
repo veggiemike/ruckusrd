@@ -104,6 +104,13 @@ emergency_shell()
 }
 
 
+autoload_fs_module()
+{
+    eval $(blkid $1 | sed 's|.*: ||')
+    [ -n "$TYPE" ] && modprobe $TYPE
+}
+
+
 # This method creates udev rules such that we end up with a /dev/$1 symlink
 # that points to the device specified by $2, which can be CDLABEL, LABEL, UUID,
 # or an actual device name (e.g., /dev/sda1, /dev/md0, /dev/mapper/vg0_lv1).
@@ -131,27 +138,31 @@ generate_udev_rules()
     #        220).
     #
     case $str in
-# FIXME: why do we need to differentiate between CDLABEL and LABEL...?  seems
-#        like an arbitrary forced difference...
-#
-#        CDLABEL=*)
-#            # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA,
-#            #       USB, and SCSI should all be using them.
-#            CDLABEL=${str#CDLABEL=}
-#            cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
-#ENV{ID_CDROM}==1, ENV{ID_FS_LABEL_ENC}==$CDLABEL, SYMLINK+="$name"
-#EOF
-#            echo "Added udev rule for CDLABEL=='$CDLABEL'"
-#            if [ "$name" = "root" ]; then
-#                thingtomount=/dev/root
-#            fi
-#            ;;
+        # NOTE: While CDLABEL and LABEL could use the same udev rule, we use
+        #       the different str to differentiate later on (e.g., for fsck).
+        #
+        CDLABEL=*)
+            # NOTE: we're assuming SCSI device nodes here, now that SATA, PATA,
+            #       USB, and SCSI should all be using them.
+            #
+            # FIXME: can we just use the cdrom.rule's ID_CDROM=1?  looks like
+            #        no...
+            #
+            CDLABEL=${str#CDLABEL=}
+            cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
+SUBSYSTEM=="block", KERNEL=="sr[0-9]*", ENV{ID_FS_LABEL_ENC}=="$CDLABEL", SYMLINK+="$name"
+EOF
+            decho "Added udev rule for CDLABEL=='$CDLABEL'"
+            if [ "$name" = "root" ]; then
+                thingtomount=/dev/root
+            fi
+            ;;
         LABEL=*)
             LABEL=${str#LABEL=}
             cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
-SUBSYSTEM=="block", ENV{ID_FS_LABEL_ENC}=="$LABEL", SYMLINK+="$name"
+SUBSYSTEM=="block", KERNEL!="sr[0-9]", ENV{ID_FS_LABEL_ENC}=="$LABEL", SYMLINK+="$name"
 EOF
-            echo "Added udev rule for LABEL=='$LABEL'"
+            decho "Added udev rule for LABEL=='$LABEL'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root
             fi
@@ -161,7 +172,7 @@ EOF
             cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
 SUBSYSTEM=="block", ENV{ID_FS_UUID_ENC}=="$UUID", SYMLINK+="$name"
 EOF
-            echo "Added udev rule for UUID=='$UUID'"
+            decho "Added udev rule for UUID=='$UUID'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root
             fi
@@ -340,7 +351,22 @@ if [ -n "$shell" ]; then
 fi
 
 # load loop module (if not built-in)
-modprobe loop
+#
+# NOTE: It doesn't look like losetup triggers an auto-load of the loop module.
+#
+# FIXME: The CentOS7 kernel has CONFIG_BLK_DEV_LOOP_MIN_COUNT=0... which means
+#        modprobing doesn't create any device nodes.  we can either figure out
+#        the right way to do this (via loop-control?) or modprobe loop
+#        max_loop=32.
+#
+#        maybe loop-control will autoprobe?
+#
+#        So, looks like "real" losetup will open /dev/loop-control (which
+#        probably triggers modprobe of loop) and does some IOCTLs to create
+#        loop device nodes.  I'm guessing the busybox version assumes they're
+#        already there.
+#
+modprobe loop max_loop=32
 
 echo -n "determining what to mount... "
 
@@ -361,8 +387,6 @@ EOF
 
 echo "$thingtomount"
 
-boinkyboink
-
 decho "starting udevd"
 /sbin/udevd --daemon --resolve-names=never
 
@@ -377,10 +401,23 @@ decho "starting udevd"
 /sbin/udevadm trigger --action=change --type=devices
 /sbin/udevadm settle
 
+# activate LVM
+#
+# FIXME: should i sleep a second here...?
+vgchange -a y
+
 # wait for udev symlinks to get created
 wait_for_udev_symlink 30 /dev/root
 root_true=`readlink /dev/root`
 [ -n "$sqsh_layerdev" ] && wait_for_udev_symlink 30 /dev/sqsh_layerdev
+
+# autoload filesystem modules if needed
+autoload_fs_module /dev/root
+rootfstype=$TYPE
+if [ -n "$sqsh_layerdev" ]; then
+    autoload_fs_module /dev/sqsh_layerdev
+    sqshfstype=$TYPE
+fi
 
 # run fsck on root dev
 #
@@ -397,10 +434,13 @@ root_true=`readlink /dev/root`
 # FIXME: We should really do better fsck error checking (see fsck(8) for exit
 #        codes).
 #
-# FIXME: does this work w/ bb fsck?
+# FIXME: should we fsck sqsh_layerdev too?  same rationale applies... probably
+#        can't umount once we've put things together (unless to_ram?).
+#
+# FIXME: does this work w/ bb fsck?  looks like -C isn't supported... oh well.
 #
 if ! (echo $root | grep -q CDLABEL); then
-    go="fsck -TC $thingtomount"
+    go="fsck -T $thingtomount"
     decho $go
     eval $go || echo "WARNING: fsck of rootdev exited non-zero"
 fi
@@ -429,7 +469,7 @@ fi
 # look for sqsh_layerdev
 if [ -h /dev/sqsh_layerdev ]; then
     # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
-    go="mkdir -p /sqsh_layerdev && mount -t auto -o ro /dev/sqsh_layerdev /sqsh_layerdev"
+    go="mkdir -p /sqsh_layerdev && mount -t $sqshfstype -o ro /dev/sqsh_layerdev /sqsh_layerdev"
     decho $go
     eval $go
 fi
