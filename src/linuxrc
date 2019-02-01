@@ -110,6 +110,12 @@ emergency_shell()
 }
 
 
+modprobe()
+{
+    grep -q $1.ko /lib/modules/$(uname -r)/modules.builtin || /sbin/modprobe $*
+}
+
+
 autoload_fs_module()
 {
     eval $(blkid $1 | sed 's|.*: ||')
