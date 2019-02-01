@@ -58,6 +58,10 @@ decho()
 
 # waits up to $1 seconds for $2 symlink to get created by udev.  if it takes
 # longer than that, something is wrong, but maybe the user can fix it.
+#
+# NOTE: Adds device-mapper device name responsible for the required evice to
+#       $dmneeded prior to returning.
+#
 wait_for_udev_symlink()
 {
     x=$1
@@ -93,6 +97,8 @@ wait_for_udev_symlink()
         echo
         bash
     fi
+
+    dmneeded="$dmneeded $(dmsetup info -c --noheadings -o name $dev 2>/dev/null || echo)"
 }
 
 
@@ -399,14 +405,49 @@ decho "starting udevd"
 /sbin/udevadm trigger --action=add --type=subsystems
 /sbin/udevadm trigger --action=add --type=devices
 /sbin/udevadm trigger --action=change --type=devices
-/sbin/udevadm settle
+
+# wait for at least one harddisk to be handled by udev
+#
+# NOTE: A full blown settle can take longer than I'd like (~10 seconds).  We
+#       can tell udevadm to STOP waiting as soon as a particular device exists,
+#       but I can't specify more than one.  So we don't call settle, we loop on
+#       our own waiting for /dev/sda or /dev/nvme0n1 (or anything else I decide
+#       to wait on in the future).
+#
+#/sbin/udevadm settle --exit-if-exists=/dev/sda
+#
+x=10
+msg="waiting up to $x seconds for at least one hdd to appear..."
+while [ ! -e /dev/sda -a ! -e /dev/nvme0n1 -a "$x" != "0" ]; do
+    if [ -n "$msg" ]; then
+        echo -n $msg
+        msg=""
+    else
+        echo -n "."
+    fi
+    x=$(($x-1))
+    sleep 1
+done
+if [ -z "$msg" ]; then
+    echo -n "."
+    # and one more second just to be safe
+    sleep 1
+    echo " done"
+fi
 
 # activate LVM
 #
-# FIXME: should i sleep a second here...?
-vgchange -a y
+# NOTE: We activate ALL logical volumes here.  Once our udev rules have created
+#       the /dev symlinks we need, we deactivate all the logvols that weren't
+#       needed for booting.  Some systems (e.g., fedora and it's cousins) like
+#       to hang for 90 seconds flailing around w/ already activated logvols
+#       unless we do this.
+#
+decho "activating LVM"
+vgchange -a y --quiet --quiet
 
 # wait for udev symlinks to get created
+dmneeded=""
 wait_for_udev_symlink 30 /dev/root
 root_true=`readlink /dev/root`
 [ -n "$sqsh_layerdev" ] && wait_for_udev_symlink 30 /dev/sqsh_layerdev
@@ -418,6 +459,17 @@ if [ -n "$sqsh_layerdev" ]; then
     autoload_fs_module /dev/sqsh_layerdev
     sqshfstype=$TYPE
 fi
+
+# deactivate unneeded logvols
+#
+# FIXME: what if i just deactivate all after mounting /sysroot... will it
+#        politely refuse to deactive mounted logvols?
+#
+decho "deactivating unneeded LVM (dmneeded='$dmneeded')"
+vgchange -a n --quiet --quiet
+for x in $dmneeded; do
+    lvchange -a y /dev/mapper/$x --quiet --quiet
+done
 
 # run fsck on root dev
 #
