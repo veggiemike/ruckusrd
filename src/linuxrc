@@ -437,10 +437,8 @@ fi
 # FIXME: should we fsck sqsh_layerdev too?  same rationale applies... probably
 #        can't umount once we've put things together (unless to_ram?).
 #
-# FIXME: does this work w/ bb fsck?  looks like -C isn't supported... oh well.
-#
 if ! (echo $root | grep -q CDLABEL); then
-    go="fsck -T $thingtomount"
+    go="fsck -TC $thingtomount"
     decho $go
     eval $go || echo "WARNING: fsck of rootdev exited non-zero"
 fi

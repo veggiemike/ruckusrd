@@ -10,3 +10,6 @@
 [submodule "subprojects/eudev"]
 	path = subprojects/eudev
 	url = https://github.com/gentoo/eudev.git
+[submodule "subprojects/e2fsprogs"]
+	path = subprojects/e2fsprogs
+	url = git://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git

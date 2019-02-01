@@ -16,6 +16,7 @@ Makefile.in
 /src/lower.sqsh
 /src/ruckusrd.conf
 /subprojects/busybox.tar
+/subprojects/e2fsprogs.tar
 /subprojects/eudev.tar
 /subprojects/lvm2.tar
 /subprojects/mdadm.tar

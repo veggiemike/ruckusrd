@@ -46,7 +46,12 @@ ln -vs lib initramfs/lib64 || exit 1
 
 # Copy all the PROGS into the initramfs
 echo '********** COPYING PROGS TO INITRAMFS ******************************************'
-for x in ../subprojects/{eudev,busybox,mdadm,lvm2}.tar; do
+for x in ../subprojects/{eudev,mdadm,lvm2,e2fsprogs,busybox}.tar; do
+    # NOTE: We use --keep-old-files here to prevent replacement of
+    #       usr/{bin,sbin,lib,lib64} symlnks.  It would be nice if we could
+    #       find a better way to do that, while allowing us to overwrite
+    #       busybox symlinks.  Until then, we'll untar busybox last and tweak
+    #       it's build to remove unneeded symlinks.
     tar -C initramfs --keep-old-files -vxf $x || exit 1
 done
 

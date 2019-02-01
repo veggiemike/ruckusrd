@@ -3,7 +3,7 @@
 # in here for each subproject.
 
 
-all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar
+all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
@@ -14,6 +14,7 @@ clean-local:
 	cd busybox && git clean -dfx
 	cd mdadm && git clean -dfx
 	cd lvm2 && git clean -dfx
+	cd e2fsprogs && git clean -dfx
 
 
 # FIXME: when we add --with-system-eudev to configure, we'll have to
@@ -92,6 +93,11 @@ eudev/FOO:
 #        final initramfs by .1M and our build time by ~10
 #        seconds... not sure that's worth it.
 #
+# NOTE: We remove a couple bb symlinks here because some of our other
+#       subprojects provide them.  We could stop compiling them by
+#       tweaking .config, but this seems easier (and more flexible)
+#       for now.
+#
 busybox/FOO:
 	pushd busybox && \
 	rm -rf FOO && \
@@ -100,6 +106,8 @@ busybox/FOO:
 	make oldconfig && \
 	make -j$(JOBCOUNT_KBUILD) && \
 	make CONFIG_PREFIX=$$PWD/FOO install && \
+	rm -f FOO/bin/{lsattr,chattr} && \
+	rm -f FOO/sbin/{fsck,tune2fs,mke2fs,mkfs.ext2} && \
 	popd || exit 1
 
 
@@ -139,10 +147,6 @@ mdadm/FOO: eudev.tar
 # NOTE: We disable systemd bits, but enable udev stuff and point to
 #       our eudev subproject.
 #
-# NOTE: We disable blkid_wiping because the build system is looking at
-#       the host system's libblkid... but we install busybox's version
-#       of blkid in initramfs.
-#
 lvm2/FOO: eudev.tar
 	pushd lvm2 && \
 	rm -rf FOO && \
@@ -153,6 +157,30 @@ lvm2/FOO: eudev.tar
 	  UDEV_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
 	  UDEV_LIBS="-L$$PWD/../eudev/FOO/lib/ -ludev" \
 	  PKG_CONFIG_PATH=$PWD/../eudev/FOO/lib/pkgconfig:$PWD/../eudev/FOO/usr/share/pkgconfig && \
+	make -j$(JOBCOUNT) && \
+	make DESTDIR=$$PWD/FOO install && \
+	rm -rf FOO/usr/share && \
+	popd || exit 1
+
+
+# FIXME: when we add --with-system-e2fsprogs to configure, we'll have to
+#        conditionally replace this rule w/ one that copies files from
+#        the host system.
+#
+# NOTE: We remove manpages here because we don't want them on the
+#       initramfs.
+#
+# NOTE: A bunch of programs installed here overlap w/ busybox (e.g.,
+#       chattr, lsatter, tune2fs, fsck).  For now, we'll use the
+#       full-featured variants because I think we care more about that
+#       than initrd size.  In order to keep our build scripts from
+#       borking, we remove the unneeded bb symlinks in the busybox
+#       build script.
+#
+e2fsprogs/FOO:
+	pushd e2fsprogs && \
+	rm -rf FOO && \
+	./configure --prefix=/usr && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf FOO/usr/share && \
