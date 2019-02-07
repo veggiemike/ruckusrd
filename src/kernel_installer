@@ -26,4 +26,4 @@ echo removing preexisting modules in $target_host:/lib/modules/$VERSION
 ssh root@$target_host rm -rf /lib/modules/$VERSION || exit 1
 
 echo installing files on $target_host
-rsync -vzurltD $SRP_ROOT/ root@$target_host:/ || exit 2
+rsync -vzurltD --keep-dirlinks $SRP_ROOT/ root@$target_host:/ || exit 2
