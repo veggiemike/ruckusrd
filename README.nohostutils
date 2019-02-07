@@ -61,6 +61,13 @@ DONE: We now use lower.sqsh as a lower layer of an overlayfs mount.  Kernel
       modules get installed on top, depmod, etc, then we cpio the resulting fs
       hierarchy and unmount everything.
 
+NOTDONE: So, the lower.sqsh method works... but now in addition to requiring
+         overlayfs support and squashfs, we also require that ruckusrd be run
+         as root (or a user w/ permission to do tons of mount shenanigans)...
+         I'm gonna tear the lower.sqsh stuff out and use a cpio archive so that
+         normal users can create initramfs archives w/out having to run all of
+         ruckusrd as root.
+
 
 * does busybox have everything we need?
 
@@ -114,6 +121,12 @@ CDLABEL=|LABEL=|UUID= udev rules for us, so we'd have to write something to do
 those lookups.
 
 DONE: I've got eudev installed and working.
+
+NOTDONE: Ok, that works... but eudev is latest and greatest... and we really
+         /could/ get by w/ ancient pre-systemd udev.  All we need to do is
+         MODALIAS magic auto-loading.  Maybe we could support either eudev or
+         udev-142 (prior to adoption of signalfd(), so would work with
+         literally prehistoric versions of glibc).
 
 
 * linuxrc.in ruckusrd.in no longer?

@@ -26,12 +26,6 @@ clean-local:
 # NOTE: We don't run the supplied autogen.sh script because we don't
 #       want to regen manpages that we're not installing
 #
-# FIXME: checks for BLKID on host sytem?  is this going to end up
-#        conflicting w/ busybox blkid in initramfs?
-#
-# FIXME: LFS has you run 'udevadm hwdb --update' after install... do i
-#        need to?
-#
 # FIXME: compilation failure on CentOS7 with eudev-3.2.5...
 #        BLKID_SUBLKS_BADCSUM undeclared.  Offending code was
 #        introduced prior to v3.0 by
