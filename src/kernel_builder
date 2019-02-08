@@ -43,7 +43,13 @@ mkdir -p $SRP_ROOT/boot &&
 ruckusrd -v -b $SRP_ROOT $SRP_ROOT/boot/initrd-$VERSION_NAME.img $VERSION || exit 3
 
 # install other files in SRP_ROOT
-cp -v arch/i386/boot/bzImage $SRP_ROOT/boot/vmlinuz-$VERSION_NAME &&
+for x in arch/*/boot/bzImage; do
+    if [ ! -h $x ]; then
+        vmlinuz=$x
+        break
+    fi
+done
+cp -v $vmlinuz $SRP_ROOT/boot/vmlinuz-$VERSION_NAME &&
 cp -v System.map $SRP_ROOT/boot/System.map-$VERSION_NAME &&
 cp -v .config $SRP_ROOT/boot/config-$VERSION_NAME || exit -1
 
