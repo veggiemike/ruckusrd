@@ -48,8 +48,6 @@ usage()
 cleanup()
 {
     retcode=$1
-    umount $TEMPDIR/initramfs 2>/dev/null
-    umount $TEMPDIR/lower 2>/dev/null
     rm -rf $TEMPDIR
     exit $retcode
 }
@@ -133,13 +131,11 @@ fi
 decho '********** PREPPING TEMPDIR ****************************************************'
 # setup our working tempdir
 TEMPDIR=`mktemp -dt ruckusrd-XXXX` &&
-$mkdir $TEMPDIR/{initramfs,lower,upper,work} || cleanup 1
+$mkdir $TEMPDIR/initramfs || cleanup 1
 
-# mount overlay in TEMPDIR
-pushd >/dev/null $TEMPDIR &&
-mount $LIBDIR/lower.sqsh lower &&
-mount -t overlay -o lowerdir=lower,upperdir=upper,workdir=work \
-    overlay initramfs &&
+# populate initramfs w/ pregenerted archive
+pushd >/dev/null $TEMPDIR/initramfs &&
+$xz -dc $LIBDIR/initramfs.cpio.xz | $cpio --extract &&
 popd >/dev/null || cleanup 1
 
 

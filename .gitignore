@@ -13,7 +13,7 @@ Makefile.in
 
 # built files
 /src/initramfs
-/src/lower.sqsh
+/src/initramfs.cpio.xz
 /src/ruckusrd.conf
 /subprojects/busybox.tar
 /subprojects/e2fsprogs.tar

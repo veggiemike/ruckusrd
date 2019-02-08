@@ -6,7 +6,7 @@
 . ruckusrd.conf
 
 # make sure we're starting clean
-rm -rf initramfs lower.sqsh
+rm -rf initramfs initramfs.cpio.xz
 
 # Make directory structure
 #
@@ -130,6 +130,8 @@ if [ -n "$blarg" ]; then
 fi
 
 
-# Create sqsh file
-echo '********** CREATING SQUASHFS ***************************************************'
-mksquashfs initramfs lower.sqsh -noappend || exit 1
+# Create initramfs.cpio.xz file
+echo '********** CREATING CPIO ARCHIVE ***********************************************'
+pushd initramfs &&
+find . | cpio -v -o -H newc | xz -vzc --check=crc32 > ../initramfs.cpio.xz &&
+popd || exit 1

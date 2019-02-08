@@ -8,7 +8,7 @@ dist_bin_SCRIPTS += ruckusrd
 pkgdata_DATA =
 pkgdata_DATA += linuxrc
 pkgdata_DATA += ruckusrd.conf
-pkgdata_DATA += lower.sqsh
+pkgdata_DATA += initramfs.cpio.xz
 
 
 install-exec-hook:
@@ -16,10 +16,10 @@ install-exec-hook:
 	(cd $(DESTDIR)$(bindir) && $(LN_S) ruckusrd mkinitrd)
 	sed -i 's|__LIBDIR__|$(pkgdatadir)|' $(DESTDIR)$(bindir)/ruckusrd
 
-lower.sqsh: ruckusrd.prep linuxrc ../subprojects/busybox.tar ../subprojects/eudev.tar ../subprojects/mdadm.tar ../subprojects/lvm2.tar ../subprojects/e2fsprogs.tar
+initramfs.cpio.xz: ruckusrd.prep linuxrc ../subprojects/busybox.tar ../subprojects/eudev.tar ../subprojects/mdadm.tar ../subprojects/lvm2.tar ../subprojects/e2fsprogs.tar
 	./ruckusrd.prep
 
 
 clean-local:
-	rm -f lower.sqsh
+	rm -f initramfs.cpio.xz
 	rm -rf initramfs
