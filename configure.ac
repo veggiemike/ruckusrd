@@ -7,6 +7,20 @@ AC_PROG_INSTALL
 AC_PROG_MKDIR_P
 AC_PROG_LN_S
 
+# check for signalfd() in glibc (added in v2.8 according to its
+# manpage), which is needed by newer eudev subproject.  if we don't
+# have it, we cannot compile eudev... but we can probalby build the
+# old udev-1.42... let's try.
+#
+# FIXME: should we bother to check for sys/signalfd.h as well?  seems
+#        like overkill...
+#
+AC_CHECK_HEADER([sys/signalfd.h], [],
+  [AC_MSG_ERROR([Missing sys/signalfd.h, required by eudev])])
+AC_CHECK_FUNC([signalfd], [],
+  [AC_MSG_ERROR([Missing signalfd(), required by eudev])])
+
+
 
 # Needed to BUILD ruckusrd (not including subprojects)
 #
