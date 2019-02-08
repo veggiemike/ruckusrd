@@ -399,6 +399,13 @@ EOF
 
 echo "$thingtomount"
 
+# prep udev hwdb
+go="/sbin/udevadm"
+[ "$quiet" != "1" ] && go="$go --debug"
+go="$go hwdb --update"
+decho $go
+eval $go
+
 decho "starting udevd"
 /sbin/udevd --daemon --resolve-names=never
 

@@ -197,15 +197,6 @@ decho $go
 eval $go || cleanup 1
 
 
-# Prepping udev's hwdb
-decho '********** PREPPING UDEV HWDB **************************************************'
-go="chroot $TEMPDIR/initramfs /bin/udevadm"
-[ "$opt_verbose" != "0" ] && go+=" --debug"
-go+=" hwdb --update"
-decho $go
-eval $go || exit 1
-
-
 # Create the compressed image
 decho '********** CREATING COMPRESSED CPIO IMAGE **************************************'
 pushd >/dev/null $TEMPDIR/initramfs &&
