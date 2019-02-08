@@ -177,7 +177,7 @@ find $HOSTMODDIR/kernel/drivers/{ata,block,cdrom,md,nvme,scsi,usb} \
 # Make sure none of the MODS we've installed have unmet dependencies
 decho '********** COPYING MODULE DEPS TO INITRAMFS ************************************'
 for m in $DESTMODDIR/*.ko{,.xz} ; do
-    /sbin/modprobe --set-version $KERNEL --show-depends $(basename ${m//.ko*/}) \
+    modprobe --set-version $KERNEL --show-depends $(basename ${m//.ko*/}) \
         | head --lines=-1 >> $TEMPDIR/modules 2>/dev/null
 done
 
@@ -191,7 +191,7 @@ done
 
 # Build module deps file so we can use modprobe
 decho '********** RUNNING DEPMOD ******************************************************'
-go="/sbin/depmod -b $TEMPDIR/initramfs -v $KERNEL"
+go="depmod -b $TEMPDIR/initramfs -v $KERNEL"
 [ "$opt_verbose" != "1" ] && go+=" > /dev/null"
 decho $go
 eval $go || cleanup 1

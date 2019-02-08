@@ -8,42 +8,42 @@ AC_PROG_MKDIR_P
 AC_PROG_LN_S
 
 
-# Needed to BUILD ruckusrd
+# Needed to BUILD ruckusrd (not including subprojects)
 #
-# mksquashfs*
+# bash, mv, cp, find, cpio, xz, tar, sed, install
 #
-
+#
 # Needed to RUN ruckusrd
 #
-# ldd, bash, tree*, cpio, cp, mv, find, mkdir, xz*, zcat*
+# bash, mv, cp, find, cpio, xz, ldd, awk, head, modprobe, depmod
 #
+AC_DEFUN([NEEDED_PROGS],
+	 [dnl bash is a special case, see below
+	  mv
+	  cp
+	  find
+	  cpio
+	  xz
+	  tar
+	  sed
+	  ldd
+	  awk
+	  head
+	  modprobe
+	  depmod
+	 ])
 
-# Needed on the initramfs
-#
-# these programs are required on the host system
-#AC_DEFUN([NEEDED_PROGS],
-#	 [dnl all progs are copied into the initramfs
-#	  busybox
-#	  dmsetup dnl only used for old squashfs.img support
-#	  e2fsck
-#	  fsck
-#	  fsck.ext2
-#	  fsck.ext3
-#	  fsck.ext4
-#	  losetup
-#	 ])
-#
-#m4_foreach_w([P], NEEDED_PROGS,
-#  [AC_PATH_PROG(m4_bpatsubst(m4_toupper(P), [\.], [_]), P)
-#   AS_IF([test "$m4_toupper(P)" = ""], [AC_MSG_ERROR([Could not find P])])
-#   AC_ARG_VAR(m4_bpatsubst(m4_toupper(P), [\.], [_]), Path to P)
-#  ])
+m4_foreach_w([P], NEEDED_PROGS,
+  [AC_PATH_PROG(m4_bpatsubst(m4_toupper(P), [\.], [_]), P)
+   AS_IF([test "$m4_bpatsubst(m4_toupper(P), [\.], [_])" = ""],
+     AC_MSG_ERROR([Could not find P]))
+  ])
 
 # bash is a special case, because bash sets the variable BASH to $0, which
 # results in /bin/sh on tons of systems.
-#AC_PATH_PROG(BASH_SHELL, bash)
-#AS_IF([test "$BASH_SHELL" = ""], [AC_MSG_ERROR([Could not find bash])])
-#AC_ARG_VAR(BASH_SHELL, Path to bash)
+AC_PATH_PROG(BASH_SHELL, bash)
+AS_IF([test "$BASH_SHELL" = ""], [AC_MSG_ERROR([Could not find bash])])
+
 
 
 # these optional programs can be used to add extra functionality if present
