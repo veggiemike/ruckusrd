@@ -151,6 +151,8 @@ lvm2/FOO: eudev.tar
 	  --enable-udev-rule-exec-detection \
 	  UDEV_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
 	  UDEV_LIBS="-L$$PWD/../eudev/FOO/lib/ -ludev" \
+	  CPPFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
+	  LDFLAGS="-L$$PWD/../eudev/FOO/lib/" \
 	  PKG_CONFIG_PATH=$PWD/../eudev/FOO/lib/pkgconfig:$PWD/../eudev/FOO/usr/share/pkgconfig && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
