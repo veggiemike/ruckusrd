@@ -95,6 +95,11 @@ DONE: Busybox, eudev, lvm2, and mdadm gives us everything we need and more.
       The only things we're missing are advanced fs utils, and those really
       aren't needed.  Could always add them later if we wanted, though.
 
+      FIXME: actually, we may want to at least add mksquashfs...  that way,
+             users can drop to a maint shell during boot to create/modify
+             sqsh_layers.  and we've already gone back and added e2fsprogs.
+             could add xfs-tools, too, maybe...
+
 
 * ash behavior?
 trap, set, exec, variable substrings, $() subshell, $(()) arithmetic,

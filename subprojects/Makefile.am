@@ -3,7 +3,7 @@
 # in here for each subproject.
 
 
-all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar
+all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
@@ -15,6 +15,7 @@ clean-local:
 	cd mdadm && git clean -dfx
 	cd lvm2 && git clean -dfx
 	cd e2fsprogs && git clean -dfx
+	cd squashfs-tools && git clean -dfx
 
 
 # FIXME: when we add --with-system-eudev to configure, we'll have to
@@ -178,4 +179,16 @@ e2fsprogs/FOO:
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf FOO/usr/share && \
+	popd || exit 1
+
+
+# FIXME: when we add --with-system-squashfs-tools to configure, we'll
+#        have to conditionally replace this rule w/ one that copies
+#        files from the host system.
+#
+squashfs-tools/FOO:
+	pushd squashfs-tools && \
+	rm -rf FOO && \
+	make -j$(JOBCOUNT) -C squashfs-tools && \
+	make -C squashfs-tools INSTALL_DIR=$$PWD/FOO/usr/sbin install && \
 	popd || exit 1

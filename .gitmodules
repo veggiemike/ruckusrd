@@ -13,3 +13,6 @@
 [submodule "subprojects/e2fsprogs"]
 	path = subprojects/e2fsprogs
 	url = git://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git
+[submodule "subprojects/squashfs-tools"]
+	path = subprojects/squashfs-tools
+	url = git://git.kernel.org/pub/scm/fs/squashfs/squashfs-tools.git
