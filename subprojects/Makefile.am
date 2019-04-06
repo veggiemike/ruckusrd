@@ -9,13 +9,13 @@ all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools
 	tar -C $^ -vcf $@ .
 
 clean-local:
-	rm -fv {eudev,busybox,mdadm,lvm2}.tar
-	cd eudev && git clean -dfx
-	cd busybox && git clean -dfx
-	cd mdadm && git clean -dfx
-	cd lvm2 && git clean -dfx
-	cd e2fsprogs && git clean -dfx
-	cd squashfs-tools && git clean -dfx
+	rm -fv {eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools}.tar
+	cd eudev && git clean -dfx && git stash
+	cd busybox && git clean -dfx && git stash
+	cd mdadm && git clean -dfx && git stash
+	cd lvm2 && git clean -dfx && git stash
+	cd e2fsprogs && git clean -dfx && git stash
+	cd squashfs-tools && git clean -dfx && git stash
 
 
 # FIXME: when we add --with-system-eudev to configure, we'll have to

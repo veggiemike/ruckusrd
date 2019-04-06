@@ -7,6 +7,10 @@ AC_PROG_INSTALL
 AC_PROG_MKDIR_P
 AC_PROG_LN_S
 
+# ruckusrd doesn't directly need libtool, but if we don't put this
+# here, subprojects will fail to find ltmain.sh while bootstrapping
+LT_INIT
+
 # check for signalfd() in glibc (added in v2.8 according to its
 # manpage), which is needed by newer eudev subproject.  if we don't
 # have it, we cannot compile eudev... but we can probalby build the
