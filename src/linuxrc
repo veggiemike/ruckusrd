@@ -803,7 +803,7 @@ EOF
     fi
 
     # add some debug output
-    if [ "$quiet" != "1" ]; then
+    if [ "$quiet" != "1" ] && [ -n "$RCLOCAL" ]; then
 	cat <<EOF >> /sysroot/$RCLOCAL
 echo ---------------
 df -h
