@@ -122,6 +122,7 @@ busybox/FOO:
 mdadm/FOO: eudev.tar
 	pushd mdadm && \
 	rm -rf FOO && \
+	sed -i 's|-Werror||g' Makefile && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf FOO/usr/share && \
