@@ -692,27 +692,47 @@ if [ -n "$sqsh_layers" ]; then
     #       that the initrd has ONLY mounted /.  So instead, we'll append a
     #       scriptlet that does the forging into rc.local.
     #
-    # FIXME: This assumes a SysV-Init style system in /etc, which is a safe
-    #        assumption considering all the other udev assumptions in
-    #        here... but we'll want to address this at some point so we can
-    #        work w/ systemd.
+    # NOTE: All this mtab forging is completely unneeded on distros
+    #       that use a symlink to /proc/mounts for mtab.
     #
-    # NOTE: We always have the rc.local appendage, but the content changes
-    #       depending on other params (e.g., sqsh_layerdev, to_ram).
+    # FIXME: At this point, is seems like a safe assumption that all
+    #        distros still have rc.local for backwards
+    #        compatibility...  but you know how assumptions work....
+    #        at some point, we may need to create a systemd service
+    #        for this.
     #
-    cp /sysroot/etc/rc.local /sysroot/etc/rc.local.ruckusrdbak
-    cat <<EOF >> /sysroot/etc/rc.local
+    if [ -h /sysroot/etc/mtab ]; then
+	RCLOCAL=
+    else
+	# use /etc/rc.d/rc.local if it exists, otherwise just use /etc/rc.local
+	if [ -f /sysroot/etc/rc.d/rc.local ]; then
+	    RCLOCAL=/etc/rc.d/rc.local
+	else
+	    RCLOCAL=/etc/rc.local
+	fi
+	# create rc.local if needed
+	if [ ! -x /sysroot/$RCLOCAL ]; then
+	    touch /sysroot/$RCLOCAL
+	    chmod +x /sysroot/$RCLOCAL
+	fi
+	cp /sysroot/$RCLOCAL /sysroot/$RCLOCAL.ruckusrdbak
+    fi
+    if [ -n "$RCLOCAL" ]; then
+	cat <<EOF >> /sysroot/$RCLOCAL
 # --- begin ruckusrd appendage ---
 EOF
+    fi
 
     # move /sqsh_layerdev into /sysroot
     if [ -h /dev/sqsh_layerdev ]; then
         decho "moving /sqsh_layerdev to /sysroot/mnt/"
 	mkdir -p /sysroot/mnt/sqsh_layerdev
         mount --move /sqsh_layerdev /sysroot/mnt/sqsh_layerdev
-	cat <<EOF >> /sysroot/etc/rc.local
+	if [ -n "$RCLOCAL" ]; then
+	    cat <<EOF >> /sysroot/$RCLOCAL
 echo /dev/sqsh_layerdev /mnt/sqsh_layerdev auto ro 0 0 >> /etc/mtab
 EOF
+	fi
     fi
 
     # move individual layer mounts into /sysroot
@@ -751,9 +771,11 @@ EOF
         #       is important to know (e.g., so you can go muck with the
         #       bootloader config).
         #
-	cat <<EOF >> /sysroot/etc/rc.local
+	if [ -n "$RCLOCAL" ]; then
+	    cat <<EOF >> /sysroot/$RCLOCAL
 echo /dev/root-true /mnt/root-true auto $root_true_rw 0 0 >> /etc/mtab
 EOF
+	fi
     else
         # setup easy mounting of /dev/root-true
         #
@@ -773,14 +795,16 @@ EOF
         # filesystem at /mnt/sqsh_layerdev
         mkdir -p /sysroot/mnt/sqsh_layerdev
         mount --bind $sqsh_layerdir /sysroot/mnt/sqsh_layerdev
-  cat <<EOF >> /sysroot/etc/rc.local
+	if [ -n "$RCLOCAL" ]; then
+	    cat <<EOF >> /sysroot/$RCLOCAL
 echo /dev/sqsh_layerdev /mnt/sqsh_layerdev auto rw 0 0 >> /etc/mtab
 EOF
+	fi
     fi
 
     # add some debug output
     if [ "$quiet" != "1" ]; then
-    cat <<EOF >> /sysroot/etc/rc.local
+	cat <<EOF >> /sysroot/$RCLOCAL
 echo ---------------
 df -h
 echo ---------------
@@ -795,9 +819,11 @@ EOF
     #       makes rc.local restore itself to its previous state once it's done
     #       executing our extra lines.
     #
-    cat <<EOF >> /sysroot/etc/rc.local
-cp /etc/rc.local.ruckusrdbak /etc/rc.local
+    if [ -n "$RCLOCAL" ]; then
+	cat <<EOF >> /sysroot/$RCLOCAL
+mv $RCLOCAL.ruckusrdbak $RCLOCAL
 EOF
+    fi
 
     # fix unmount chicken-and-the-egg problem
     #
@@ -813,6 +839,10 @@ EOF
     #
     # FIXME: figure out how to make this not depend on SysV-Init style scripts,
     #        and the naming/ordering of the host systems shutdown/halt scripts.
+    #
+    #        i made a systemd unit for gkrellmd at cah, it was
+    #        simple...  just need to figure out how to propperly
+    #        detect systemd vs sysvinit
     #
     if [ -z "$to_ram" ]; then
         cat <<EOF > /sysroot/etc/init.d/ruckusrd_umount
