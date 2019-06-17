@@ -64,9 +64,21 @@ DEPLIBS=$(find initramfs -type f -exec ldd {} 2>/dev/null \; \
 # NOTE: Deref symlinks, otherwise we'll end up with a bunch of broken symlinks
 #       instead of actual libraries for every single lib.
 #
+# NOTE: At least on Ubuntu 18.04, libgcc_s.so is needed at runtime by
+#       mksquashfs (so it can pthread_cancel) on the initramfs, but nothing
+#       explicitly links against it so it's left out here...
+#
 for f in $DEPLIBS; do
     if [ ! -f initramfs/lib/$(basename $f) ]; then
         cp -va --dereference $f initramfs/lib/ || exit 1
+    fi
+    # grab ligbcc_s.so if it exists in the same dir as libpthread.so
+    if (echo $f | grep -q libpthread); then
+        gcc_s=$(dirname $f)/libgcc_s.so.*
+        #echo GCC_S: $gcc_s
+        if [ -f $gcc_s ]; then
+            cp -va --dereference $gcc_s initramfs/lib/ || exit 1
+        fi
     fi
 done
 
