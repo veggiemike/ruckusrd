@@ -14,71 +14,34 @@ desktop Linux systms.
 
 Strengths:
 
- 1.  Squashfs Root Filesystem.  When supplied with a squashfs.img
-     containing a root filesystem, an initrd created by RuckusRD will
-     create a read-write virtual device for the rootfs by combining the
-     squashfs image (read-only by nature) with a read-write overlay of
-     system RAM.  Furthermore, the underlying squashfs.img can be loaded
-     entirely into RAM, enabling the user to unmount and remove the boot
-     media.  Persistent changes to the essentially non-memory-retentive
-     system can be handled by a special "conf" directory.
+ 1.  Layered Squashfs Root Filesystem.  When supplied with one or more
+     sqsh_layers containing a root filesystem, an initrd created by
+     RuckusRD will create a read-write virtual device for the rootfs
+     by combining the squashfs image(s) (read-only by nature) with a
+     read-write upper layer.  If another block device is used for the
+     upper layer, changes to the system will be persistent.  If the
+     upper layer is RAM, the system becomes non-persistent (any
+     changes will go away upon reboot).
+     
+     Furthermore, when using RAM for upper layer, the lower
+     sqsh_layers can be loaded entirely into RAM, enabling the user to
+     unmount and remove the boot media.
+
+     You don't HAVE to use sqsh_layers, though.  You can use an initrd
+     created by RuckusRD to boot a normal old root filesystem and
+     still benefit from the other bits of awesomeness RuckusRD
+     provides.
 
  2.  Universal Initramfs.  Images created by RuckusRD can be used for
-     multiple machines with different hardware without regenerating initrd.
-     This is done by making sure that only device drivers are compiled as
-     modules, and all the modules that COULD BE required to get us to the
-     rootfs are included in the initramfs (not just the ones for THIS
-     MACHINE).
+     multiple machines with different hardware without regenerating
+     initrd.  All the kernel modules needed for early boot (e.g.,
+     sccsi, filesystems) and maintenance shells (e.g., USB HID,
+     keyboard) are included in the initramfs, along with any modules
+     they in turn require.
 
-
-Details:
-
-Due to it's primary use (embedded systems, removable media), it behaves a bit
-differently than your run-of-the-mill mkinitrd.
-
- 1. All kernel bits needed for booting are assumed to be built in to the kernel
-    (e.g., scsi_mod, sg, sd_mod, libata, usb_storage, ext2, uhci_hcd, ehci_hcd,
-    ohci_hcd, sr_mod, cdrom, dm_snapshot, dm_zero, dm_mirror, dm_region_hash,
-    dm_log, dm_mod, raid1) except for DEVICE DRIVERS.  Drivers for individual
-    SATA or PATA controllers need to get added to the initrd, but everything
-    needed to boot from CD-ROM or USB flash drive should be compiled into the
-    kernel.
-
-    FIXME: lets make this work for distro kernels... i think it
-           practically already does.  we're already using udev to
-           magically pick the right modules to load, we just have to
-           include more types of modules (or all?) in the initramfs
-
- 2. Instead of selecting only the needed modules to support mounting the rootfs
-    of the host system running the script, ruckusrd sticks ALL the compiled ATA
-    modules (and their dependencies) in the initialramfs.  This is an attempt
-    to make the resulting initrd as system-independent as possible.
-
- 3. If a squashfs.img exists at / of the rootfs (or if you've supplied
-    squashfs= or squashdev= on the kernel command line), the initrd combines
-    it with a writable overlay (RAM via losetup) via the device mapper (so
-    that it can be mounted read/write).  The resulting virtual block device
-    is then used as the root device for booting.  If 'to_ram' is added to
-    the kernel command line, the initrd loads the squashfs image directly
-    into RAM (so that the underlying block device can be safely removed).
-    If a squashfs.img doesn't exist, the system is booted in a normal manor.
-
- 4. By default, the rootfs is mounted read-only.  It's normally up to the
-    booting system's init scripts to remount read-write if desired.  However,
-    this behavior can be changed by adding 'rw' to the kernel command line.
-
- 5. If LVM is used for rootfs, it MUST be specified using the /dev/mapper/VG-LV
-    notation.  Using root=/dev/VG-LV notation WILL NOT work.
-
-
-NOTE: The linuxrc boot script assumes a System V Init system is being used
-      to do some housekeeping regarding the Squashfs root filesystem.  For
-      now, RuckusRD's squashfs functionality will NOT work propperly with
-      other init implementations (e.g., systemd, upstart).  All testing thus
-      far has been done on relatively old distros using relatively old
-      versions of udev, so there may be upstream udev incompatiblities as
-      well.  Ironing this out is planned as the driver for an eventual 1.0
-      release.
-
+ 3.  Swiss army knife maintenance shell of doom.  The maintenence
+     shell provided is a fully functional embedded rootfs with
+     BusyBox, eudev, lvm, mdadm, e2fsprogs, and squashfs-tools.
+     
 
 See docs/ for more ramblings.  ;-)

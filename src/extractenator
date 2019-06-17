@@ -17,6 +17,7 @@ usage()
         echo
     fi
     echo "extractenator - a self-extracting installer creator"
+    echo "Copyright (C) 2012-2019 Michael D Labriola <michael.d.labriola@gmail.com>"
     echo
     echo "usage: `basename $0` OPTIONS PAYLOAD..."
     echo

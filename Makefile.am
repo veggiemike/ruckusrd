@@ -3,7 +3,7 @@ SUBDIRS += subprojects
 SUBDIRS += src
 SUBDIRS += docs
 
-top_docs = README COPYING AUTHORS TODO README.overlayfs
+top_docs = README COPYING AUTHORS TODO
 
 EXTRA_DIST =
 EXTRA_DIST += $(top_docs)
