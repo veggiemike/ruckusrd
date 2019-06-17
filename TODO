@@ -17,9 +17,12 @@
  5. Add --with-system-{busybox,e2fsprogs,eudev,lvm2,mdadm,squashfs-tools}
     configure flags.
 
- 6. Buid something into the build system to fetch submodules when building from
-    dist tarball.  Right now, you can really only build the subprojects via a
-    git clone.
+ 6. Build something into the build system to fetch submodules when building
+    from dist tarball.  Right now, you can really only build the subprojects
+    via a git clone.
+
+ 7. Rip out any remaining squashfs.img device mapper garbage.
+
 
 * For whenever
 
