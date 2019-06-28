@@ -75,6 +75,9 @@ wait_for_udev_symlink()
             echo -n "."
         fi
         x=$(($x-1))
+        # just in case we need to activate LVM on a freshly plugged device
+        # (e.g., USB that was a bit slow to register
+        vgchange -a y --quiet --quiet
         sleep 1
     done
 
