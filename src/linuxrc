@@ -41,8 +41,8 @@
 # - bash ${param#word} and ${param//pattern/string} expansions (yes and yes!)
 # - bash trap and set -e (maybe... testing now)
 # - bash $() command subst (yes!)
-# - bash {} globbing (e.g., cp foo{,bak}) (NOPE, but fixed already)
-# - bash var+= (NOPE, but fixed already)
+# - bash {} globbing (e.g., cp foo{,bak}) (NOPE)
+# - bash var+= (NOPE)
 
 
 . /ruckusrd.conf
@@ -671,18 +671,21 @@ if [ -n "$sqsh_layers" ]; then
     fi
 
     # append a timestamp to system hostname if configured
-    #
-    # FIXME: this isn't very distro-agnostic, is it?
-    #
     if [ -n "$hoststamp" ]; then
         stamp=`date +%s`
         decho "appending timestamp to hostname: $stamp"
-        [ -f /sysroot/etc/sysconfig/network ] || break
-        . /sysroot/etc/sysconfig/network
-        [ -n "$HOSTNAME" ] || break
-        for x in /etc/sysconfig/network /etc/hosts; do
-            sed -i "s|\($HOSTNAME\)|\1-$stamp|" /sysroot/$x
-        done
+        if [ -f /sysroot/etc/hostname ]; then
+            # systemd
+            HOSTNAME=$(cat /sysroot/etc/hostname)-$stamp
+            echo $HOSTNAME > /sysroot/etc/hostname
+        elif [ -f /sysroot/etc/sysconfig/network ]; then
+            # old redhat-ish sysvinit
+            . /sysroot/etc/sysconfig/network
+            [ -n "$HOSTNAME" ] || break
+            for x in /etc/sysconfig/network /etc/hosts; do
+                sed -i "s|\($HOSTNAME\)|\1-$stamp|" /sysroot/$x
+            done
+        fi
     fi
 
     # get ready to fix mtab
