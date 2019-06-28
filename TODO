@@ -2,17 +2,14 @@
 
 * For 1.0.0
 
- 1. Maybe revamp command-line usage
+ 1. fix all the FIXMEs
 
- 2. Add checksum verification of sqsh_layers to linuxrc.  If anything's been
-    modified, make a lot of noise and don't boot.
+ 2. documentation (html, man)
 
- 3. Straighten out mounting behavior on EFI systems where "boot" partition
-    isn't mounted at /boot.  Right now, things get really confusing because
-    /boot is a part of your layered rootfs... but the *contents* of /boot don't
-    stay consistent with the actual boot device.
+ 3. Maybe revamp command-line usage?
 
- 4. Clean up remaining systemd warts (e.g., rc.local, ruckusrd_umount service).
+ 4. Maybe add checksum verification of sqsh_layers to linuxrc?  If anything's
+    been modified, make a lot of noise and don't boot.
 
  5. Add --with-system-{busybox,e2fsprogs,eudev,lvm2,mdadm,squashfs-tools}
     configure flags.
@@ -21,11 +18,17 @@
     from dist tarball.  Right now, you can really only build the subprojects
     via a git clone.
 
- 7. Rip out any remaining squashfs.img device mapper garbage.
+
+* For 0.13
+
+ 1. Rip out any remaining squashfs.img device mapper garbage.
 
 
-* For whenever
+* For 0.12.x
 
- 1. fix all the FIXMEs
+ 1. Uh, oh...  I'm getting tons of "systemd-journald: Failed to open system
+    journal: Operation not supported" messages in dmesg when using a ram_layer.
+    They went away after I did a journalctl --verify... which passed just fine.
+    Very odd.  Not sure I can fix this prior to systemd handoff...
 
- 2. documentation (html, man)
+ 2. Clean up remaining systemd warts (e.g., rc.local, ruckusrd_umount service).
