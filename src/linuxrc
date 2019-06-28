@@ -650,8 +650,33 @@ if [ -n "$sqsh_layers" ]; then
     #        ram_layer, otherwise we'll be recording that deletion in upper
     #        (remember, we've got a rw overlay backed by /mnt/root-true/upper).
     #
-    if [ -z "$to_ram" ] && [ -d /tmproot/boot ]; then
-        mount --bind /tmproot/boot /sysroot/boot
+    # FIXME: this might get wonky on EFI systems that use an ESP of /boot/efi
+    #        (ubuntu, maybe redhat)...  is the ESP gets mounted by the actual
+    #        host system after handoff (via /etc/fstab), it *should* happily
+    #        mount the ESP on top of our bindmounted /boot.
+    #
+    if [ -z "$to_ram" ]; then
+        if [ -n "`find /tmproot -maxdepth 1 -name vmlinuz\* 2>/dev/null`" ]; then
+            # there's a kernel directly in /tmproot, so it's probably a /boot
+            # partition.  bind mount it as such.
+            decho "bind mounting /tmproot to /sysroot/boot"
+            mount --bind /tmproot /sysroot/boot
+        elif [ -n "`find /tmproot/boot -maxdepth 1 -name vmlinuz\* 2>/dev/null`" ]; then
+            # there's a kernel inside a boot dir inside /tmproot, bind mount
+            # it!
+            decho "bind mounting /tmproot/boot to /sysroot/boot"
+            mount --bind /tmproot/boot /sysroot/boot
+        else
+            # odd... couldn't find a kernel...?
+            #
+            # NOTE: This might be totally normal.  Booting UEFI, for example,
+            #       could have the kernel and other support files included on
+            #       the ESP, which we don't have mounted in here.  If that's
+            #       the case, the host sytem will mount the ESP via its fstab
+            #       normally.
+            #
+            decho "couldn't find /boot tree to bind mount, but might be fine"
+        fi
     fi
 fi
 
