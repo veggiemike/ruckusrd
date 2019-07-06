@@ -32,3 +32,5 @@
     Very odd.  Not sure I can fix this prior to systemd handoff...
 
  2. Clean up remaining systemd warts (e.g., rc.local, ruckusrd_umount service).
+
+ 3. Pretty sure I broke out-of-tree building at some point... need to fix that.
