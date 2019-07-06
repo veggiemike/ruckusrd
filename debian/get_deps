@@ -15,7 +15,7 @@ if [ ! $# -ge 1 ]; then
 fi
 
 
-libs=$((find . -type f | xargs ldd 2>/dev/null) | grep -v "not found" | awk '/=>/ {print $3}' | sort | uniq)
+libs=$((find $* -type f | xargs ldd 2>/dev/null) | grep -v "not found" | awk '/=>/ {print $3}' | sort | uniq)
 echo
 echo libs: $libs
 
@@ -25,16 +25,12 @@ if [ -z "$libs" ]; then
 fi
 
 pkgs=$(dpkg -S $libs | awk -F: '{print $1}' | sort | uniq)
-echo
-echo pkgs: $pkgs
-
 if [ -z "$pkgs" ]; then
-    echo "libs detected, but no pkgs found... you have problems"
+    echo >>/dev/stderr "libs detected, but no pkgs found... you have problems"
     exit 1
 fi
 
 echo
-echo "comma-delimited for DEBIAN/control Depends:"
-echo $pkgs | sed 's| |, |g'
+echo pkgs: $(echo $pkgs | sed 's| |, |g')
 
 exit 0

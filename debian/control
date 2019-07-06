@@ -2,7 +2,7 @@ Package: ruckusrd
 Version: __version__
 Section: utils
 Priority: optional
-Architecture: amd64
+Architecture: __arch__
 Installed-Size: __size__
 Depends: bash __deplibs__
 Maintainer: Michael D Labriola <michael.d.labriola@gmail.com>
