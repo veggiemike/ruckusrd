@@ -22,8 +22,10 @@ fi
 echo VERSION: $VERSION
 echo target_host: $target_host
 
-echo removing preexisting modules in $target_host:/lib/modules/$VERSION
-ssh root@$target_host rm -rf /lib/modules/$VERSION || exit 1
+# we do this in a single line to reduce the number of ssh authentications
+# necessary
+echo removing preexisting modules and headers on $target_host
+ssh root@$target_host rm -rf /lib/modules/$VERSION /usr/src/linux-headers-$VERSION || exit 1
 
 echo installing files on $target_host
 rsync -vzurltD --keep-dirlinks $SRP_ROOT/ root@$target_host:/ || exit 2

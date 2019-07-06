@@ -23,6 +23,9 @@ cat > $tmpdir/installer <<EOF
 echo -n "removing preexisting modules in /lib/modules/$VERSION... "
 rm -rf /lib/modules/$VERSION && echo DONE || { echo FAIL; exit 1; }
 
+echo -n "removing preexisting headers in /usr/src/linux-headers-$VERSION... "
+rm -rf /usr/src/linux-headers-$VERSION && echo DONE || { echo FAIL; exit 1; }
+
 echo -n "extracting archive... "
 (tar -C FOO -c . | tar -x --no-same-owner --no-same-permissions -C /) && echo DONE || { echo FAIL; exit 1; }
 
