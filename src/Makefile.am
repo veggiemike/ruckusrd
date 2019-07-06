@@ -16,6 +16,9 @@ install-exec-hook:
 	(cd $(DESTDIR)$(bindir) && $(LN_S) ruckusrd mkinitrd)
 	sed -i 's|__LIBDIR__|$(pkgdatadir)|' $(DESTDIR)$(bindir)/ruckusrd
 
+uninstall-local:
+	rm -f $(DESTDIR)$(bindir)/mkinitrd
+
 initramfs.cpio.xz: ruckusrd.prep linuxrc ../subprojects/busybox.tar ../subprojects/eudev.tar ../subprojects/mdadm.tar ../subprojects/lvm2.tar ../subprojects/e2fsprogs.tar ../subprojects/squashfs-tools.tar
 	./ruckusrd.prep
 
