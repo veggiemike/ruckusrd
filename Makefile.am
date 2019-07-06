@@ -7,6 +7,8 @@ top_docs = README COPYING AUTHORS TODO
 
 EXTRA_DIST =
 EXTRA_DIST += $(top_docs)
+EXTRA_DIST += debian/control
+EXTRA_DIST += debian/get_deps
 
 install-data-local:
 	$(MKDIR_P) $(DESTDIR)$(docdir)

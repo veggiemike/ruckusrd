@@ -1,0 +1,16 @@
+Package: ruckusrd
+Version: __version__
+Section: utils
+Priority: optional
+Architecture: amd64
+Installed-Size: __size__
+Depends: __depends__
+Maintainer: Michael D Labriola <michael.d.labriola@gmail.com>
+Homepage: http://git.sourceruckus.org/?p=ruckusrd.git
+Description: RuckusRD - a super awesome, yet simple, mkinitrd replacement
+ RuckusRD provides you with an initramfs capable of 1) creating a
+ Layserd Squashfs Root Filesystem (great for baselining!), 2) being
+ used on all different kinds of hardware (instead of needing to
+ re-build your initramfs for each system), and 3) giving you a super
+ handy maintentence shell for maintaining your sqsh_layers or fixing
+ boot issues.
