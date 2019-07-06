@@ -19,10 +19,22 @@ libs=$((find . -type f | xargs ldd 2>/dev/null) | grep -v "not found" | awk '/=>
 echo
 echo libs: $libs
 
+if [ -z "$libs" ]; then
+    echo "no libs detected, nothing more to do, goodbye"
+    exit 0
+fi
+
 pkgs=$(dpkg -S $libs | awk -F: '{print $1}' | sort | uniq)
 echo
 echo pkgs: $pkgs
 
+if [ -z "$pkgs" ]; then
+    echo "libs detected, but no pkgs found... you have problems"
+    exit 1
+fi
+
 echo
 echo "comma-delimited for DEBIAN/control Depends:"
 echo $pkgs | sed 's| |, |g'
+
+exit 0

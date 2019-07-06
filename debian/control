@@ -4,7 +4,7 @@ Section: utils
 Priority: optional
 Architecture: amd64
 Installed-Size: __size__
-Depends: __depends__
+Depends: bash __deplibs__
 Maintainer: Michael D Labriola <michael.d.labriola@gmail.com>
 Homepage: http://git.sourceruckus.org/?p=ruckusrd.git
 Description: RuckusRD - a super awesome, yet simple, mkinitrd replacement
