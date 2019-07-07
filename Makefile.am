@@ -33,7 +33,7 @@ DEBCTRL_DEPS=$(DEBSIZE) $(DEBARCH) $(DEBDEPS)
 
 dpkg: $(DEBCTRL)
 	rm -f $(DEBCTRL_DEPS)
-	dpkg-deb --build $(DPKGDIR)
+	dpkg-deb --build --root-owner-group $(DPKGDIR)
 	rm -rf $(DPKGDIR)
 
 $(DPKGDIR):
