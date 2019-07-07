@@ -32,6 +32,8 @@ Strengths:
      still benefit from the other bits of awesomeness RuckusRD
      provides.
 
+     See docs/sqsh_layers.txt for more info.
+
  2.  Universal Initramfs.  Images created by RuckusRD can be used for
      multiple machines with different hardware without regenerating
      initrd.  All the kernel modules needed for early boot (e.g.,

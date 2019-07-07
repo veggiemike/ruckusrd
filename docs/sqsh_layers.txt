@@ -1,6 +1,6 @@
 -*- org -*-
 
-OverlayFS instead of device mapper voodoo
+RuckusRD's Squashfs Layering Mechanism (sqsh_layers)
 
 * Overview
 As always, default behavior of linuxrc script will be to assemble a traditional
@@ -10,11 +10,11 @@ Until we remove it, the old squashfs behavior (complete w/ autodetecting
 presence of squashfs.img at /) will remain.  Will probably wait a rev or so
 before removal.
 
-If =sqsh_layers=layer1:layer2= is provided on the kernel command line,
+If =sqsh_layers=layer2:layer1= is provided on the kernel command line,
 =/layer1.sqsh= will be mounted at =/layer1=, =/layer2.sqsh= at =/layer2=, etc.
 These layers will be used as the "lower layers" for an OverlayFS mount.  Note
-that OverlayFS stacks lower layers from right to left (i.e., =layer1= is
-stacked on top of =layer2=).
+that OverlayFS stacks lower layers from right to left (i.e., =layer2= is
+stacked on top of =layer1=).
 
 The "upper layer" is for read-write functionality.  Unless overriden via other
 parameters, =/upper= will be used.
@@ -22,7 +22,7 @@ parameters, =/upper= will be used.
 After switching root, this will result in the rootdev being at =/mnt/root-true=
 with each read-only squashfs layer being mounted at =/mnt/sqsh_layer-NAME=.
 Since the upper layer needs to be writable, the rootdev will be mounted
-read-write.
+read-write (unless =ram_layer=, see below).
 
 * Additional parameters
 ** ram_layer=SIZE
@@ -71,22 +71,18 @@ doing:
 
 and preppending =newlayer:= to =sqsh_layers= on the kernel command line.
 
+NOTE: You'll also have to clean out =/mnt/root-true/upper/upper= w/out hosing
+      up the overlayfs mount, though.  Easiest way is actually do the
+      =mksquashfs= command from a RuckusRD =maint= shell, then =rm -rf
+      /sysroot/upper= and reboot.
+
 How to merge a couple squashfs layers into a single one...?
 
 Say you've got =new3:new2:new1:server:base= and you want to merge all the new
 layers together:
 
-copy contents of new1, new2, and new3 into a new tmpfs mount, then mksquashfs
-and modify kernel params
-
-: # cd /mnt/root-true
-: # mkdir supernew
-: # mount -t tmpfs none supernew
-: # cp -a new[123]/* supernew
-: # mksquashfs supernew supernew.sqsh
-: # umount supernew
-
-or combine new1,2,3 with a secondary overlayfs mount?
+combine new1,2,3 with a secondary overlayfs mount, then mksquashfs and modify
+kernel params
 
 : # cd /mnt/root-true
 : # mkdir supernew
@@ -192,6 +188,12 @@ will break old scripts.
 By default, won't overwrite an existing image file.  Default basedir is /.
 Default kernel version is currently running kernel.
 
+NOTE: We could consider changing the overwriting behavior at this point, since
+      we won't need to match behavior of 'mkinitrd' any more, since we will
+      have already broken command line usage.
+
+NOTE: Also, we should stop installing a 'mkinitrd' symlink at this point.
+
 ** ruckusrd sqsh-convert
 ruckusrd sqsh-convert LAYERNAME
 
@@ -202,7 +204,7 @@ mount --bind / /tmp/sqsh
 mksqshfs /tmp/sqsh LAYERNAME.sqsh -noappend
 
 ** ruckusrd sqsh-commit
-ruckusrd commit [--append] [LAYERNAME]
+ruckusrd sqsh-commit [--append] [LAYERNAME]
 
 Commits run-time changes on a non-persistent setup (i.e., when using
 =ram_layer=) by creating a new sqsh_layer to be added to the kernel command
@@ -214,6 +216,10 @@ NOTE: It's up to the user to actually modify the kernel command line arguments
 FIXME: could make the user commit and then merge in 2 steps... would simplify
        command line parsing here a little.
 
+FIXME: Also, we'd have to purge upper/work w/out borking the overlayfs mount...
+       We'll have to figure out what kind of shenanigans are needed to get this
+       working w/out a reboot.
+
 ** ruckusrd sqsh-merge
 ruckusrd merge LAYER1 LAYER2 ...
 
@@ -224,3 +230,5 @@ slow).
 
 NOTE: It's up to the user to actually make similar changes to the kernel
       command line in the bootloader config file.
+
+FIXME: We'll also want to figure out how to do this w/out needing a reboot.
