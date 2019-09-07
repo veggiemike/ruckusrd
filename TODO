@@ -35,5 +35,22 @@
 
  3. Pretty sure I broke out-of-tree building at some point... need to fix that.
 
- 4. Figure out how to purge upper/work w/out borking the overlayfs mount so we
-    can implement a sqsh-commit routine that doesn't require a reboot.
+ 4. Figure out if/how to purge upper/work w/out borking the overlayfs mount so
+    we can implement a sqsh-commit routine that doesn't require a reboot.  This
+    may not be possible w/out new features being added to overlayfs in the
+    kernel.
+
+ 5. Tidy up linuxrc output.  "quiet" mode should be silent to match expected
+    behavior in most distros.  Perhaps prefix each output w/ "ruckusrd: " or
+    something like that to differentiate our initramfs messages from kernel
+    spew?
+
+ 6. Fix non-retentive mode (ram_layer) to include the topmost upper retentive
+    layer as the topmost lower ro layer.  That seems like an obvious oopsie in
+    the original sqsh_layers implementation, as that's roughly how the old
+    squashfs.img system worked.
+
+ 7. Allow passing overlayfs mount options on kernel command line.  Right now,
+    default mount opts are used, but people might want to play with overlayfs
+    mount options (e.g., index, nfs).  The existing `rootflags` option is just
+    for the initial /sysroot mount, prior to doing anything special.

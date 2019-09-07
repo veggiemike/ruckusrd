@@ -178,6 +178,10 @@ mount -o loop config.sqsh config
 --dry-run
 --version
 
+I think I'm going to have a --reboot flag and force it's prescence on any ops
+requiring a reboot.  Any ops that don't will issue an error if you specify
+--reboot (for just in case we ever work around the need to reboot).
+
 ** ruckusrd create
 ruckusrd create [--base=DIR] [--kernel=VERSION] IMGNAME
 
@@ -194,21 +198,38 @@ NOTE: We could consider changing the overwriting behavior at this point, since
 
 NOTE: Also, we should stop installing a 'mkinitrd' symlink at this point.
 
-** ruckusrd sqsh-convert
-ruckusrd sqsh-convert LAYERNAME
+** ruckusrd sqsh-init
+ruckusrd sqsh-init [--force | --dry-run] [--reboot] LAYERNAME ROOTNAME
 
-Takes a running system's rootfs and converts it into a .sqsh file suitable for
-use as a =sqsh_layer=.
+Creates an initial sqsh_layer from a running system's rootfs named LAYERNAME
+and preps ROOTNAME, which will be the upper-layer device specified to the
+kernel via root= (supports root=LABEL= and root=UUID=).
+
+FIXME: ROOTNAME filesystem should be created already?  Or we could create it
+       for the user and have him specify device name instead...?
+
+NOTE: sqsh_layers= will need to get added to kernel command line.  In order for
+      ruckusrd to do that, it would have to know quite a bit about your
+      bootloader... which isn't practical.  So the user will have to make
+      kernel cmdline changes.
 
 mount --bind / /tmp/sqsh
 mksqshfs /tmp/sqsh LAYERNAME.sqsh -noappend
 
-** ruckusrd sqsh-commit
-ruckusrd sqsh-commit [--append] [LAYERNAME]
+NOTE: That bindmount trick has you archiving a live read-write root filesystem,
+      though...  If rootfs is lvm, we could create a snapshot to archive and
+      avoid the reboot.  Of course, the user is going to want to reboot and
+      start *using* sqsh_layers after this... so it's not like the forced
+      reboot is that bad to begin with.
 
-Commits run-time changes on a non-persistent setup (i.e., when using
-=ram_layer=) by creating a new sqsh_layer to be added to the kernel command
-line.  If desired, changes can be merged into the topmost sqsh_layer.
+** ruckusrd sqsh-commit
+ruckusrd sqsh-commit [--force | --dry-run] [--merge=N] [--reboot] LAYERNAME
+
+Commits upper-layer changes by creating a new sqsh_layer to be added to the
+kernel command line.  If desired, this new layer can be merged into the topmost
+N lower layers, resulting in a single new sqsh_layer named LAYERNAME.
+
+If not =ram_layer=, upper layer will get cleaned out so we can start fresh.
 
 NOTE: It's up to the user to actually modify the kernel command line arguments
       in their bootloader config file.
@@ -220,15 +241,198 @@ FIXME: Also, we'd have to purge upper/work w/out borking the overlayfs mount...
        We'll have to figure out what kind of shenanigans are needed to get this
        working w/out a reboot.
 
-** ruckusrd sqsh-merge
-ruckusrd merge LAYER1 LAYER2 ...
+mksquashfs /mnt/root-true/upper/upper /mnt/sqshlayer_dev/newone.sqsh
+rm -rf /mnt/root-true/upper/{upper,work}
+reboot
 
-Merge the specified squashfs layers into a single filesystem layer.  This can
-be done periodically to keep things from getting too crazy (i.e., because I'm
-assuming that having a dozen lower layers in an overlayfs is probably pretty
-slow).
+FIXME: so... i don't think we *can* safely do this w/out rebooting.  1) I'd
+       would rally need to get / mounted read-only prior to doing the
+       mksquashfs call, which might cause stuff to crash.  2) I would need to
+       umount and reassemble the now verry pissed off overlay mount... which is
+       your rootfs... so system instability is going to be a problem.
+
+FIXME: Should this actually *remove* the old N topmost layers when merging?
+
+** ruckusrd sqsh-merge
+ruckusrd sqsh-merge [--force | --dry-run] N LAYERNAME
+
+Merge the topmost N lower layers into a single sqsh_layer named LAYERNAME.
+This can be done periodically to keep things from getting too crazy (i.e.,
+because I'm assuming that having a dozen lower layers in an overlayfs is
+probably pretty slow).
 
 NOTE: It's up to the user to actually make similar changes to the kernel
       command line in the bootloader config file.
 
-FIXME: We'll also want to figure out how to do this w/out needing a reboot.
+FIXME: This one, we could potentially sqeek by w/out rebooting...  We cannot
+       force the overlay to USE the new merged layer, but its contents will
+       still be identical to the new layer... So we could just keep right on
+       running, except that it might get confusing/misleading.  Actually, we
+       can avoid confusion by -o remounting w/ new settings...  They don't
+       actually effect anything other than /proc/mounts, but that's really
+       enough for this oddball case.
+
+FIXME: Should this actually *remove* the old N topmost layers?
+
+* live overlay changes dreaming
+
+Ok, so I'd love to be able to commit changes on the fly w/out having to
+reboot... but I don't think I can.
+
+wait...
+
+mount -o remount,rw /mnt/sqsh_layerdev
+cd /mnt/root-true/upper/upper
+mksquashfs . /mnt/sqsh_layerdev/blarg.sqsh
+mkdir /mnt/sqsh_layer-blarg
+mount /mnt/sqsh_layerdev/blarg.sqsh /mnt/sqsh_layer-blarg
+mount -o remount,lowerdir=/mnt/sqsh_layer-blarg:/sqsh_layer-denuc-base3:/sqsh_layer-denuc-base2:/sqsh_layer-denuc-base,upperdir=/tmproot/upper/upper.new,workdir=/tmproot/upper/work.new /
+
+it let me do that...  but now did it work or eat itself?!?  looks like neither.
+the original upperdir is still getting mods written to it, and the new one is
+just an empty dir.  and if i remove a dir from upper, even though it's now in
+the topmost lower layer, it's gone from rootfs.  looks like all that did was
+change the output of mount and /proc/mounts
+
+i can't really even stage relayering for next reboot, because if I go to do
+another commit after queing one up, I won't be able to tell what's new in upper
+since the last commit... timestamps maybe?  I ton't think that will work
+regarding file removal, though.
+
+Looks like 'ruckusrd commit' will have to force a reboot...  it could either 1)
+do what I just described up to the remount, then reboot.  Or 2), somehow inform
+the initramfs that it should do more work upon next invocation.  Could use
+=/.ruckusrd_commit= or something like that.  Doing option 1) frequently will
+eventually leave us w/ awkward filesystem problems I think (since we're
+archiving a read-write filesystem).
+
+** sqsh-convert
+Tell user to update bootloader config, actually print out what it should be?
+Then reboot (i.e. tell the user to reboot).
+
+Perhaps we could force syslinux usage and edit /boot/syslinux/syslinux.cfg for
+the user?  That would tie us to syslinux, which I love, but doesn't have super
+UEFI support yet/still.
+
+maint # this can't go maint, it'll have to be 'shell'
+mount -o remount,rw /dev/root # not needed, because already rw?
+mount -o remount,rw /sev/sqsh_layerdev # if needed
+mksquashfs /sysroot /path/to_sqsh/$new_layer
+rm /sysroot/.ruckusrd_sqsh_convert flag
+mount -o remount,ro everything possible
+reboot
+
+We'll need sqsh_layer name to get passed in somehow
+
+
+** sqsh-commit
+get everything unmounted
+mount /dev/root /tmproot
+mount /dev/squash_layerdev /sqsh
+mksquashfs /tmproot/upper/upper /sqsh/$new_layer
+
+mount -o remount,rw /dev/sqsh_layerdev
+mount -o remount,ro /dev/root
+mksquashfs /sysroot/mnt/root-true/upper/upper \
+    /sysroot/mnt/sqshlayer_dev/$new_layer
+rm -rf /mnt/root-true/upper/{upper,work}
+reboot
+
+** sqsh-merge
+maint
+mount overlay the ones to merg
+mksquashfs the overlay
+umount
+reboot
+
+
+* replace kernel command line w/ a config file?
+then we don't have to make bootloader changes upong commit or merge calls?
+will no longer be able to tweak layers at boot time via bootloader menu, though.
+
+
+* Known Issues:
+** keeps falling back to index=off after i make the 2nd layer
+
+overlayfs: null uuid detected in lower fs '/', falling back to index=off,nfs_export=off
+
+ok, looks like index=on doesn't play well w/ multiple-lowers...  so...  poop.
+
+it does, however, seem perfectly content if WE impliement multiple lowers
+pre-4.0 style...  like this
+
+*** we've got a single baselined layer
+mount -t overlay -o lowerdir=/sqsh_layer-base,upperdir=/tmproot/upper-base/upper,workdir=/tmproot/upper-base/work overlay1 /layer1
+
+*** now we baseline the 2nd layer
+we're actually NOT creating a new sqsh here...  we're keeping the 1st overlay
+mount around w/ its existing upper,work dirs but mounting it read-only.  So to
+baseline, all we really do is create a new upper dir for the next layer BUT
+LEAVE THE 1ST UPPER ALONE.
+
+*** and mount it like this
+mount -o remount,ro /layer1
+mount -t overlay -o lowerdir=/layer1,upperdir=/tmproot/upper-middle/upper,workdir=/tmproot/upper-middle/work overlay2 /layer2
+
+etc etc etc...
+
+That gives me a working multiple lower overlay with working index and nfs
+export for better POSIX compliance (e.g., rename() will work, hard links won't
+get broken on copy_up (i think?))
+
+The problem here is that /layer1 is mounted,ro, but it's upperdir actually
+isn't... so you CAN go bork the hell out of it by accident... which I don't
+really like.
+
+Hm.  I'm also no longer making layers that you can pull out and redisribute
+easily...
+
+Perhaps I can put the uper-name files on independent loopback mounted images,
+mount them rw until just after the overlay mount (so that it doesn't complain
+about readonly upper), then remount,ro the upper?  I'd be using twice as many
+loopback mounts... and all but the lowest lower layer would have to be ext
+instead of squashfs.
+
+Or I could just have the layers tied together and distributed along w/ a 
+
+I'd have a single squashfs image and an ext image of all the upperdirs...  so
+my subsequent "layers" would really be "extra upper dirs".
+
+sqsh_layers=middle:base
+
+would have to manually parse that out, go find base.sqsh, mount it using it's
+included upperdir, then make a 2nd overlay mount of the middle upperdir.
+
+Maybe do this after a config file rewrite...  it's really implementing nested
+overlayfs.  Or maybe we just do "sqsh_layers=base overlays=top,middle".  Either
+way, I'd hate to break the "pick a bunch of layers and put your system
+together" paradigm I was shooting for so that we get index=on.
+
+** dpkg backup files go wonky?
+
+this has happened a couple times now w/ multiple lower layers and REDIRECT on.
+it looks like dpkg make a hardlink or renames to a backup file, causing both
+files to copy_up, then overwrites the original file, leaving the upper link a
+bit wonky.  Each time it's happened it's been with a backup file that was safe
+to remove, so i booted to maint, unmounted everything, just mounted the upper
+and removed the backup file.
+
+not sure how to really fix this... and it's strange that i never ran into it
+while working in centos.  well, i guess most of my work with centos had all the
+rpm work done prior to lowest layer creation, because i had no internet.  all
+upper-lower layers were software being installed by hand or via srp.
+
+Rpm might also not be doing the exactly same dance for "secure file removal"
+that dpkg does... at least on some packages, but definately not on all.
+
+** broken symlinks make syslog noise?
+
+Not sure if it's all broken symlinks or something a did in this case...  but
+systemctl disable --now apache2 results in broken symlinks in /etc/rc2.d and
+/etc/rc3.d and a lot of noise if you do an ls in those dirs
+
+Recreating the symlinks directly in the upper dir (while mounted) seems to fix
+the problem... which is very strange indeed.
+
+Odd... when I tried to recreate this by doing a systemctl disable --now
+dnsmasq, the symlinks all looked fine...
