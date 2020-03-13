@@ -615,6 +615,15 @@ if [ -n "$sqsh_layers" ]; then
         mkdir -p /upper
         mount -t tmpfs -o size=$ram_layer ram_layer /upper
         mkdir -p /upper/upper /upper/work
+        decho "converting retentive upper to non-retentive lower layer"
+        # FIXME: if we do this, we will NOT be able to completely unmount the
+        #        orignal root device w/out doing some extra shenanigans...
+        mkdir -p /sqsh_layer-upper
+        go="mount -o ro,bind /tmproot /sqsh_layer-upper"
+        decho $go
+        eval $go
+        sqsh_layers=upper:$sqsh_layers
+        sqsh_layers_ws="upper $sqsh_layers_ws"
         upper=upper
     else
         # need to remount rootfs rw so we can write into upper layer
