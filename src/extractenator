@@ -38,7 +38,7 @@ usage()
 
 # call getopt
 #
-# NOTE: This handles spacing out arguments corrently for the case statement
+# NOTE: This handles spacing out arguments correctly for the case statement
 #       below and checks for unknown flags.  Required flags are checked for
 #       below.
 #

@@ -6,8 +6,9 @@
 #
 # Licensed under the GPLv3. See the file COPYING for details. 
 #
-# This script is a utility for creating a self extracting executable that runs
-# an install script after extracting to a temp directory.
+# This script is a utility for running a job in a disowned subprocess so the
+# user can logout, then emailing status and output to the user when the job
+# completes.
 
 
 usage()
@@ -21,18 +22,19 @@ usage()
     echo
     echo "usage: `basename $0` OPTIONS CMD..."
     echo
-    echo "  -f, --filename LOGFILE    Specify base of output/error filenames (e.g.,"
-    echo "                            mylog will cause mylog.out and mylog.err to get"
-    echo "                            created)."
+    echo "  -f, --filename LOGFILE    Specify output filename.  Both stdout and stderr"
+    echo "                            will be redirected to this file.  When the process"
+    echo "                            finishes, the files last few lines will contain"
+    echo "                            \"DOIT: ALL DONE\", a return code, and timing stats."
     echo
     echo "  -m, --mail EMAILADDRESS   Email stdout/stderr to specified address instead"
-    echo "                            of logging to files."
+    echo "                            of logging to a file."
 }
 
 
 # call getopt
 #
-# NOTE: This handles spacing out arguments corrently for the case statement
+# NOTE: This handles spacing out arguments correctly for the case statement
 #       below and checks for unknown flags.  Required flags are checked for
 #       below.
 #
@@ -91,10 +93,9 @@ echo filename: $filename
 echo mail: $mail
 echo cmd: $cmd
 
-
-go="{ time ($cmd 2>&1 ; echo ret=$?) } 2>&1"
-[ -n "mail" ] && go+=" | mail -s \"doit $cmd: all done\" $mail"
-[ -n "$filename" ] && go+=" > $filename"
+go="{ time ($cmd ; echo -e \"\n\nDOIT: ALL DONE\nRET=\$?\") } 2>&1"
+[ -n "$mail" ] && go+=" | mail -s \"doit $cmd [$PWD]: all done\" $mail"
+[ -n "$filename" ] && go+=" | cat > $filename"
 go+=" &"
 
 echo $go

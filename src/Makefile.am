@@ -1,4 +1,5 @@
 dist_bin_SCRIPTS =
+dist_bin_SCRIPTS += doit
 dist_bin_SCRIPTS += extractenator
 dist_bin_SCRIPTS += kernel_builder
 dist_bin_SCRIPTS += kernel_installer
