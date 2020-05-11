@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+# RuckusRD - a super awesome, yet simple, mkinitrd replacement
+#
+# Copyright 2012-2020 Michael D Labriola <michael.d.labriola@gmail.com>
+#
+# Licensed under the GPLv3. See the file COPYING for details. 
+#
+# This script is a utility for creating a self extracting executable that runs
+# an install script after extracting to a temp directory.
+
+
+usage()
+{
+    if [ -n "$*" ]; then
+        echo ERROR: $*
+        echo
+    fi
+    echo "doit - run something in the background w/ emailed output"
+    echo "Copyright (C) 2012-2020 Michael D Labriola <michael.d.labriola@gmail.com>"
+    echo
+    echo "usage: `basename $0` OPTIONS CMD..."
+    echo
+    echo "  -f, --filename LOGFILE    Specify base of output/error filenames (e.g.,"
+    echo "                            mylog will cause mylog.out and mylog.err to get"
+    echo "                            created)."
+    echo
+    echo "  -m, --mail EMAILADDRESS   Email stdout/stderr to specified address instead"
+    echo "                            of logging to files."
+}
+
+
+# call getopt
+#
+# NOTE: This handles spacing out arguments corrently for the case statement
+#       below and checks for unknown flags.  Required flags are checked for
+#       below.
+#
+# NOTE: The set -- command causes the resulting output of getopt to replace the
+#       current positional arguments (e.g, $1, $2).
+#
+__opts=$(getopt -un $0 \
+    -o hf:m: \
+    --long help,filename:,mail: -- $@)
+if [ $? != 0 ]; then
+    echo
+    usage
+    exit 1
+fi
+set -- $__opts
+
+
+# parse the new positional arguments
+while true; do
+    case "$1" in
+        -f|--filename)
+            filename=$2
+            shift 2
+            ;;
+	-m|--mail)
+            mail=$2
+            shift 2
+            ;;
+	--)
+            # done parsing
+            shift
+            break
+            ;;
+	*)
+            usage
+            exit 1
+            ;;
+    esac
+done
+cmd=$*
+
+# check for required options
+if [ -z "$filename" -a -z "$mail" ]; then
+    usage "--filename or --mail required"
+    exit 1
+elif [ -n "$filename" -a -n "$mail" ]; then
+    usage "cannot do both --filename and --mail"
+    exit 1
+fi
+if [ -z "$cmd" ]; then
+    usage "CMD required"
+    exit 1
+fi
+
+echo filename: $filename
+echo mail: $mail
+echo cmd: $cmd
+
+
+go="{ time ($cmd 2>&1 ; echo ret=$?) } 2>&1"
+[ -n "mail" ] && go+=" | mail -s \"doit $cmd: all done\" $mail"
+[ -n "$filename" ] && go+=" > $filename"
+go+=" &"
+
+echo $go
+eval $go
+exit 0
