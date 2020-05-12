@@ -358,7 +358,7 @@ overlayfs: null uuid detected in lower fs '/', falling back to index=off,nfs_exp
 
 ok, looks like index=on doesn't play well w/ multiple-lowers...  so...  poop.
 
-it does, however, seem perfectly content if WE impliement multiple lowers
+it does, however, seem perfectly content if WE implement multiple lowers
 pre-4.0 style...  like this
 
 *** we've got a single baselined layer
@@ -407,6 +407,24 @@ Maybe do this after a config file rewrite...  it's really implementing nested
 overlayfs.  Or maybe we just do "sqsh_layers=base overlays=top,middle".  Either
 way, I'd hate to break the "pick a bunch of layers and put your system
 together" paradigm I was shooting for so that we get index=on.
+
+i started implementing a new nested mounting algorithm... but i seem to
+remember that upper MUST be read-write even if the mount is read-only... which
+is going to bite me if middle.sqsh contains work and upper from a previous
+overlay... right?
+
+perhaps we can do multiple lowers w/out an upper for the middle layers?
+
+mount -t overlay -olower=/sqsh_layer-middle:/sqsh_layer-base
+
+no, then we'll have /upper/upper inside the rootfs
+
+didn't think of this before, but having multiple named sets of upper,work in
+root-true works better when using sqsh_layerdev... because now we can have a
+shared sqshlayerdev for the base image, and individual ext4 filesystems for the
+checkpointed middle layers...  otherwise, we need to write all the sqsh layers
+to the layer dev, but then that gets shared by all the domUs... which could get
+confusing.
 
 ** dpkg backup files go wonky?
 
