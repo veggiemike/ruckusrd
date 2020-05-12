@@ -434,7 +434,7 @@ decho "starting udevd"
 #
 x=10
 msg="waiting up to $x seconds for at least one hdd to appear..."
-while [ ! -e /dev/sda -a ! -e /dev/nvme0n1 -a "$x" != "0" ]; do
+while [ ! -e /dev/sda -a ! -e /dev/nvme0n1 -a ! -e /dev/xvda -a "$x" != "0" ]; do
     if [ -n "$msg" ]; then
         echo -n $msg
         msg=""
