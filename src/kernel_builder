@@ -41,7 +41,9 @@ $MAKE INSTALL_MOD_PATH=$SRP_ROOT modules_install || exit 2
 
 VERSION=$(basename $SRP_ROOT/lib/modules/*)
 VERSION_NAME=$VERSION
-if [ -n "$NOVERSION" ]; then
+if [ "$NOVERSION" = "stable" ]; then
+    VERSION_NAME=$(echo $VERSION | awk -F. '{printf "%s.%s.y", $1, $2}')
+elif [ -n "$NOVERSION" ]; then
     VERSION_NAME=test
 fi
 
