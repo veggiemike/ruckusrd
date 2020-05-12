@@ -619,7 +619,16 @@ if [ -n "$sqsh_layers" ]; then
         # FIXME: if we do this, we will NOT be able to completely unmount the
         #        orignal root device w/out doing some extra shenanigans...
         mkdir -p /sqsh_layer-upper
-        go="mount -o ro,bind /tmproot /sqsh_layer-upper"
+        # FIXME: are we going to run into the multiple lower layer problems
+        #        (e.g., falling back to index=off,nfs_export=off) if we do
+        #        this?
+        #
+        #        testing this out looks like "probably, yes".  i get wonky
+        #        errors from systemd that can mostly be worked around... but
+        #        clearly something is amiss.  pretty sure xino is not getting
+        #        enabled.
+        #
+        go="mount -o ro,bind /tmproot/upper/upper /sqsh_layer-upper"
         decho $go
         eval $go
         sqsh_layers=upper:$sqsh_layers
