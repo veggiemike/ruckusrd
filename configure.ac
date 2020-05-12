@@ -1,7 +1,7 @@
 AC_PREREQ([2.65])
 AC_INIT([ruckusrd], [0.13.0-dev], [michael.d.labriola@gmail.com])
 
-AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip foreign])
+AM_INIT_AUTOMAKE([dist-xz no-dist-gzip foreign])
 
 AC_PROG_INSTALL
 AC_PROG_MKDIR_P
