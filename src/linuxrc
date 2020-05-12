@@ -631,6 +631,7 @@ if [ -n "$sqsh_layers" ]; then
     #       we won't have to worry pre-switchroot paths being incorrect once we
     #       swithcroot.
     #
+    top=
     for x in $sqsh_layers_ws; do
         loopdev=$(losetup -f)
         losetup $loopdev $sqsh_layerdir/$x.sqsh
@@ -639,6 +640,41 @@ if [ -n "$sqsh_layers" ]; then
         go="mount -o ro /dev/sqsh_layer-$x /sqsh_layer-$x"
         decho $go
         eval $go
+        # mount overlay combining lower layers, if needed
+        #
+        # NOTE: This is to avoid problems w/ overlayfs lower layers (i.e., if
+        #       you just use an old 'upper', it's missing the old 'work', which
+        #       causes breakage w/ xino and other overlayfs features)
+        #
+        #       The idea here, is to mount each lower layer as an independent
+        #       overlay mount, with it's own upper and work dirs.  We're
+        #       basically taking the nesting of lower layers out and
+        #       implementing it ourselves.
+        #
+        # FIXME: how are these middle layers created...?  are we assuming the
+        #        creation of blarg.sqsh such that it contains the old upper and
+        #        work dirs?  or are we going to just keep the old upper and
+        #        work dirs IN the actual ext4 root-true upper filesystem?  in
+        #        other words, do we really just have a bottommost sqsh with a
+        #        bunch of named upper dirs int he actual ext4 filesystem?
+        #
+        #        i'd like to go for broke and assume the creation of blarg.sqsh
+        #        containing upper and work... that keeps root-true the
+        #        cleanest, and makes middle layers more like bottom layers...
+        #        but that means we'll have to do something extra when using
+        #        ram_layer for non-retentive upper layer (e.g., shenanigans?
+        #        or create a sqsh from the old upper temporarily?)
+        #
+        if [ -n "$top" ]; then
+            mkdir -p /sqsh_layer-$x-overlay
+            overlayflags=lowerdir=$top,upperdir=/sqsh_layer-$x/upper,workdir=/sqsh_layer-$x/work
+            go="mount -t overlay -o ro,$overlayflags $x-midlayer /sqsh_layer-$x-overlay"
+            decho $go
+            eval $go
+            top=/sqsh_layer-$x-overlay
+        else
+            top=/sqsh_layer-$x
+        fi
     done
 
     # create ram layer if requested
@@ -663,6 +699,12 @@ if [ -n "$sqsh_layers" ]; then
         go="mount -o ro,bind /tmproot/upper/upper /sqsh_layer-upper"
         decho $go
         eval $go
+        mkdir -p /sqsh_layer-upper-overlay
+        overlayflags=lowerdir=$top,upperdir=/sqsh_layer-upper/upper,workdir=/sqsh_layer-upper/work
+        go="mount -t overlay -o ro,$overlayflags upper-midlayer /sqsh_layer-upper-overlay"
+        decho $go
+        eval $go
+        top=/sqsh_layer-upper-overlay
         sqsh_layers=upper:$sqsh_layers
         sqsh_layers_ws="upper $sqsh_layers_ws"
         upper=upper
@@ -687,12 +729,19 @@ if [ -n "$sqsh_layers" ]; then
 
 
     # mount the merged filesystem
+    #
+    # NOTE: We've setup intermediate overlay mounts for nested lower layers, so
+    #       this is just us layer the topmost lower layer with our upper.
+    #
     decho "mounting overlayfs at /sysroot"
-    lower=/sqsh_layer-${sqsh_layers//:/:/sqsh_layer-}
+    #lower=/sqsh_layer-${sqsh_layers//:/:/sqsh_layer-}
+    lower=$top
     overlayflags=lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work
-    decho "lower: $lower"
-    decho "upper: $upper"
-    mount -t overlay -o $overlayflags rootfs /sysroot
+    #decho "lower: $lower"
+    #decho "upper: $upper"
+    go="mount -t overlay -o $overlayflags rootfs /sysroot"
+    decho $go
+    eval $go
 
     # this leaves us with /boot containing the merged contents of the layers...
     # but the ACTUAL boot files will end up living in /mnt/root-true/boot/...
