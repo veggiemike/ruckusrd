@@ -611,6 +611,11 @@ if [ -n "$sqsh_layers" ]; then
         decho ""
         go="cp -a"
         [ "$quiet" != "1" ] && go="$go -v"
+        # FIXME: this is assuming all layers are on sqsh_layerdev, which is no
+        #        longer true for checkpointed upper-dir stuff being added...
+        #        that stuff wouldn't make sense to load into ram anyways, but
+        #        still... it's worth mentioning or putting some corrective code
+        #        here
         for x in $sqsh_layers_ws; do
             go="$go $sqsh_layerdir/$x.sqsh"
         done
@@ -633,6 +638,8 @@ if [ -n "$sqsh_layers" ]; then
     #
     top=
     for x in $sqsh_layers_ws; do
+        # check to see if layer is a true sqsh layer or a checkpointed upper
+        # layer.
         loopdev=$(losetup -f)
         losetup $loopdev $sqsh_layerdir/$x.sqsh
         ln -s $loopdev /dev/sqsh_layer-$x
