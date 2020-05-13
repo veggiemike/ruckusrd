@@ -246,8 +246,11 @@ root_true_rw="ro"
 rootflags=""
 rootfstype="auto"
 to_ram=""
-shell=""
-maint=""
+shell="" # right after booting, almost useless
+shell2="" # after waiting for harddrives, udev, lvm work, etc, just prior to mounting rootfs
+shell3="" # prior to doing sqsh_layer magic (but after moving /sysroot to /tmproot)
+shell4="" # just prior to mounting final overlayfs
+maint="" # just before switch_root and handover to init
 hoststamp=""
 quiet=0
 sqsh_layers=""
@@ -279,6 +282,15 @@ for o in `cat /proc/cmdline` ; do
 	;;
     shell)
         shell=1
+        ;;
+    shell2)
+        shell2=1
+        ;;
+    shell3)
+        shell3=1
+        ;;
+    shell4)
+        shell4=1
         ;;
     maint)
 	maint=1
@@ -351,6 +363,10 @@ decho "root_true_rw=$root_true_rw"
 decho "rootflags=$rootflags"
 decho "rootfstype=$rootfstype"
 decho "to_ram=$to_ram"
+decho "shell=$shell"
+decho "shell2=$shell2"
+decho "shell3=$shell3"
+decho "shell4=$shell4"
 decho "maint=$maint"
 decho "hoststamp=$hoststamp"
 decho "sqsh_layers=$sqsh_layers"
@@ -511,6 +527,15 @@ if ! (echo $root | grep -q CDLABEL); then
     eval $go || echo "WARNING: fsck of rootdev exited non-zero"
 fi
 
+
+# shell breakpoint #2
+if [ -n "$shell2" ]; then
+    echo "Dropping into shell prior to mounting rootfs, as requested.  Enjoy!"
+    echo
+    bash
+fi
+
+
 mountoptions=" -o ro"
 if [ -n "$rootflags" ]; then
     mountoptions="$mountoptions,$rootflags"
@@ -559,6 +584,15 @@ if [ -n "$sqsh_layers" ]; then
     decho "moving /sysroot to /tmproot"
     mount --move /sysroot /tmproot
 fi
+
+
+# shell breakpoint #3
+if [ -n "$shell3" ]; then
+    echo "Dropping into shell prior to sqsh_layer magic, as requested.  Enjoy!"
+    echo
+    bash
+fi
+
 
 # squashfs magic time
 if [ -n "$sqsh_layers" ]; then
@@ -644,6 +678,15 @@ if [ -n "$sqsh_layers" ]; then
         # so we must change this flag to rw
         root_true_rw=rw
     fi
+
+
+    # shell breakpoint #4
+    if [ -n "$shell4" ]; then
+        echo "Dropping into shell prior to final overlayfs mount, as requested.  Enjoy!"
+        echo
+        bash
+    fi
+
 
     # mount the merged filesystem
     decho "mounting overlayfs at /sysroot"
