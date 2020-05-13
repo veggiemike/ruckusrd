@@ -408,6 +408,7 @@ overlayfs.  Or maybe we just do "sqsh_layers=base overlays=top,middle".  Either
 way, I'd hate to break the "pick a bunch of layers and put your system
 together" paradigm I was shooting for so that we get index=on.
 
+*** update
 i started implementing a new nested mounting algorithm... but i seem to
 remember that upper MUST be read-write even if the mount is read-only... which
 is going to bite me if middle.sqsh contains work and upper from a previous
@@ -425,6 +426,37 @@ shared sqshlayerdev for the base image, and individual ext4 filesystems for the
 checkpointed middle layers...  otherwise, we need to write all the sqsh layers
 to the layer dev, but then that gets shared by all the domUs... which could get
 confusing.
+
+*** another update
+
+ok, so it looks like ALL the extra features to get more POSIX-like behavior
+don't work if you pack up an upper dir and try to distribute it for use an an
+extra lower layer (e.g., xino, index, redirect_dir).  they only way to use
+these and keep things from breaking is to keep multiple sets of read-write
+upper dirs around, and i can't seem to propperly even make copies of them
+(filesystem uuid is stored in an xattr... which CAN be copied, but then the
+UUID doesn't match).
+
+so, we need our linuxrc to
+
+1) look for specified lowers in squashdev (as foo.sqsh) AND ALSO in rootdev (as
+   foo-upper/), and
+
+2) create nested overlay mounts so each layer can have its own full set of
+   upper and work dirs (but mount middle layers ro).
+
+Then we need to explain in the docs that as soon as you start using xino/index
+features, further layers must be kepth in rootdir as plain old renamed
+directories.  The fact that they stay on rootdev means they will be writeable
+(even though their overlay mounts are ro), which i don't like...  but I can't
+come up with any way around that.  (maybe immutable attributes?)
+
+
+*** Is this really all just do to xino?
+Can we just try to live w/out that one?  Kernel docs say:
+
+
+
 
 ** dpkg backup files go wonky?
 
