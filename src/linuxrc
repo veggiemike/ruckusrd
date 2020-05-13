@@ -625,13 +625,11 @@ if [ -n "$sqsh_layers" ]; then
     #
     # NOTE: We create /dev symlinks here to disguise the loopback device.
     #       W/out it, some systems attempt to unmount loop devices prior to
-    #       other filesystems, which leads to problems.
+    #       other filesystems, which leads to problems. (also, it's helpful for
+    #       the user to see in df output)
     #
     #       we won't have to worry pre-switchroot paths being incorrect once we
     #       swithcroot.
-    #
-    # FIXME: are these /dev symlinks still around after switchroot runs its own
-    #        udev stuff?
     #
     for x in $sqsh_layers_ws; do
         loopdev=$(losetup -f)
