@@ -262,8 +262,20 @@ root_true_rw="ro"
 rootflags=""
 rootfstype="auto"
 to_ram=""
+# breakpoints!
+#
+# right after booting, almost useless, unless theres some module we have to
+# load prior to doing anything...?
 shell=""
-maint=""
+# after waiting for harddrives, udev, lvm work, etc, just prior to mounting
+# rootfs
+shell_mountdevs=""
+# prior to all the sqsh_layer magic... kind of a black box at the moment
+shell_sqshprep=""
+# just prior to mounting final overlayfs
+shell_mountoverlay=""
+
+maint="" # just before switch_root and handover to init
 hoststamp=""
 quiet=0
 sqsh_layers=""
@@ -295,6 +307,15 @@ for o in `cat /proc/cmdline` ; do
 	;;
     shell)
         shell=1
+        ;;
+    shell_mountdevs)
+        shell_mountdevs=1
+        ;;
+    shell_sqshprep)
+        shell_sqshprep=1
+        ;;
+    shell_mountoverlay)
+        shell_mountoverlay=1
         ;;
     maint)
 	maint=1
@@ -363,6 +384,14 @@ if [ -n "$sqsh_layerdir_rel" ]; then
     sqsh_layerdir=$tmp
 fi
 
+# only pass kernel command line if we're launching /sbin/init
+if [ "$init" == "/sbin/init" ] ; then
+    initargs=$(cat /proc/cmdline)
+else
+    initargs=""
+fi
+
+
 decho "kernel commandline: `cat /proc/cmdline`"
 decho "init=$init"
 decho "root=$root"
@@ -371,6 +400,10 @@ decho "root_true_rw=$root_true_rw"
 decho "rootflags=$rootflags"
 decho "rootfstype=$rootfstype"
 decho "to_ram=$to_ram"
+decho "shell=$shell"
+decho "shell_mountdevs=$shell_mountdevs"
+decho "shell_sqshprep=$shell_sqshprep"
+decho "shell_mountoverlay=$shell_mountoverlay"
 decho "maint=$maint"
 decho "hoststamp=$hoststamp"
 decho "sqsh_layers=$sqsh_layers"
@@ -487,6 +520,7 @@ dmneeded=""
 wait_for_udev_symlink 30 /dev/root
 root_true=`readlink /dev/root`
 [ -n "$sqsh_layerdev" ] && wait_for_udev_symlink 30 /dev/sqsh_layerdev
+ln -s $root_true /dev/root-true
 
 # autoload filesystem modules if needed
 autoload_fs_module /dev/root
@@ -531,147 +565,188 @@ if ! (echo $root | grep -q CDLABEL); then
     eval $go || echo "WARNING: fsck of rootdev exited non-zero"
 fi
 
-mountoptions=" -o ro"
-if [ -n "$rootflags" ]; then
-    mountoptions="$mountoptions,$rootflags"
-fi
 
-go="mount -t $rootfstype $mountoptions $thingtomount /sysroot"
-decho $go
-eval $go
-RES=$?
+# create mountpoints for root and sqsh_layerdev
+mkdir -p /tmproot
+[ -h /dev/sqsh_layerdev ] && mkdir -p /sqsh_layerdev
 
-if [ "$RES" != "0" ] ; then
-    echo "---------------------------------"
-    echo "WARNING: Cannot mount rootfs!"
-    echo "---------------------------------"
+# mountdevs breakpoint
+if [ -n "$shell_mountdevs" ]; then
+    echo "Dropping into shell prior to mounting device(s), as requested."
     echo
-    echo "Dropping to a shell. "
-    echo "Mount rootfs at /sysroot and exit shell to continue. Good luck!"
+    echo "Prior to exiting, ensure that rootdev is mounted ro at /tmproot, and"
+    echo "sqsh_layerdev (if used) is mounted ro at /sqsh_layerdev.  Good luck!"
     echo
     bash
-fi
 
-# look for sqsh_layerdev
-if [ -h /dev/sqsh_layerdev ]; then
-    # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
-    go="mkdir -p /sqsh_layerdev && mount -t $sqshfstype -o ro /dev/sqsh_layerdev /sqsh_layerdev"
-    decho $go
-    eval $go
-fi
-
-# only pass kernel command line if we're launching /sbin/init
-if [ "$init" == "/sbin/init" ] ; then
-    initargs=$(cat /proc/cmdline)
 else
-    initargs=""
-fi
 
-# do prep for squashfs magic common to both old device-mapper and new overlayfs
-# implementations
-if [ -n "$sqsh_layers" ]; then
-    decho "doing common squashfs prep"
-
-    ln -s $root_true /dev/root-true
-
-    # move /sysroot out of the way so we can still access it
-    mkdir /tmproot
-    decho "moving /sysroot to /tmproot"
-    mount --move /sysroot /tmproot
-fi
-
-# squashfs magic time
-if [ -n "$sqsh_layers" ]; then
-    # do new OverlayFS based stuff
-    decho "setting up OverlayFS squashfs layers"
-
-    # copy to ram if requested
-    #
-    # NOTE: We copy them to RAM, but then move the dir they're in to
-    #       /mnt/sqsh_layerdev later on so it's available via a visible filesys
-    #       for future usage (e.g., creating virtual machines, installing).
-    #
-    if [ -n "$to_ram" ]; then
-        echo -n "Copying squashfs layer(s) to RAM... "
-        mkdir -p /sqsh_layerdev
-        decho ""
-        go="cp -a"
-        [ "$quiet" != "1" ] && go="$go -v"
-        for x in $sqsh_layers_ws; do
-            go="$go $(lookup_layer $x)"
-        done
-        go="$go /sqsh_layerdev"
-        decho $go
-        eval $go
-	echo "done"
-        sqsh_layerdir=/sqsh_layerdev
+    mountoptions=" -o ro"
+    if [ -n "$rootflags" ]; then
+        mountoptions="$mountoptions,$rootflags"
     fi
 
-    # mount individual layers
-    #
-    # NOTE: We create /dev symlinks here to disguise the loopback device.
-    #       W/out it, some systems attempt to unmount loop devices prior to
-    #       other filesystems, which leads to problems.
-    #
-    #       we won't have to worry pre-switchroot paths being incorrect once we
-    #       swithcroot.
-    #
-    # FIXME: are these /dev symlinks still around after switchroot runs its own
-    #        udev stuff?
-    #
-    for x in $sqsh_layers_ws; do
-        loopdev=$(losetup -f)
-        losetup $loopdev $(lookup_layer $x)
-        ln -s $loopdev /dev/sqsh_layer-$x
-        mkdir -p /sqsh_layer-$x
-        go="mount -o ro /dev/sqsh_layer-$x /sqsh_layer-$x"
-        decho $go
-        eval $go
-    done
+    go="mount -t $rootfstype $mountoptions $thingtomount /tmproot"
+    decho $go
+    eval $go
+    RES=$?
 
-    # create ram layer if requested
-    if [ -n "$ram_layer" ]; then
-        decho "creating ram_layer w/ size=$ram_layer"
-        mkdir -p /upper
-        mount -t tmpfs -o size=$ram_layer ram_layer /upper
-        mkdir -p /upper/upper /upper/work
-        decho "converting retentive upper to non-retentive lower layer"
-        # FIXME: if we do this, we will NOT be able to completely unmount the
-        #        orignal root device w/out doing some extra shenanigans...
-        mkdir -p /sqsh_layer-upper
-        # FIXME: are we going to run into the multiple lower layer problems
-        #        (e.g., falling back to index=off,nfs_export=off) if we do
-        #        this?
-        #
-        #        testing this out looks like "probably, yes".  i get wonky
-        #        errors from systemd that can mostly be worked around... but
-        #        clearly something is amiss.  pretty sure xino is not getting
-        #        enabled.
-        #
-        go="mount -o ro,bind /tmproot/upper/upper /sqsh_layer-upper"
+    if [ "$RES" != "0" ] ; then
+        echo "---------------------------------"
+        echo "WARNING: Cannot mount rootdev!"
+        echo "---------------------------------"
+        echo
+        echo "Dropping to a shell. "
+        echo "Mount rootdev ro at /tmproot and exit shell to continue. Good luck!"
+        echo
+        bash
+    fi
+
+    # look for sqsh_layerdev
+    if [ -h /dev/sqsh_layerdev ]; then
+        # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
+        go="mount -t $sqshfstype -o ro /dev/sqsh_layerdev /sqsh_layerdev"
         decho $go
         eval $go
-        sqsh_layers=upper:$sqsh_layers
-        sqsh_layers_ws="upper $sqsh_layers_ws"
-        upper=upper
+    fi
+fi
+
+
+if [ -z "$sqsh_layers" ]; then
+    # move /tmproot to /sysroot instead of doing sqsh_layer magic
+    decho "moving /tmproot to /sysroot"
+    mount --move /tmproot /sysroot
+
+else
+
+    # sqshprep breakpoint
+    if [ -n "$shell_sqshprep" ]; then
+        echo "Dropping into shell prior to sqsh_layer prep work, as requested."
+        echo
+        echo "Prior to exiting, ensure that everything is ready for mounting the final"
+        echo "overlay on /sysroot.  If you don't know what that entails, don't break"
+        echo "here... :-/"
+        echo
+        bash
+
     else
-        # need to remount rootfs rw so we can write into upper layer
-        decho "remounting /tmproot rw"
-        mount -o remount,rw /tmproot
-        mkdir -p /tmproot/upper/upper /tmproot/upper/work
+
+        decho "setting up sqsh_layers for eventual OverlayFS mount"
+
+        # copy to ram if requested
+        #
+        # NOTE: We copy them to RAM, but then move the dir they're in to
+        #       /mnt/sqsh_layerdev later on so it's available via a visible filesys
+        #       for future usage (e.g., creating virtual machines, installing).
+        #
+        if [ -n "$to_ram" ]; then
+            echo -n "Copying squashfs layer(s) to RAM... "
+            mkdir -p /sqsh_layerdev
+            decho ""
+            go="cp -a"
+            [ "$quiet" != "1" ] && go="$go -v"
+            for x in $sqsh_layers_ws; do
+                go="$go $(lookup_layer $x)"
+            done
+            go="$go /sqsh_layerdev"
+            decho $go
+            eval $go
+	    echo "done"
+            sqsh_layerdir=/sqsh_layerdev
+        fi
+
+        # mount individual layers
+        #
+        # NOTE: We create /dev symlinks here to disguise the loopback device.
+        #       W/out it, some systems attempt to unmount loop devices prior to
+        #       other filesystems, which leads to problems. (also, it's helpful for
+        #       the user to see in df output)
+        #
+        #       we won't have to worry pre-switchroot paths being incorrect once we
+        #       swithcroot.
+        #
+        for x in $sqsh_layers_ws; do
+            loopdev=$(losetup -f)
+            losetup $loopdev $(lookup_layer $x)
+            ln -s $loopdev /dev/sqsh_layer-$x
+            mkdir -p /sqsh_layer-$x
+            go="mount -o ro /dev/sqsh_layer-$x /sqsh_layer-$x"
+            decho $go
+            eval $go
+        done
+
+        # create ram layer if requested
+        if [ -n "$ram_layer" ]; then
+            decho "creating ram_layer w/ size=$ram_layer"
+            mkdir -p /upper
+            mount -t tmpfs -o size=$ram_layer ram_layer /upper
+            mkdir -p /upper/upper /upper/work
+            decho "converting retentive upper to non-retentive lower layer"
+            # FIXME: if we do this, we will NOT be able to completely unmount the
+            #        orignal root device w/out doing some extra shenanigans...
+            mkdir -p /sqsh_layer-upper
+            # FIXME: are we going to run into the multiple lower layer problems
+            #        (e.g., falling back to index=off,nfs_export=off) if we do
+            #        this?
+            #
+            #        testing this out looks like "probably, yes".  i get wonky
+            #        errors from systemd that can mostly be worked around... but
+            #        clearly something is amiss.  pretty sure xino is not getting
+            #        enabled.
+            #
+            go="mount -o ro,bind /tmproot/upper/upper /sqsh_layer-upper"
+            decho $go
+            eval $go
+            sqsh_layers=upper:$sqsh_layers
+            sqsh_layers_ws="upper $sqsh_layers_ws"
+            upper=upper
+        else
+            # need to remount rootfs rw so we can write into upper layer
+            decho "remounting /tmproot rw"
+            mount -o remount,rw /tmproot
+            mkdir -p /tmproot/upper/upper /tmproot/upper/work
+            upper=/tmproot/upper
+            # if we're not using ram_layer, we cannot remount sysroot ro later on,
+            # so we must change this flag to rw
+            root_true_rw=rw
+        fi
+
+    fi
+
+    # NOTE: If we've gone through shell_sqshprep, there are a couple unset
+    #       variables we need to set before we carry on.
+    #
+    # FIXME: This is assuming that if you went through shell_sqshprep, you
+    #        didn't set up ram_layer.  We could do a bit better, but doing
+    #        ram_layer also involves changing sqsh_layers and
+    #        sqsh_layers_ws... could be hard to get right.
+    #
+    if [ -z "$upper" ]; then
         upper=/tmproot/upper
-        # if we're not using ram_layer, we cannot remount sysroot ro later on,
-        # so we must change this flag to rw
         root_true_rw=rw
     fi
 
-    # mount the merged filesystem
-    decho "mounting overlayfs at /sysroot"
-    lower=/sqsh_layer-${sqsh_layers//:/:/sqsh_layer-}
-    overlayflags=lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work
-    decho "lower: $lower"
-    decho "upper: $upper"
-    mount -t overlay -o $overlayflags rootfs /sysroot
+    # mountoverlay breakpoint
+    if [ -n "$shell_mountoverlay" ]; then
+        echo "Dropping into shell prior to final overlayfs mount, as requested."
+        echo
+        echo "Prior to exiting, ensure that the final overlay is mounted ro at /sysroot"
+        echo
+        bash
+
+    else
+
+        # mount the merged filesystem
+        decho "mounting overlayfs at /sysroot"
+        lower=/sqsh_layer-${sqsh_layers//:/:/sqsh_layer-}
+        overlayflags=lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work
+        decho "lower: $lower"
+        decho "upper: $upper"
+        mount -t overlay -o $overlayflags rootfs /sysroot
+    fi
+
+    # extra sqsh_layer finalization
+    decho "doing extra sqsh_layer finalization"
 
     # this leaves us with /boot containing the merged contents of the layers...
     # but the ACTUAL boot files will end up living in /mnt/root-true/boot/...
@@ -716,12 +791,6 @@ if [ -n "$sqsh_layers" ]; then
             decho "couldn't find /boot tree to bind mount, but might be fine"
         fi
     fi
-fi
-
-# do extra squashfs magic common to both old device-mapper and new overlayfs
-# implementations
-if [ -n "$sqsh_layers" ]; then
-    decho "doing common squashfs finalization"
 
     # copy over module options
     #
