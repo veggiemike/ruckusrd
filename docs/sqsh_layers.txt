@@ -453,9 +453,80 @@ come up with any way around that.  (maybe immutable attributes?)
 
 
 *** Is this really all just do to xino?
-Can we just try to live w/out that one?  Kernel docs say:
+Can we just try to live w/out that one?  oh... actually, the one that pisses
+off dpkg usage is index=on... which is the one we would have to disable in
+order to share images w/out having UUID issues.
 
 
+*** can we just force xino=on?
+Well, yes, we can.  but i still cannot remove
+/var/log/journal/blarg/system.journal afterwards.
+
+
+*** another update of doom
+5.7 seems to fix my issues, miraculously... :-) at least, it fixes the issues
+w/ ram_layer upper w/ 0.12.3.  checkpointing a live upper into an additional
+sqsh layer is still giving me troubles...
+
+so, how best to create snapshot... w/out breaking xino, index, or redirect_dir
+for the middle layers?
+
+option 1
+- cd /sysroot/mnt/root-true
+- mksquashfs upper/upper newlayer.sqsh
+- rm -rf upper/upper/* (make sure to get .* too!)
+- maybe delete upper/work/*
+
+in this case, make a backup using GNU tar (not the busybox applet)
+- tar --acls --xattrs -zcf upper.tar.gz upper
+
+upper/upper/var/log/journal/f016a89e2f04a4c745f075db5eb98601/system.journal has both xattrs and acls
+
+option 2
+- cd /sysroot/mnt/root-true
+- mksquashfs upper/upper newlayer.sqsh
+- mv upper to upper-previous
+- mkdir -p upper/{upper,work}
+
+I'm pretty sure I was doing option 2 originally when I ran into all the
+problems... but, I may have been doing the right thing and just running into
+overlayfs bugs
+
+ok, option 1 (w/out cleaning up work) gave me:
+
+overlayfs: null uuid detected in lower fs '/', falling back to index=off,nfs_export=off.
+
+putting things back together took some work...
+- removed gimli-snap1 from kernel command line
+- completely removed borked uppper
+- tar --acls --xattrs -xf upper.tar.gz
+- booted up, got kernel overlay errors that said to delete index dir
+- deleted index dir
+- booted up fine
+
+tar --acls --xattrs -psxf upper.tar.gz
+
+I wonder if that last run-around was because I extracted w/out -ps...?
+
+
+
+
+
+
+And, is the "right" way do to it any different if we're talking about
+checkpointing a live ram_layer?  Obviously, I'd have to do it w/out rebooting
+into the ruckusrd maint shell...  And, not as obviously, I might need to ALSO
+mksquashfs from the topmost lower layer (sqsh_layer-upper), which could
+(should?) be basically /mnt/root-true/upper moved around and made read-only.
+
+- mksquashfs of /mnt/upper/upper
+- IF /mnt/sqsh_layer-upper/upper isn't empty, mksquashfs it too
+- delete /mnt/sqsh_layer-upper/upper/*
+- ??
+
+perhaps we should combine anything from sqsh_layer-upper with whatever is in
+the ram_layer in a single pass?  how?  i guess via a multi-lower-no-upper ro
+overlay of the 2?
 
 
 ** dpkg backup files go wonky?
