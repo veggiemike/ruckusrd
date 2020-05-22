@@ -207,6 +207,22 @@ EOF
 }
 
 
+lookup_layer()
+{
+    name=$1.sqsh
+    for path in $sqsh_layerdir; do
+        if [ -e $path/$name ]; then
+            echo $path/$name
+            return
+        fi
+    done
+
+    # just in case it's not found, echo something sane-ish looking so we don't
+    # end up with wrong number of arguments later on.
+    echo not-found-$name
+}
+
+
 trap "emergency_shell" 0 2
 
 # exit immediately if a command fails
@@ -312,7 +328,7 @@ for o in `cat /proc/cmdline` ; do
         ;;
     sqsh_layerdev=*)
         sqsh_layerdev=${o#sqsh_layerdev=}
-        sqsh_layerdir=/sqsh_layerdev
+        sqsh_layerdir="$sqsh_layerdir /sqsh_layerdev"
         ;;
     sqsh_layerdir=*)
         sqsh_layerdir_rel=${o#sqsh_layerdir=}
@@ -340,7 +356,11 @@ done
 
 # if user provided sqsh_layerdir, append it to the device mountpoint
 if [ -n "$sqsh_layerdir_rel" ]; then
-    sqsh_layerdir=$sqsh_layerdir/$sqsh_layerdir_rel
+    tmp=
+    for x in $sqsh_layerdir; do
+        tmp="$tmp $x/$sqsh_layerdir_rel"
+    done
+    sqsh_layerdir=$tmp
 fi
 
 decho "kernel commandline: `cat /proc/cmdline`"
@@ -578,7 +598,7 @@ if [ -n "$sqsh_layers" ]; then
         go="cp -a"
         [ "$quiet" != "1" ] && go="$go -v"
         for x in $sqsh_layers_ws; do
-            go="$go $sqsh_layerdir/$x.sqsh"
+            go="$go $(lookup_layer $x)"
         done
         go="$go /sqsh_layerdev"
         decho $go
@@ -601,7 +621,7 @@ if [ -n "$sqsh_layers" ]; then
     #
     for x in $sqsh_layers_ws; do
         loopdev=$(losetup -f)
-        losetup $loopdev $sqsh_layerdir/$x.sqsh
+        losetup $loopdev $(lookup_layer $x)
         ln -s $loopdev /dev/sqsh_layer-$x
         mkdir -p /sqsh_layer-$x
         go="mount -o ro /dev/sqsh_layer-$x /sqsh_layer-$x"
