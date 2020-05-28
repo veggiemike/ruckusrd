@@ -684,6 +684,10 @@ else
             decho "converting retentive upper to non-retentive lower layer"
             # FIXME: if we do this, we will NOT be able to completely unmount the
             #        orignal root device w/out doing some extra shenanigans...
+            #
+            #        wait, won't this just get umounted by the ruckusrd_umount
+            #        service?
+            #
             mkdir -p /sqsh_layer-upper
             # FIXME: are we going to run into the multiple lower layer problems
             #        (e.g., falling back to index=off,nfs_export=off) if we do
@@ -740,9 +744,9 @@ else
         decho "mounting overlayfs at /sysroot"
         lower=/sqsh_layer-${sqsh_layers//:/:/sqsh_layer-}
         overlayflags=lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work
-        decho "lower: $lower"
-        decho "upper: $upper"
-        mount -t overlay -o $overlayflags rootfs /sysroot
+        go="mount -t overlay -o $overlayflags rootfs /sysroot"
+        decho $go
+        eval $go
     fi
 
     # extra sqsh_layer finalization
@@ -830,14 +834,16 @@ else
     #       that the initrd has ONLY mounted /.  So instead, we'll append a
     #       scriptlet that does the forging into rc.local.
     #
-    # NOTE: All this mtab forging is completely unneeded on distros
-    #       that use a symlink to /proc/mounts for mtab.
+    # NOTE: All this mtab forging is completely unneeded on distros that use a
+    #       symlink to /proc/mounts for mtab.  This is the case for almost all
+    #       distros at this point, but users or buggy scripts could have broken
+    #       the symlink.
     #
-    # FIXME: At this point, is seems like a safe assumption that all
-    #        distros still have rc.local for backwards
-    #        compatibility...  but you know how assumptions work....
-    #        at some point, we may need to create a systemd service
-    #        for this.
+    # FIXME: At this point, is seems like a safe assumption that all distros
+    #        still have rc.local for backwards compatibility...  but you know
+    #        how assumptions work....  at some point, we may need to create a
+    #        systemd service for this.  (CentOS 7, Ubuntu 18.04, and Ubuntu
+    #        20.04 definately all still support rc.local)
     #
     if [ -h /sysroot/etc/mtab ]; then
 	RCLOCAL=
@@ -978,9 +984,8 @@ EOF
     # FIXME: figure out how to make this not depend on SysV-Init style scripts,
     #        and the naming/ordering of the host systems shutdown/halt scripts.
     #
-    #        i made a systemd unit for gkrellmd at cah, it was
-    #        simple...  just need to figure out how to propperly
-    #        detect systemd vs sysvinit
+    #        i made a systemd unit for gkrellmd at cah, it was simple...  just
+    #        need to figure out how to propperly detect systemd vs sysvinit
     #
     if [ -z "$to_ram" ]; then
         cat <<EOF > /sysroot/etc/init.d/ruckusrd_umount
