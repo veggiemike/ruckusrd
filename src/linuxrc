@@ -261,6 +261,7 @@ root_rw=""
 root_true_rw="ro"
 rootflags=""
 rootfstype="auto"
+overlayflags=""
 to_ram=""
 # breakpoints!
 #
@@ -342,6 +343,9 @@ for o in `cat /proc/cmdline` ; do
     rootfstype=*)
         rootfstype=${o#rootfstype=}
         ;;
+    overlayflags=*)
+        overlayflags=${o#overlayflags=}
+        ;;
     sqsh_layers=*)
         sqsh_layers=${o#sqsh_layers=}
         # make layers space-delimited for iterating
@@ -399,6 +403,7 @@ decho "root_rw=$root_rw"
 decho "root_true_rw=$root_true_rw"
 decho "rootflags=$rootflags"
 decho "rootfstype=$rootfstype"
+decho "overlayflags=$overlayflags"
 decho "to_ram=$to_ram"
 decho "shell=$shell"
 decho "shell_mountdevs=$shell_mountdevs"
@@ -743,7 +748,12 @@ else
         # mount the merged filesystem
         decho "mounting overlayfs at /sysroot"
         lower=/sqsh_layer-${sqsh_layers//:/:/sqsh_layer-}
-        overlayflags=lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work
+        layers=lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work
+        if [ -n "$overlayflags" ]; then
+            overlayflags=$overlayflags,$layers
+        else
+            overlayflags=$layers
+        fi
         go="mount -t overlay -o $overlayflags rootfs /sysroot"
         decho $go
         eval $go
