@@ -37,6 +37,12 @@ mounted read-only.  This is primarily for supporting sharing of a read-only
 device between multiple virtual machines which all have their own dedicated
 rootdev for the upper layer.
 
+NOTE: This causes us to look at rootdev AND THEN sqsh_layerdev for named
+      layers.  This way, we'll be able to have shared base images w/
+      host-specific extra layers.  Otherwise, if a host with lots of changes
+      decides to create a new layer, it would have to have write access to
+      sqsh_layerdev (which it almost definately does not have).
+
 NOTE: This option cannot be used along with =to_ram= because... why would you
       do that?  The point of =to_ram= is allowing for removal of the root
       device after boot.  To use =to_ram= with a separate sqshdev would work in
@@ -345,88 +351,80 @@ mksquashfs the overlay
 umount
 reboot
 
-
 * replace kernel command line w/ a config file?
-then we don't have to make bootloader changes upong commit or merge calls?
-will no longer be able to tweak layers at boot time via bootloader menu, though.
+Then we don't have to make bootloader changes upong commit or merge calls?  We
+will no longer be able to tweak layers at boot time via bootloader menu,
+though.
 
+Well, we WILL be able to override via kernel command line, but we'll have to
+know what we're overriding and type it all out by hand because it will no
+longer already be there to tweak.
 
 * Known Issues:
-** keeps falling back to index=off after i make the 2nd layer
+** multiple lower layers doesn't play well w/ advanced overlay mount options
+Specifically index=on, which is required for nfs_export.  I'm unsure if this is
+just a wont-ever-work issue, or would work if squashfs supported filesystem
+UUID, or if it's bugs in overlayfs... either way, using these options with or
+overlay mount eventually leads to the following moutn errors after creating 2
+or more lower layers:
 
 overlayfs: null uuid detected in lower fs '/', falling back to index=off,nfs_export=off
 
-ok, looks like index=on doesn't play well w/ multiple-lowers...  so...  poop.
+And once you've got that, I'm pretty sure you're overlay is pretty much hosed,
+since you cannot use index=on and then switch back to index=off w/out wrecking
+your filesystem according to the overlayfs docs.
 
-it does, however, seem perfectly content if WE impliement multiple lowers
-pre-4.0 style...  like this
+** squashfs doesn't support filesystem UUIDs
+I could try and implement this and supply patches to kernel and squashfs-tools.
+Fixing it *might* avoid problems w/ multiple lower layers mentioned above.
 
-*** we've got a single baselined layer
-mount -t overlay -o lowerdir=/sqsh_layer-base,upperdir=/tmproot/upper-base/upper,workdir=/tmproot/upper-base/work overlay1 /layer1
+** squashfs doesn't support POSIX ACLs
+Poop... but is it hurting anything?  There have been patches for the kerne and
+the squashfs-tools circulating on LKML for years w/out anyone seeming to care
+enough to get it merged...  I could test the patches out and make some noise.
 
-*** now we baseline the 2nd layer
-we're actually NOT creating a new sqsh here...  we're keeping the 1st overlay
-mount around w/ its existing upper,work dirs but mounting it read-only.  So to
-baseline, all we really do is create a new upper dir for the next layer BUT
-LEAVE THE 1ST UPPER ALONE.
+FYI, the test-case file I've used in the past is
+/var/log/journal/<machine-id>/system.journal, which should have the following
+in Ubunut 18.04:
 
-*** and mount it like this
-mount -o remount,ro /layer1
-mount -t overlay -o lowerdir=/layer1,upperdir=/tmproot/upper-middle/upper,workdir=/tmproot/upper-middle/work overlay2 /layer2
+% getfacl /var/log/journal/ee438e41a35bc6e2371ff8505e1a2c9b/system.journal
+# file: var/log/journal/ee438e41a35bc6e2371ff8505e1a2c9b/system.journal
+# owner: root
+# group: systemd-journal
+user::rw-
+group::r-x			#effective:r--
+group:adm:r-x			#effective:r--
+mask::r--
+other::---
 
-etc etc etc...
+% getfattr /var/log/journal/ee438e41a35bc6e2371ff8505e1a2c9b/system.journal
+# file: var/log/journal/ee438e41a35bc6e2371ff8505e1a2c9b/system.journal
+user.crtime_usec
 
-That gives me a working multiple lower overlay with working index and nfs
-export for better POSIX compliance (e.g., rename() will work, hard links won't
-get broken on copy_up (i think?))
-
-The problem here is that /layer1 is mounted,ro, but it's upperdir actually
-isn't... so you CAN go bork the hell out of it by accident... which I don't
-really like.
-
-Hm.  I'm also no longer making layers that you can pull out and redisribute
-easily...
-
-Perhaps I can put the uper-name files on independent loopback mounted images,
-mount them rw until just after the overlay mount (so that it doesn't complain
-about readonly upper), then remount,ro the upper?  I'd be using twice as many
-loopback mounts... and all but the lowest lower layer would have to be ext
-instead of squashfs.
-
-Or I could just have the layers tied together and distributed along w/ a 
-
-I'd have a single squashfs image and an ext image of all the upperdirs...  so
-my subsequent "layers" would really be "extra upper dirs".
-
-sqsh_layers=middle:base
-
-would have to manually parse that out, go find base.sqsh, mount it using it's
-included upperdir, then make a 2nd overlay mount of the middle upperdir.
-
-Maybe do this after a config file rewrite...  it's really implementing nested
-overlayfs.  Or maybe we just do "sqsh_layers=base overlays=top,middle".  Either
-way, I'd hate to break the "pick a bunch of layers and put your system
-together" paradigm I was shooting for so that we get index=on.
+% lsattr /var/log/journal/ee438e41a35bc6e2371ff8505e1a2c9b/system.journal
+--------------e--- /var/log/journal/ee438e41a35bc6e2371ff8505e1a2c9b/system.journal
 
 ** dpkg backup files go wonky?
-
-this has happened a couple times now w/ multiple lower layers and REDIRECT on.
-it looks like dpkg make a hardlink or renames to a backup file, causing both
+This has happened a couple times now w/ multiple lower layers and REDIRECT on.
+It looks like dpkg makes a hardlink or renames to a backup file, causing both
 files to copy_up, then overwrites the original file, leaving the upper link a
 bit wonky.  Each time it's happened it's been with a backup file that was safe
-to remove, so i booted to maint, unmounted everything, just mounted the upper
+to remove, so I booted to maint, unmounted everything, just mounted the upper
 and removed the backup file.
 
-not sure how to really fix this... and it's strange that i never ran into it
-while working in centos.  well, i guess most of my work with centos had all the
-rpm work done prior to lowest layer creation, because i had no internet.  all
+Not sure how to really fix this... and it's strange that I never ran into it
+while working in centos.  Well, I guess most of my work with centos had all the
+rpm work done prior to lowest layer creation, because I had no internet.  All
 upper-lower layers were software being installed by hand or via srp.
 
-Rpm might also not be doing the exactly same dance for "secure file removal"
+Rpm might also not be doing the exactly Same dance for "secure file removal"
 that dpkg does... at least on some packages, but definately not on all.
 
-** broken symlinks make syslog noise?
+UPDATE: I think this was due to my overlay being borked up by the multiple
+        lower layers w/ index=on mentioned above.  Keep your eye open for this
+        now that I'm not using index=on anymore.
 
+** broken symlinks make syslog noise?
 Not sure if it's all broken symlinks or something a did in this case...  but
 systemctl disable --now apache2 results in broken symlinks in /etc/rc2.d and
 /etc/rc3.d and a lot of noise if you do an ls in those dirs
@@ -436,3 +434,57 @@ the problem... which is very strange indeed.
 
 Odd... when I tried to recreate this by doing a systemctl disable --now
 dnsmasq, the symlinks all looked fine...
+
+** can't sqsh commit from domU w/out poking from the dom0
+Not sure how this behaves bare metal, but when I try to create new sqsh_layers
+from the maint shell, there doesn't seem to be a good way to reboot afterwards.
+The reboot and shutdown commands do nothing, and I can either intentionally
+cause kernel panic by umounting things and exiting or let the system boot up
+into an awkward/trashed upper layer... which will probably panic.  Once panic
+happens, I need to destroy and recreate the domU.
+
+I guess if I build the sqsh commit stuff right into linuxrc I could ensure that
+the NEW set of lower/upper layers gets reassembled after running mksquashfs and
+then boot it up w/out a panic...  but doing things by hand is a bit of a pain.
+
+So, even if I DO reassemble and boot up nicely, I haven't changed any
+bootloader xen config.  In other words, next reboot will be all hosed up unless
+the user goes and fixes the bootloader/xen config.  Soo... probably better if I
+don't automatically reassemble.  If there's manual intervention required, we
+should hit the user in the head w/ it to make sure it doesn't get forgotten.
+
+Can I compare /.sqsh_config to /proc/cmdline and fix if needed?  And don't
+remove /.sqsh_config unless the 2 match?  But what if they don't match because
+the user modified boot params via bootload menu?
+
+If I migrate to a config-file based setup, but allow for overriding via command
+line, then we can let command line trump config-file always.  And we can use a
+DIFFERENT file to tell linuxrc to do reconstruction operations (e.g., sqsh
+commit).  Although... where would the config file go?  Would have to be on
+root-true.  And linuxrc commands could be in the rootfs at /.sqsh_config or
+something like that.
+
+*** xen
+From the dom0, I can do a 'xl config-update guest ./guest.cfg' after tweaking
+the config file.  But is there a way to edit that from within the virtual
+machine?  That sure would be nice... but I don't think such a mechanism exists.
+
+Even if we stored the .cfg file on the domU filesystem somewhere, there's no
+mechanism to reparse it from within the domU, so a reboot will use the old
+config until dom0 updates it.
+
+UPDATE: What if we do a poweroff from the domU and have some service in the
+        dom0 configured to notice and re-create it?  Can we get xen-watchdog to
+        do this for us?  Or does that only notice lockups...?
+
+*** bare-metal
+The user needs to update whatever bootloader they are using... We cannot make
+any assumptions there, really.  Even if I did add bootloader-specific update
+code, it would be a messy ton of work with tons of pitfalls... and it's not
+hard to manually do.
+
+UPDATE: If we put all the sqsh_layer stuff in a config file, we CAN update it
+        for the user automatically.  But if we're planning on that, we have to
+        make it very obvious that users should NOT have sqsh_layer command line
+        options in their bootloader config and that they should ONLY be
+        specified there for testing purposes.

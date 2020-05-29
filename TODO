@@ -14,35 +14,35 @@
  - Add --with-system-{busybox,e2fsprogs,eudev,lvm2,mdadm,squashfs-tools}
    configure flags.
 
- - Build something into the build system to fetch submodules when building from
-   dist tarball.  Right now, you can really only build the subprojects via a
-   git clone.
 
+* For 0.14
 
-* For 0.13
+ - Add config-file support (/mnt/root-true/ruckusrd.conf?).  Retain kernel
+   commandline parsing, but only needed to override what's in the config file.
+   This will allow us to update config w/out needing to mess with booloader
+   config.
 
- - Rip out any remaining squashfs.img device mapper garbage.
-
- - Upgrade to latest busybox, maybe latest other subprojects.
-
- - Switch dist target to tar.xz.
-
- - Migrate to manually layering multiple lower layers so work around overlayfs
-   xino wonky problems.
-
-
-* Could happen in 0.12.x stable release
-
- - Clean up remaining systemd warts (e.g., rc.local, ruckusrd_umount service).
-
- - Pretty sure I broke out-of-tree building at some point... need to fix that.
+ - Should prefix all our non-standard kernel commandline options w/
+   ruckusrd.whatever.  Once we have config-file support, we should be able to
+   keep it a bit less verbose, and this will guard us against accidentally
+   using the same option as something in the kernel or systemd.  A couple
+   should probably stay unprefixed (e.g., root=, quiet).
 
  - Tidy up  linuxrc output.  "quiet"  mode should  be silent to  match expected
    behavior in  most distros.  Perhaps  prefix each  output w/ "ruckusrd:  " or
    something  like that  to differentiate  our initramfs  messages from  kernel
    spew?
 
- - Allow passing overlayfs mount options on kernel command line.  Right now,
-   default mount opts are used, but people might want to play with overlayfs
-   mount options (e.g., index, nfs).  The existing `rootflags` option is just
-   for the initial /sysroot mount, prior to doing anything special.
+
+* Could happen in a stable release
+
+ - Clean up remaining systemd warts (e.g., rc.local, ruckusrd_umount service).
+   (If we can't do this w/out breaking compatibility, it'll have to be in a
+   major release)
+
+ - Pretty sure I broke out-of-tree building at some point... need to fix that.
+
+ - Build something into the build system to fetch submodules when building from
+   dist tarball.  Right now, you can really only build the subprojects via a
+   git clone.  (This means our dist tarballs are currently useless, as we don't
+   yet have --with-system-whatever flags...)
