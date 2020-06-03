@@ -998,30 +998,92 @@ EOF
     #        need to figure out how to propperly detect systemd vs sysvinit
     #
     if [ -z "$to_ram" ]; then
-        cat <<EOF > /sysroot/etc/init.d/ruckusrd_umount
-#!/bin/sh
+        # create script
+        ruckusrd_umount=/.ruckusrd_umount
+        cat <<EOF > /sysroot/$ruckusrd_umount
+#!/bin/bash
 
 # quietly umount rootfs dependencies that we left mounted on top of rootfs, so
 # that we can umount / eventually.
 
-umount -l /boot 2>/dev/null
+umount -l /boot
 
-mount -o remount,ro /mnt/root-true 2>/dev/null
-umount -l /mnt/root-true 2>/dev/null
+# leave this rw so overlay continues to work...
+#mount -o remount,ro /mnt/root-true
+umount -l /mnt/root-true
 
-mount -o remount,ro /mnt/sqsh_layerdev 2>/dev/null
-umount -l /mnt/sqsh_layerdev 2>/dev/null
+#mount -o remount,ro /mnt/sqsh_layerdev
+umount -l /mnt/sqsh_layerdev
 
 EOF
         for x in $sqsh_layers_ws; do
-            cat <<EOF >> /sysroot/etc/init.d/ruckusrd_umount
-umount -l /mnt/sqsh_layer-$x 2>/dev/null
+            cat <<EOF >> /sysroot/$ruckusrd_umount
+umount -l /mnt/sqsh_layer-$x
 EOF
         done
 
-        chmod +x /sysroot/etc/init.d/ruckusrd_umount
-        ln -fs ../init.d/ruckusrd_umount /sysroot/etc/rc0.d/S00ruckusrd_halt
-        ln -fs ../init.d/ruckusrd_umount /sysroot/etc/rc6.d/S00ruckusrd_reboot
+        chmod +x /sysroot/$ruckusrd_umount
+
+        # actually make that script get executed on shutdown
+        if [ "$(basename $(readlink /sysroot/$init))" != "systemd" ]; then
+            # not systemd, assume sysvinit
+            ln -fs $ruckusrd_umount /sysroot/etc/rc0.d/S00ruckusrd_halt
+            ln -fs $ruckusrd_umount /sysroot/etc/rc6.d/S00ruckusrd_reboot
+            # add a couple lines to the script to remove those symlinks, too
+            cat <<EOF >> /sysroot/$ruckusrd_umount
+
+rm -f /etc/rc0.d/S00ruckusrd_halt
+rm -f /etc/rc6.d/S00ruckusrd_reboot
+EOF
+        else
+            # look up path to systemd services
+            #
+            # NOTE: We can't do "systemctl show --value -p FragmentPath
+            #       halt.target" because systemctl doesn't work until systemd
+            #       is running...
+            #
+            #       this might not be 100% correct, but it's a best guess for
+            #       now (and works in Ubuntu).
+            #
+            systemdpath=$(dirname $(readlink /sysroot/$init))/system
+
+            # create service file
+            cat <<EOF > /sysroot/$systemdpath/ruckusrd_umount.service
+[Unit]
+Description=RuckusRD sqsh_layer unmount
+DefaultDependencies=no
+Before=umount.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=$ruckusrd_umount
+
+EOF
+
+            # register it for shutdown
+            for x in halt poweroff reboot; do
+                ln -s ../ruckusrd_umount.service /sysroot/$systemdpath/$x.target.wants/ruckusrd_umount.service
+            done
+
+            # add a couple lines to the script to remove those symlinks and the
+            # service file
+            cat <<EOF >> /sysroot/$ruckusrd_umount
+
+for x in halt poweroff reboot; do
+    rm -f $systemdpath/\$x.target.wants/ruckusrd_umount.service
+done
+
+rm -f $systemdpath/ruckusrd_umount.service
+EOF
+
+        fi
+
+        # and add a line to remove the script itself
+        cat <<EOF >> /sysroot/$ruckusrd_umount
+
+rm -f $ruckusrd_umount
+EOF
     fi
 
     # and finally, remount /sysroot read-only because most/all systems expect /
