@@ -988,7 +988,6 @@ umount -l /boot
 #mount -o remount,ro /mnt/root-true
 umount -l /mnt/root-true
 
-#mount -o remount,ro /mnt/sqsh_layerdev
 umount -l /mnt/sqsh_layerdev
 
 EOF
@@ -1039,7 +1038,7 @@ EOF
 
             # register it for shutdown
             for x in halt poweroff reboot; do
-                ln -s ../ruckusrd_umount.service /sysroot/$systemdpath/$x.target.wants/ruckusrd_umount.service
+                ln -fs ../ruckusrd_umount.service /sysroot/$systemdpath/$x.target.wants/ruckusrd_umount.service
             done
 
             # add a couple lines to the script to remove those symlinks and the
