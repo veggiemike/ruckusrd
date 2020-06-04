@@ -39,7 +39,7 @@
 #
 # - sed -i (yes!)
 # - bash ${param#word} and ${param//pattern/string} expansions (yes and yes!)
-# - bash trap and set -e (maybe... testing now)
+# - bash trap and set -e (yes!)
 # - bash $() command subst (yes!)
 # - bash {} globbing (e.g., cp foo{,bak}) (NOPE)
 # - bash var+= (NOPE)
@@ -226,9 +226,6 @@ lookup_layer()
 trap "emergency_shell" 0 2
 
 # exit immediately if a command fails
-#
-# FIXME: does this work in ash?
-#
 set -e
 
 PATH=/sbin:/bin
@@ -687,22 +684,7 @@ else
             mount -t tmpfs -o size=$ram_layer ram_layer /upper
             mkdir -p /upper/upper /upper/work
             decho "converting retentive upper to non-retentive lower layer"
-            # FIXME: if we do this, we will NOT be able to completely unmount the
-            #        orignal root device w/out doing some extra shenanigans...
-            #
-            #        wait, won't this just get umounted by the ruckusrd_umount
-            #        service?
-            #
             mkdir -p /sqsh_layer-upper
-            # FIXME: are we going to run into the multiple lower layer problems
-            #        (e.g., falling back to index=off,nfs_export=off) if we do
-            #        this?
-            #
-            #        testing this out looks like "probably, yes".  i get wonky
-            #        errors from systemd that can mostly be worked around... but
-            #        clearly something is amiss.  pretty sure xino is not getting
-            #        enabled.
-            #
             go="mount -o ro,bind /tmproot/upper/upper /sqsh_layer-upper"
             decho $go
             eval $go
@@ -990,12 +972,6 @@ EOF
     #       assumptions about the system being booted.  We have to register
     #       some sort of script to execute at shutdown, after mostly everything
     #       has finished, but before the system tries to unmount its rootfs.
-    #
-    # FIXME: figure out how to make this not depend on SysV-Init style scripts,
-    #        and the naming/ordering of the host systems shutdown/halt scripts.
-    #
-    #        i made a systemd unit for gkrellmd at cah, it was simple...  just
-    #        need to figure out how to propperly detect systemd vs sysvinit
     #
     if [ -z "$to_ram" ]; then
         # create script
