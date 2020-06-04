@@ -102,5 +102,11 @@ ln -vsf /usr/src/linux-headers-$VERSION $SRP_ROOT/lib/modules/$VERSION/build
 # 5. cleanup
 rm -f $SRP_ROOT/.hdrsrcfiles $SRP_ROOT/.hdrobjfiles
 
+# set stable symlinks for modules and headers
+if [ "$NOVERSION" = "stable" ]; then
+    ln -vsf $VERSION $SRP_ROOT/lib/modules/$VERSION_NAME
+    ln -vsf $VERSION $SRP_ROOT/usr/src/linux-headers-$VERSION_NAME
+fi
+
 echo VERSION: $VERSION
 echo VERSION_NAME: $VERSION_NAME

@@ -11,21 +11,51 @@
 
 export SRP_ROOT=$PWD/FOO
 
-VERSION=$(basename $SRP_ROOT/lib/modules/*)
 target_host=$1
-
 if [ -z "$target_host" ]; then
     echo "need to specify target host"
     exit -1
 fi
 
+# figure out VERSION, which might be a stable .y version w/ a symlink
+for x in $SRP_ROOT/lib/modules/*; do
+    if [ -h $x ]; then
+        VERSION=$(readlink $x)
+        VERSION_NAME=$(basename $x)
+        break
+    else
+        VERSION=$(basename $x)
+    fi
+done
+
 echo VERSION: $VERSION
+echo VERSION_NAME: $VERSION_NAME
 echo target_host: $target_host
 
 # we do this in a single line to reduce the number of ssh authentications
 # necessary
 echo removing preexisting modules and headers on $target_host
-ssh root@$target_host rm -rf /lib/modules/$VERSION /usr/src/linux-headers-$VERSION || exit 1
+go="rm -rf /lib/modules/$VERSION /usr/src/linux-headers-$VERSION"
+if [ -n "$VERSION_NAME" ]; then
+    # we're installing a stable symlink.  let's remove any pre-existing symlink
+    # AND what it currently points at.  we're going to be removing the boot
+    # files anyways, so the leftover modules and headers dirs are just leftover
+    # junk anyways.
+    #
+    # FIXME: corner case: install 5.7.0, then install 5.7.y.  that will
+    #        overwrite the 5.7.0 modules, and then upgrading to the next 5.7.y
+    #        will remove 5.7.0's modules, rendering it broken.
+    #
+    #        should we check for existence of matching /boot files before
+    #        removing symlink target modules?  [ -f /boot/vmlinuz-$VERSION ] ??
+    #
+    #        i think that's getting too convoluted... just don't do that.
+    #
+    go+="; [ -h /lib/modules/$VERSION_NAME ] && rm -rf /lib/modules/\$(readlink /lib/modules/$VERSION_NAME) /lib/modules/$VERSION_NAME"
+    go+="; [ -h /usr/src/linux-headers-$VERSION_NAME ] && rm -rf /usr/src/\$(readlink /usr/src/linux-headers-$VERSION_NAME) /usr/src/linux-headers-$VERSION_NAME"
+fi
+echo $go
+ssh root@$target_host "$go"
 
 echo installing files on $target_host
 rsync -vzurltD --keep-dirlinks $SRP_ROOT/ root@$target_host:/ || exit 2
