@@ -36,10 +36,6 @@
 
 * Could happen in a stable release
 
- - Clean up remaining systemd warts (e.g., rc.local, ruckusrd_umount service).
-   (If we can't do this w/out breaking compatibility, it'll have to be in a
-   major release)
-
  - Pretty sure I broke out-of-tree building at some point... need to fix that.
 
  - Build something into the build system to fetch submodules when building from
