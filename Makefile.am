@@ -23,7 +23,9 @@ uninstall-local:
 # i know this isn't the right way to do this... but it's how i've been
 # occasionally making .pkg files to install, now documented/automated
 # to make life easier.
-DPKGDIR=$(abs_top_builddir)/$(PACKAGE_TARNAME)_$(PACKAGE_VERSION)-1
+DEBNAME=$(PACKAGE_TARNAME)_$(PACKAGE_VERSION)-1
+DEBFILE=$(abs_top_builddir)/$(DEBNAME).deb
+DPKGDIR=$(abs_top_builddir)/$(DEBNAME)
 DEBDIR=$(DPKGDIR)/DEBIAN
 DEBCTRL=$(DEBDIR)/control
 DEBSIZE=$(DEBDIR)/.size
@@ -31,7 +33,10 @@ DEBARCH=$(DEBDIR)/.arch
 DEBDEPS=$(DEBDIR)/.deps
 DEBCTRL_DEPS=$(DEBSIZE) $(DEBARCH) $(DEBDEPS)
 
-dpkg: $(DEBCTRL)
+.PHONY: dpkg
+dpkg: $(DEBFILE)
+
+$(DEBFILE): $(DEBCTRL)
 	rm -f $(DEBCTRL_DEPS)
 	dpkg-deb --build --root-owner-group $(DPKGDIR)
 	rm -rf $(DPKGDIR)
@@ -50,7 +55,8 @@ $(DEBARCH): $(DEBDIR)
 
 $(DEBDEPS): $(DEBDIR)
 	$(srcdir)/debian/get_deps $(DPKGDIR) > $(DEBDIR)/.tmp
-	awk -F": " '/^pkgs:/ {print $2}' $(DEBDIR)/.tmp > $@
+	awk -F": " '/^pkgs:/ {print $$2}' $(DEBDIR)/.tmp > $@
+	rm -f $(DEBDIR)/.tmp
 
 $(DEBCTRL): $(DEBCTRL_DEPS)
 	cat $(srcdir)/debian/control | sed \
