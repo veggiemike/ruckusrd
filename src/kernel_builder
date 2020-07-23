@@ -102,6 +102,11 @@ ln -vsf /usr/src/linux-headers-$VERSION $SRP_ROOT/lib/modules/$VERSION/build
 # 5. cleanup
 rm -f $SRP_ROOT/.hdrsrcfiles $SRP_ROOT/.hdrobjfiles
 
+# additional step, not entirely sure if this is legit, but the one out-of-tree
+# module I've tried to build recently (drbd9) was looking for .config...  I
+# figure it can't hurt.
+cp -v .config $SRP_ROOT/usr/src/linux-headers-$VERSION/.config || exit 1
+
 # set stable symlinks for modules and headers
 if [ "$NOVERSION" = "stable" ]; then
     ln -vsf $VERSION $SRP_ROOT/lib/modules/$VERSION_NAME
