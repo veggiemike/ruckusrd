@@ -34,6 +34,23 @@ echo target_host: $target_host
 
 # we do this in a single line to reduce the number of ssh authentications
 # necessary
+#
+# FIXME: why the heck didn't i just do rysnc --delete?  You can't really
+#        accomplish all this w/ rsync --delete because our new...  well, what
+#        about the case where we're accidentally re-installing the same thing.
+#        in that case, 5.8.y->5.8.9, we'll remove 5.8.9 and then needlessly
+#        re-install it.  but we really do need to do symlink checking and
+#        removing prior to the rsync, otherwise we'll loose track of the
+#        symlink.  making the stable symlink magic work all the time, while not
+#        needlessly re-installing, would be a bit non-trivial...
+#
+#        1. record where stable symlink points.
+#
+#        2. if new version != current stable, remove old stable tree.
+#
+#        3. rsync --delete new one (potentially overwriting/deleting if new ==
+#        current), which includes the new stable symlink.
+#
 echo removing preexisting modules and headers on $target_host
 go="rm -rf /lib/modules/$VERSION /usr/src/linux-headers-$VERSION"
 if [ -n "$VERSION_NAME" ]; then
@@ -58,4 +75,14 @@ echo $go
 ssh root@$target_host "$go"
 
 echo installing files on $target_host
+# FIXME: why -u? i just deleted everything a few lines ago...
+#
+# NOTE: We use -rltD here instead of -a because we actually don't want to keep
+#       perms (-p), group (-g), and owner (-o)... because who wants there
+#       kernel files to be owned by anyone other than root.
+#
+# FIXME: why --keep-dirlinks?  i must have gotten bitten by not using it... but
+#        i don't actually remember the scenario.  /boot was a symlink maybe?
+#        or /lib/modules?
+#
 rsync -vzurltD --keep-dirlinks $SRP_ROOT/ root@$target_host:/ || exit 2
