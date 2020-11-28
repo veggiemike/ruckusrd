@@ -3,7 +3,7 @@
 # in here for each subproject.
 
 
-all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar
+all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
@@ -16,6 +16,7 @@ clean-local:
 	cd lvm2 && git clean -dfx && git stash
 	cd e2fsprogs && git clean -dfx && git stash
 	cd squashfs-tools && git clean -dfx && git stash
+	cd zfs && git clean -dfx && git stash
 
 
 # FIXME: when we add --with-system-eudev to configure, we'll have to
@@ -201,4 +202,22 @@ squashfs-tools/FOO:
 	    squashfs-tools/Makefile && \
 	make -j$(JOBCOUNT) -C squashfs-tools && \
 	make -C squashfs-tools INSTALL_DIR=$$PWD/FOO/usr/sbin install && \
+	popd || exit 1
+
+
+# FIXME: when we add --with-system-zfs to configure, we'll have to
+#        conditionally replace this rule w/ one that copies files from
+#        the host system.
+#
+zfs/FOO:
+	pushd zfs && \
+	rm -rf FOO && \
+	./autogen.sh && \
+	./configure --prefix=/usr --sbindir=/sbin --sysconfdir=/etc \
+	  --localstatedir=/var --with-systemdunitdir=/lib/systemd/system \
+	  --with-systemdpresetdir=/lib/systemd/system-preset \
+	  --with-systemdgeneratordir=/lib/systemd/system-generator \
+	  --enable-linux-builtin && \
+	make -j$(JOBCOUNT) && \
+	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1

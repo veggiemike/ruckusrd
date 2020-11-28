@@ -16,3 +16,6 @@
 [submodule "subprojects/squashfs-tools"]
 	path = subprojects/squashfs-tools
 	url = git://git.kernel.org/pub/scm/fs/squashfs/squashfs-tools.git
+[submodule "subprojects/zfs"]
+	path = subprojects/zfs
+	url = ../contrib/zfs.git
