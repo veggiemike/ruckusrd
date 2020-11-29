@@ -220,4 +220,6 @@ zfs/FOO:
 	  --enable-linux-builtin && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
+	rm -rf $$PWD/FOO/usr/include && \
+	rm -rf $$PWD/FOO/usr/share/zfs/zfs-tests && \
 	popd || exit 1
