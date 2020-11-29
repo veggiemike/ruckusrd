@@ -193,22 +193,19 @@ EOF
             fi
             ;;
         ZFS=*)
-            ZFS=${str#ZFS=}
-            ZFS_POOL=${ZFS%%/*}
-            ZFS_DS=${ZFS#*/}
-            # NOTE: Hmm.  udev isn't gonna do the trick here.  We need to go
-            #       off and do some zpool setup instead.  We'll set
-            #       thingtomount to $str (which is ZFS=/pool/dataset) so
-            #       calling code can go do zfs magic after udev finishes
-            #       probing devices.
+            # NOTE: We don't use udev here.  Instead, we've got a block of ZFS
+            #       initialization code down below that uses the ZFS and
+            #       ZFS_POOL variables, set here.
             #
             # FIXME: this is going to break if user passes in a ZFS
             #        sqsh_layerdev as well... but i don't care right now.  i
             #        think ZFS is going to be an alternative to
             #        sqsh_layers... not sure why you'd combine the two.
             #
+            ZFS=${str#ZFS=}
+            ZFS_POOL=${ZFS%%/*}
             if [ "$name" = "root" ]; then
-                thingtomount="ZFS (pool=$ZFS_POOL, dataset=$ZFS_DS)"
+                thingtomount=$ZFS
             fi
             ;;
         /dev/*)
@@ -549,7 +546,8 @@ if [ -n "$ZFS" ]; then
     #        initrd, i'd better set -R /sysroot for import...  if it's handled
     #        by the host system, we'd better not set that.
     #
-    zpool import $ZFS_POOL -R /sysroot -N
+    zpool import $ZFS_POOL -N
+    #zpool import $ZFS_POOL -R /sysroot -N
     #zpool mount $ZFS_POOL/$ZFS_DS
     #zpool mount -a
     rootfstype=zfs
