@@ -192,6 +192,25 @@ EOF
                 thingtomount=/dev/root
             fi
             ;;
+        ZFS=*)
+            ZFS=${str#ZFS=}
+            ZFS_POOL=${ZFS%%/*}
+            ZFS_DS=${ZFS#*/}
+            # NOTE: Hmm.  udev isn't gonna do the trick here.  We need to go
+            #       off and do some zpool setup instead.  We'll set
+            #       thingtomount to $str (which is ZFS=/pool/dataset) so
+            #       calling code can go do zfs magic after udev finishes
+            #       probing devices.
+            #
+            # FIXME: this is going to break if user passes in a ZFS
+            #        sqsh_layerdev as well... but i don't care right now.  i
+            #        think ZFS is going to be an alternative to
+            #        sqsh_layers... not sure why you'd combine the two.
+            #
+            if [ "$name" = "root" ]; then
+                thingtomount="ZFS (pool=$ZFS_POOL, dataset=$ZFS_DS)"
+            fi
+            ;;
         /dev/*)
             ln -fs $str /dev/$name
             if [ "$name" = "root" ]; then
@@ -517,19 +536,38 @@ fi
 decho "activating LVM"
 vgchange -a y --quiet --quiet
 
-# wait for udev symlinks to get created
-dmneeded=""
-wait_for_udev_symlink 30 /dev/root
-root_true=`readlink /dev/root`
-[ -n "$sqsh_layerdev" ] && wait_for_udev_symlink 30 /dev/sqsh_layerdev
-ln -s $root_true /dev/root-true
+# do ZFS initialization
+if [ -n "$ZFS" ]; then
+    modprobe zfs
+    # NOTE: we don't set root_true, but that's fine becuase we're not doing an
+    #       overlay.
+    #
+    # NOTE: we don't have a /dev/root symlink, but that's fine because we're
+    #       not doing an overlay.
+    #
+    # FIXME: when does the rest of my pool get mounted?  if we need to do it in
+    #        initrd, i'd better set -R /sysroot for import...  if it's handled
+    #        by the host system, we'd better not set that.
+    #
+    zpool import $ZFS_POOL -R /sysroot -N
+    #zpool mount $ZFS_POOL/$ZFS_DS
+    #zpool mount -a
+    rootfstype=zfs
+else
+    # wait for udev symlinks to get created
+    dmneeded=""
+    wait_for_udev_symlink 30 /dev/root
+    root_true=`readlink /dev/root`
+    [ -n "$sqsh_layerdev" ] && wait_for_udev_symlink 30 /dev/sqsh_layerdev
+    ln -s $root_true /dev/root-true
 
-# autoload filesystem modules if needed
-autoload_fs_module /dev/root
-rootfstype=$TYPE
-if [ -n "$sqsh_layerdev" ]; then
-    autoload_fs_module /dev/sqsh_layerdev
-    sqshfstype=$TYPE
+    # autoload filesystem modules if needed
+    autoload_fs_module /dev/root
+    rootfstype=$TYPE
+    if [ -n "$sqsh_layerdev" ]; then
+        autoload_fs_module /dev/sqsh_layerdev
+        sqshfstype=$TYPE
+    fi
 fi
 
 # deactivate unneeded logvols
@@ -561,7 +599,7 @@ done
 # FIXME: should we fsck sqsh_layerdev too?  same rationale applies... probably
 #        can't umount once we've put things together (unless to_ram?).
 #
-if ! (echo $root | grep -q CDLABEL); then
+if ! (echo $root | grep -q "CDLABEL=\|ZFS="); then
     go="fsck -TC $thingtomount"
     decho $go
     eval $go || echo "WARNING: fsck of rootdev exited non-zero"
@@ -569,14 +607,14 @@ fi
 
 
 # create mountpoints for root and sqsh_layerdev
-mkdir -p /tmproot
+mkdir -p /sysroot
 [ -h /dev/sqsh_layerdev ] && mkdir -p /sqsh_layerdev
 
 # mountdevs breakpoint
 if [ -n "$shell_mountdevs" ]; then
     echo "Dropping into shell prior to mounting device(s), as requested."
     echo
-    echo "Prior to exiting, ensure that rootdev is mounted ro at /tmproot, and"
+    echo "Prior to exiting, ensure that rootdev is mounted ro at /sysroot, and"
     echo "sqsh_layerdev (if used) is mounted ro at /sqsh_layerdev.  Good luck!"
     echo
     bash
@@ -588,7 +626,7 @@ else
         mountoptions="$mountoptions,$rootflags"
     fi
 
-    go="mount -t $rootfstype $mountoptions $thingtomount /tmproot"
+    go="mount -t $rootfstype $mountoptions $thingtomount /sysroot"
     decho $go
     eval $go
     RES=$?
@@ -599,7 +637,7 @@ else
         echo "---------------------------------"
         echo
         echo "Dropping to a shell. "
-        echo "Mount rootdev ro at /tmproot and exit shell to continue. Good luck!"
+        echo "Mount rootdev ro at /sysroot and exit shell to continue. Good luck!"
         echo
         bash
     fi
@@ -614,12 +652,11 @@ else
 fi
 
 
-if [ -z "$sqsh_layers" ]; then
-    # move /tmproot to /sysroot instead of doing sqsh_layer magic
-    decho "moving /tmproot to /sysroot"
-    mount --move /tmproot /sysroot
-
-else
+if [ -n "$sqsh_layers" ]; then
+    # move /sysroot to /tmproot so we can do sqsh_layer magic
+    decho "moving /sysroot to /tmproot"
+    mkdir -p /tmproot
+    mount --move /sysroot /tmproot
 
     # sqshprep breakpoint
     if [ -n "$shell_sqshprep" ]; then
