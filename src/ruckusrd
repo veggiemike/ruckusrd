@@ -163,8 +163,8 @@ $cp $HOSTMODDIR/modules.* $DESTMODDIR/ || cleanup 1
 # NOTE: if we ever want to add DRM drivers as well (potentially for early KMS
 #       fbcon splash screen), add drivers/gpu to the find statement below.
 #
-find $HOSTMODDIR/kernel/drivers/{ata,block,cdrom,md,nvme,scsi,usb,hid} \
-    $HOSTMODDIR/kernel/fs \
+find $HOSTMODDIR/kernel/drivers/{ata,block,cdrom,md,nvme,scsi,usb,hid,net} \
+    $HOSTMODDIR/kernel/{fs,net} \
     \( -name \*.ko.xz -o -name \*.ko \) \
     -exec $cp {} $DESTMODDIR/ \; 2>/dev/null
 
