@@ -100,6 +100,13 @@ eval $go
 chmod -w initramfs/bin/{dmsetup,lvm} initramfs/lib/libdevmapper.so.*
 
 
+# Remove static libs
+echo '********** REMOVING STATIC LIBRARIES *******************************************'
+go="rm -v --interactive=never initramfs/lib/*.a"
+echo $go
+eval $go
+
+
 # Copy modprobe.conf and friends over
 #
 # FIXME: Most mkinitrd scripts I've looked at copy /etc/modprobe.conf and
