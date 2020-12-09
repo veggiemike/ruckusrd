@@ -542,14 +542,11 @@ if [ -n "$ZFS" ]; then
     # NOTE: we don't have a /dev/root symlink, but that's fine because we're
     #       not doing an overlay.
     #
-    # FIXME: when does the rest of my pool get mounted?  if we need to do it in
-    #        initrd, i'd better set -R /sysroot for import...  if it's handled
-    #        by the host system, we'd better not set that.
+    # NOTE: We're only mounting the specified root dataset here.  The OS will
+    #       mount the rest during it's normal bootup processing (assuming it's
+    #       configured properly).
     #
     zpool import $ZFS_POOL -N
-    #zpool import $ZFS_POOL -R /sysroot -N
-    #zpool mount $ZFS_POOL/$ZFS_DS
-    #zpool mount -a
     rootfstype=zfs
 else
     # wait for udev symlinks to get created
