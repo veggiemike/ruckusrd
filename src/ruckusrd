@@ -40,7 +40,7 @@ usage()
     echo "RuckusRD v$VERSION - a super awesome, yet simple, mkinitrd replacement"
     echo "Copyright (C) 2012-2020 Michael D Labriola <michael.d.labriola@gmail.com>"
     echo
-    echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] [-b basedir] <out-initrd-image> <kernel-version>"
+    echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] [-b basedir] [-c best|fast] <out-initrd-image> <kernel-version>"
     echo
     echo "example: $(basename $0) /boot/myinitramfs.img \`uname -r\`"
 }
@@ -59,6 +59,7 @@ opt_verbose=0
 INITRAMFS_TARGET=""
 KERNEL=""
 BASEDIR=""
+COMPMODE="fast"
 while [ $# -gt 0 ] ; do
     case $1 in
         --help)
@@ -77,6 +78,10 @@ while [ $# -gt 0 ] ; do
             ;;
         -b)
             BASEDIR=$2
+            shift
+            ;;
+        -c)
+            COMPMODE=$2
             shift
             ;;
         *)
@@ -206,10 +211,56 @@ decho $go
 eval $go || cleanup 1
 
 
+# Pick a compressor
+decho '********** PICKING A COMPRESSOR ************************************************'
+fast_list="zstd lz4 gzip xz"
+best_list="xz zstd gzip lz4"
+comp_cmd=
+config=$BASEDIR/boot/config-$KERNEL
+if [ ! -f $config ]; then
+    echo "WARNING: kernel config $config missing, default to gzip compression"
+    comp_cmd="gzip"
+else
+    case $COMPMODE in
+        fast)
+            comp_list=$fast_list
+            ;;
+        best)
+            comp_list=$best_list
+            ;;
+        *)
+            echo "WARNING: invalid COMPMODE $COMPMODE, using fast"
+            comp_list=$fast_list
+    esac
+    for comp in $comp_list; do
+        # check for binary
+        which $comp >/dev/null || continue
+        # check kernel config
+        grep -q CONFIG_RD_${comp^^} $config || continue
+        comp_cmd="$comp"
+        break
+    done
+fi
+if [ -z "$comp_cmd" ]; then
+    comp_cmd="cat"
+elif [ "$opt_verbose" != 0 ]; then
+    comp_cmd+=" -v"
+fi
+case ${comp_cmd%% *} in
+    lz4)
+        comp_cmd+=" -l"
+        ;;
+    xz)
+        comp_cmd+=" --check=crc32"
+        ;;
+esac
+echo "Chose compressor: $comp_cmd"
+
+
 # Create the compressed image
 decho '********** CREATING COMPRESSED CPIO IMAGE **************************************'
 pushd >/dev/null $TEMPDIR/initramfs &&
-find . | $cpio -o -H newc | $xz -vzc --check=crc32 > ../initramfs.img &&
+find . | $cpio -o -H newc | $comp_cmd > ../initramfs.img &&
 popd >/dev/null || cleanup 1
 
 rm -f $INITRAMFS_TARGET
