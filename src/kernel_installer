@@ -28,6 +28,8 @@ for x in $SRP_ROOT/lib/modules/*; do
     fi
 done
 
+[ -n "$VERSION" ] || exit 1
+
 echo VERSION: $VERSION
 echo VERSION_NAME: $VERSION_NAME
 echo target_host: $target_host
