@@ -15,7 +15,7 @@
    configure flags.
 
 
-* For 0.14
+* For 0.15
 
  - Add config-file support (/mnt/root-true/ruckusrd.conf?).  Retain kernel
    commandline parsing, but only needed to override what's in the config file.
@@ -32,26 +32,6 @@
    behavior in  most distros.  Perhaps  prefix each  output w/ "ruckusrd:  " or
    something  like that  to differentiate  our initramfs  messages from  kernel
    spew?
-
- - Should I look into including zfs userland tools on initramfs?  Is this
-   needed to support zfs for rootfs?  Might be a perk.  Right now, I'm really
-   only providing support for MDRAID/LVM/EXT4... which has been all I need.
-   But if I really fall for zfs (which I might), I might want to play with zfs
-   for upper layer?  Zfs for upper layer might even help w/ my live
-   snapshotting problem... who knows?
-
- - Add --compressor=xz|lz4|zstd to ruckusrd
-
-   $xz -vzc --check=crc32 > ../initramfs.img
-   lz4 -vzc --best --favor-decSpeed > ../initramfs.img
-
-   actually... i can't get a lz4 compressed initramfs to boot... maybe revisit
-   this w/ zstd later?
-
-   zstd -vzc
-
-   hmm... can't get those to boot either...  durp, zstd isn't mainlined until
-   maybe 5.9.  will revisit then.
 
 
 * Could happen in a stable release
