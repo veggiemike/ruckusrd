@@ -49,7 +49,7 @@ fi
 
 # create initrd using ruckusrd
 mkdir -p $SRP_ROOT/boot &&
-ruckusrd -v -b $SRP_ROOT $SRP_ROOT/boot/initrd-$VERSION_NAME.img $VERSION || exit 3
+ruckusrd -v -b $SRP_ROOT $SRP_ROOT/boot/initrd-$VERSION_NAME.img $VERSION_NAME || exit 3
 
 # install other /boot files in SRP_ROOT
 for x in arch/*/boot/bzImage; do

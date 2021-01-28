@@ -120,11 +120,13 @@ cpio="cpio"
 mkdir="mkdir -p"
 mv="mv"
 xz="xz"
+ln="ln"
 if [ "$opt_verbose" != "0" ]; then
     cp+=" -v"
     mkdir+=" -v"
     mv+=" -v"
     xz+=" -v"
+    ln+=" -v"
 else
     cpio+=" --quiet"
 fi
@@ -142,8 +144,14 @@ popd >/dev/null || cleanup 1
 
 decho '********** PREPPING INITRAMFS KERNEL DIR ***************************************'
 HOSTMODDIR=$BASEDIR/lib/modules/$KERNEL
-DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$KERNEL
-$mkdir $DESTMODDIR || cleanup 1
+if [ -h $HOSTMODDIR ]; then
+    DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$(readlink $HOSTMODDIR)
+    $mkdir $DESTMODDIR || cleanup 1
+    $ln -s $(readlink $HOSTMODDIR) $TEMPDIR/initramfs/lib/modules/$KERNEL || cleanup 1
+else
+    DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$KERNEL
+    $mkdir $DESTMODDIR || cleanup 1
+fi
 
 # Copy modules.order, modules.builtin, and other KBuild generated files
 #
