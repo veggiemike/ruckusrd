@@ -18,4 +18,4 @@
 	url = git://git.kernel.org/pub/scm/fs/squashfs/squashfs-tools.git
 [submodule "subprojects/zfs"]
 	path = subprojects/zfs
-	url = ../contrib/zfs.git
+	url = https://github.com/openzfs/zfs.git
