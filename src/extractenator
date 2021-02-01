@@ -33,6 +33,22 @@ usage()
     echo "                            'xz', or 'none' and the default is 'gzip'.  If"
     echo "                            COMP is specified as 'none', no compressor is used"
     echo "                            (e.g., if payload files are already compressed)."
+    # FIXME: should we add zstd?  it doesn't appear to be much better than gzip
+    #        for these files (82M vs 83M), perhaps a little faster.
+    #
+    # FIXME: should we change the default?  make it xz?  we are really more
+    #        concerned with size here than anything else, because these
+    #        installers will be sitting around taking up disk space, or being
+    #        downloaded/uploaded to other boxes.  If it takes a wee bit longer
+    #        to create, I'm not sure I care.
+    #
+    #        xz:   62M  1:44
+    #        gzip: 83M  8.9s
+    #        zstd: 82M  1.2s
+    #
+    # FIXME: could also play w/ xz -T0 to use all available cores/threads?
+    #
+    #        xz -T0:  63M  14.5s
 }
 
 

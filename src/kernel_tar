@@ -19,6 +19,15 @@ filename=$PWD/kernel-installer-$VERSION.sh
 tmpdir=`mktemp -dt \`basename $0\`-XXXX`
 
 # create the installer script
+#
+# FIXME: should check for VERSION symlink, remove what it points to if
+#        detected.
+#
+# FIXME: why do we tar FOO to stdout, pipe that into tar to install?  was it
+#        just to avoid having to retest something else when i split
+#        extracenator into a seperate script?  We could do 'cp -a' or something
+#        similar instead... right?
+#
 cat > $tmpdir/installer <<EOF
 echo -n "removing preexisting modules in /lib/modules/$VERSION... "
 rm -rf /lib/modules/$VERSION && echo DONE || { echo FAIL; exit 1; }
