@@ -41,9 +41,6 @@ usage()
     echo "                              with the default  xz compressor.  Can be provided"
     echo "                              multiple times, causing argurments to be appended"
     echo "                              (i.e., becaue you cannot have spaces in ARGS)."
-    # FIXME: should we add zstd?  it doesn't appear to be much better than gzip
-    #        for these files (82M vs 83M), perhaps a little faster.
-    #
     # FIXME: should we change the default?  make it xz?  we are really more
     #        concerned with size here than anything else, because these
     #        installers will be sitting around taking up disk space, or being
