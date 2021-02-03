@@ -15,6 +15,74 @@ VERSION=$(basename $SRP_ROOT/lib/modules/*)
 
 filename=$PWD/kernel-installer-$VERSION.sh
 
+# detect when we're running out of a source tree and avoid PATH in that case
+if [ -f $(dirname $0)/linuxrc ]; then
+    extractenator=$(dirname $0)/extractenator
+else
+    extractenator=extractenator
+fi
+
+
+usage()
+{
+    if [ -n "$*" ]; then
+        echo ERROR: $*
+        echo
+    fi
+    echo "kernel_tar - a self-extracting kernel installer creator"
+    echo "Copyright (C) 2012-2021 Michael D Labriola <michael.d.labriola@gmail.com>"
+    echo
+    echo "usage: `basename $0` OPTIONS [-- EXTRACTENATOR_OPTIONS]"
+    echo
+    echo "kernel_tar uses extractenator to create a self-extracting kernel installer using"
+    echo "the build output of kernel_builder (the FOO directory).  Extractenator is"
+    echo "provided with its required --filename (kernel-installer-x.y.z.sh), --script (a"
+    echo "generated installation script), and payload (the FOO directory).  Other"
+    echo "extractenator options can be passed into the child process by appending them to"
+    echo "the command line after a '--' (used to indicate end of option parsing).  See"
+    echo "extractenator --help for more info."
+    echo
+    echo "Once created, the installer is run by simply executing it from the / directory"
+    echo "(it extracts into the current working directory, so runing it somewhere else"
+    echo "will make a mess)."
+}
+
+
+# call getopt
+#
+# NOTE: This handles spacing out arguments correctly for the case statement
+#       below and checks for unknown flags.  Required flags are checked for
+#       below.
+#
+# NOTE: The set -- command causes the resulting output of getopt to replace the
+#       current positional arguments (e.g, $1, $2).
+#
+__opts=$(getopt -un $(basename $0) \
+    -o h \
+    --long help -- $@)
+if [ $? != 0 ]; then
+    echo
+    usage
+    exit 1
+fi
+set -- $__opts
+
+# parse the new positional arguments
+while true; do
+    case "$1" in
+	--)
+            # done parsing
+            shift
+            break
+            ;;
+	*)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+
 # setup a tmpdir
 tmpdir=`mktemp -dt \`basename $0\`-XXXX`
 
@@ -47,7 +115,7 @@ EOF
 # NOTE: $* is so we can pass additional arguments to extractenator (e.g.,
 #       --comp).
 #
-extractenator -f $filename -s $tmpdir/installer FOO $* || exit 1
+$extractenator -f $filename -s $tmpdir/installer FOO $* || exit 1
 
 rm -rf $tmpdir
 exit 0
