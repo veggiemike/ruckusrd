@@ -47,13 +47,11 @@ usage()
     #        downloaded/uploaded to other boxes.  If it takes a wee bit longer
     #        to create, I'm not sure I care.
     #
-    #        xz:   62M  1:44
-    #        gzip: 83M  8.9s
-    #        zstd: 82M  1.2s
-    #
-    # FIXME: could also play w/ xz -T0 to use all available cores/threads?
-    #
-    #        xz -T0:  63M  14.5s
+    #        xz:     62M  1:50
+    #        xz -T0: 63M  0:14.8
+    #        gzip:   83M  0:08.9
+    #        bzip2:  76M  0:16.9
+    #        zstd:   82M  0:01.8
 }
 
 
@@ -78,7 +76,7 @@ set -- $__opts
 
 # defaults
 comp="xz"
-decomp="zcat"
+decomp="xzcat"
 compargs="-T0"
 
 # parse the new positional arguments
@@ -190,7 +188,7 @@ sed -i "s|__SKIP__|$skip|" $filename
 
 # and now append the payload
 echo -n "appending payload... "
-(tar -c $payload | $comp >> $filename) || { echo FAIL; exit 1; }
+(tar -c $payload | $comp $compargs >> $filename) || { echo FAIL; exit 1; }
 echo DONE
 
 # and make it executable
