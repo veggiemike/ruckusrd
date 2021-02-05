@@ -37,13 +37,14 @@ Strengths:
  2.  Universal Initramfs.  Images created by RuckusRD can be used for
      multiple machines with different hardware without regenerating
      initrd.  All the kernel modules needed for early boot (e.g.,
-     sccsi, filesystems) and maintenance shells (e.g., USB HID,
-     keyboard) are included in the initramfs, along with any modules
-     they in turn require.
+     sccsi, filesystems), maintenance shells (e.g., USB HID,
+     keyboard), and networking (e.g., wired/wireless subsystems,
+     protocols, device drivers) are included in the initramfs, along
+     with any modules they in turn require.
 
  3.  Swiss army knife maintenance shell of doom.  The maintenence
      shell provided is a fully functional embedded rootfs with
-     BusyBox, eudev, lvm, mdadm, e2fsprogs, and squashfs-tools.
-     
+     BusyBox, eudev, lvm, mdadm, e2fsprogs, squashfs-tools, and the
+     OpenZFS userland tools.
 
 See docs/ for more ramblings.  ;-)

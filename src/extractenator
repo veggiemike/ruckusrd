@@ -41,17 +41,14 @@ usage()
     echo "                              with the default  xz compressor.  Can be provided"
     echo "                              multiple times, causing argurments to be appended"
     echo "                              (i.e., becaue you cannot have spaces in ARGS)."
-    # FIXME: should we change the default?  make it xz?  we are really more
-    #        concerned with size here than anything else, because these
-    #        installers will be sitting around taking up disk space, or being
-    #        downloaded/uploaded to other boxes.  If it takes a wee bit longer
-    #        to create, I'm not sure I care.
+    # NOTE: Here's the last round of compressor benchmarking I did on a Ryzen 7
+    #       2700X (8 cores/16 threads).
     #
-    #        xz:     62M  1:50
-    #        xz -T0: 63M  0:14.8
-    #        gzip:   83M  0:08.9
-    #        bzip2:  76M  0:16.9
-    #        zstd:   82M  0:01.8
+    #       xz:     62M  1:50
+    #       xz -T0: 63M  0:14.8
+    #       gzip:   83M  0:08.9
+    #       bzip2:  76M  0:16.9
+    #       zstd:   82M  0:01.8
 }
 
 

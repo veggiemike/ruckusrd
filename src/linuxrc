@@ -139,16 +139,6 @@ generate_udev_rules()
     name=$1
     str=$2
 
-    # blkid commands
-    #
-    # FIXME: ditch this and use builtin blkid!
-    #
-    # IMPORT{builtin}="blkid"
-    # then just use ENV{ID_FS_UUID_ENC} ENV{ID_FS_LABEL_ENC}
-    #
-    #get_label="/sbin/blkid -o value -s LABEL"
-    #get_uuid="/sbin/blkid -o value -s UUID"
-
     # FIXME: probably want to entirely rewrite these rules for eudev (upstream
     #        220).
     #
