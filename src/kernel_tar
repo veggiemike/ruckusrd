@@ -42,9 +42,9 @@ usage()
     echo "the command line after a '--' (used to indicate end of option parsing).  See"
     echo "extractenator --help for more info."
     echo
-    echo "Once created, the installer is run by simply executing it from the / directory"
-    echo "(it extracts into the current working directory, so runing it somewhere else"
-    echo "will make a mess)."
+    echo "Once created, the installer is run by simply executing it.  The installer script"
+    echo "cleans /lib/modules and /usr/src/headers, then copies the payload (initially"
+    echo "extracted to current working directory) into /."
 }
 
 
