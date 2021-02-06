@@ -26,6 +26,13 @@ export SRP_ROOT=$PWD/FOO
 
 rm -rf $SRP_ROOT
 
+# detect when we're running out of a source tree and avoid PATH in that case
+if [ -f $(dirname $0)/linuxrc ]; then
+    ruckusrd=$(dirname $0)/ruckusrd
+else
+    ruckusrd=ruckusrd
+fi
+
 CPUCOUNT=`grep processor /proc/cpuinfo | wc -l`
 # using CPUCOUNT*4 here because KBuild uses recursive Make calls... this
 # seems to mostly equate to a normal package's -jCPUCOUNT+1
@@ -111,7 +118,7 @@ if [ "$NOVERSION" = "stable" ]; then
 fi
 
 # create initrd using ruckusrd
-ruckusrd -v -b $SRP_ROOT $SRP_ROOT/boot/initrd-$VERSION_NAME.img $VERSION_NAME || exit 3
+$ruckusrd -v -b $SRP_ROOT $SRP_ROOT/boot/initrd-$VERSION_NAME.img $VERSION_NAME || exit 3
 
 echo VERSION: $VERSION
 echo VERSION_NAME: $VERSION_NAME
