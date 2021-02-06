@@ -150,6 +150,7 @@ popd >/dev/null || cleanup 1
 decho '********** PREPPING INITRAMFS KERNEL DIR ***************************************'
 HOSTMODDIR=$BASEDIR/lib/modules/$KERNEL
 if [ -h $HOSTMODDIR ]; then
+    decho HOSTMODDIR is a symlink
     DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$(readlink $HOSTMODDIR)
     $mkdir $DESTMODDIR || cleanup 1
     $ln -s $(readlink $HOSTMODDIR) $TEMPDIR/initramfs/lib/modules/$KERNEL || cleanup 1
@@ -157,6 +158,8 @@ else
     DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$KERNEL
     $mkdir $DESTMODDIR || cleanup 1
 fi
+decho HOSTMODDIR=$HOSTMODDIR
+decho DESTMODDIR=$DESTMODDIR
 
 # Copy modules.order, modules.builtin, and other KBuild generated files
 #
