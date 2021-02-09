@@ -156,7 +156,7 @@ echo decomp: $decomp
 echo payload: $payload
 
 
-# create the initial installer script
+# create the initial extraction script
 echo -n "creating $filename... "
 cat > $filename <<EOF
 #!/bin/sh
@@ -166,6 +166,19 @@ tmpdir=\`mktemp -dt \\\`basename \$0\\\`-XXXX\`
 
 echo -n "extracting archive to \$tmpdir... "
 (tail -n +\$skip \$0 | $decomp | tar -x --no-same-owner --no-same-permissions -C \$tmpdir) && echo DONE || { echo FAIL; exit 1; }
+
+while [ \$# -gt 0 ] ; do
+    case "\$1" in
+        --dry-run|-n)
+            echo "dry-run, installation script will not be run, tmpdir will not be cleaned up"
+            exit 0
+            ;;
+        --help|-h|*)
+            echo "usage: $filename [--dry-run|-n]"
+            exit 0
+            ;;
+    esac
+done
 
 pushd \$tmpdir >/dev/null
 `cat $script`
