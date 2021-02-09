@@ -11,16 +11,30 @@
 #
 export SRP_ROOT=$PWD/FOO
 
-VERSION=$(basename $SRP_ROOT/lib/modules/*)
-
-filename=$PWD/kernel-installer-$VERSION.sh
-
 # detect when we're running out of a source tree and avoid PATH in that case
 if [ -f $(dirname $0)/linuxrc ]; then
     extractenator=$(dirname $0)/extractenator
 else
     extractenator=extractenator
 fi
+
+# figure out VERSION, which might be a stable .y version w/ a symlink
+for x in $SRP_ROOT/lib/modules/*; do
+    if [ -h $x ]; then
+        VERSION=$(readlink $x)
+        VERSION_NAME=$(basename $x)
+        break
+    else
+        VERSION=$(basename $x)
+    fi
+done
+
+if [ -z "$VERSION" ]; then
+    echo "ERROR: can't detect VERSION; malformed installer"
+   exit 1
+fi
+
+filename=$PWD/kernel-installer-$VERSION.sh
 
 
 usage()
@@ -86,24 +100,13 @@ done
 # setup a tmpdir
 tmpdir=`mktemp -dt \`basename $0\`-XXXX`
 
+echo VERSION: $VERSION
+echo VERSION_NAME: $VERSION_NAME
+echo tmpdir: $tmpdir
+echo filename: $filename
+
 # create the installer script
 cat > $tmpdir/installer <<EOF
-# figure out VERSION, which might be a stable .y version w/ a symlink
-for x in FOO/lib/modules/*; do
-    if [ -h $x ]; then
-        VERSION=$(readlink $x)
-        VERSION_NAME=$(basename $x)
-        break
-    else
-        VERSION=$(basename $x)
-    fi
-done
-
-if [ -z "$VERSION" ]; then
-    echo "ERROR: can't detect VERSION; malformed installer"
-   exit 1
-fi
-
 echo VERSION: $VERSION
 echo VERSION_NAME: $VERSION_NAME
 
@@ -111,12 +114,12 @@ echo -n "removing preexisting modules in /lib/modules/$VERSION... "
 rm -rf /lib/modules/$VERSION && echo DONE || { echo FAIL; exit 1; }
 
 if [ -n "$VERSION_NAME" ]; then
-    if [ -h /lib/modules/$VERSION_NAME; then
-        old_one=$(readlink /lib/modules/$VERSION_NAME)
-        echo -n "following $VERSION_NAME symlink to remove modules in $old_one... "
-        rm -rf /lib/modules/$old_ones && echo DONE || { echo FAIL; exit 1; }
+    if [ -h /lib/modules/$VERSION_NAME ]; then
+        old_one=\$(readlink /lib/modules/$VERSION_NAME)
+        echo -n "following $VERSION_NAME symlink to remove modules in \$old_one... "
+        rm -rf /lib/modules/\$old_one && echo DONE || { echo FAIL; exit 1; }
         echo -n "removing $VERSION_NAME symlink... "
-        rm /lib/modules/$VERSION_NAME" && echo DONE || { echo FAIL; exit 1; }
+        rm /lib/modules/$VERSION_NAME && echo DONE || { echo FAIL; exit 1; }
     fi
 fi
 
@@ -124,12 +127,12 @@ echo -n "removing preexisting headers in /usr/src/linux-headers-$VERSION... "
 rm -rf /usr/src/linux-headers-$VERSION && echo DONE || { echo FAIL; exit 1; }
 
 if [ -n "$VERSION_NAME" ]; then
-    if [ -h /usr/src/linux-headers-$VERSION_NAME; then
-        old_one=$(readlink /usr/src/linux-headers-$VERSION_NAME)
-        echo -n "following $VERSION_NAME symlink to remove headers in $old_one... "
-        rm -rf /usr/src/linux-headers-$old_ones && echo DONE || { echo FAIL; exit 1; }
+    if [ -h /usr/src/linux-headers-$VERSION_NAME ]; then
+        old_one=\$(readlink /usr/src/linux-headers-$VERSION_NAME)
+        echo -n "following $VERSION_NAME symlink to remove headers in \$old_one... "
+        rm -rf /usr/src/linux-headers-\$old_one && echo DONE || { echo FAIL; exit 1; }
         echo -n "removing $VERSION_NAME symlink... "
-        rm /usr/src/linux-headers-$VERSION_NAME" && echo DONE || { echo FAIL; exit 1; }
+        rm /usr/src/linux-headers-$VERSION_NAME && echo DONE || { echo FAIL; exit 1; }
     fi
 fi
 
