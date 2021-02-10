@@ -159,19 +159,15 @@ echo payload: $payload
 # create the initial extraction script
 echo -n "creating $filename... "
 cat > $filename <<EOF
-#!/bin/sh
+#!/bin/bash
 skip=__SKIP__
 
-tmpdir=\`mktemp -dt \\\`basename \$0\\\`-XXXX\`
-
-echo -n "extracting archive to \$tmpdir... "
-(tail -n +\$skip \$0 | $decomp | tar -x --no-same-owner --no-same-permissions -C \$tmpdir) && echo DONE || { echo FAIL; exit 1; }
-
+dryrun=
 while [ \$# -gt 0 ] ; do
     case "\$1" in
         --dry-run|-n)
-            echo "dry-run, installation script will not be run, tmpdir will not be cleaned up"
-            exit 0
+            dryrun=1
+            shift
             ;;
         --help|-h|*)
             echo "usage: $filename [--dry-run|-n]"
@@ -179,6 +175,18 @@ while [ \$# -gt 0 ] ; do
             ;;
     esac
 done
+
+tmpdir=\`mktemp -dt \\\`basename \$0\\\`-XXXX\`
+
+echo -n "extracting archive to \$tmpdir... "
+(tail -n +\$skip \$0 | $decomp | tar -x --no-same-owner --no-same-permissions -C \$tmpdir) && echo DONE || { echo FAIL; exit 1; }
+
+if [ -n "\$dryrun" ]; then
+    echo "specified dry-run, installation script will not be run, tmpdir will not be cleaned up"
+    # create install.sh in tmpdir for easy review
+    head -n +\$((skip-1)) \$0 > \$tmpdir/install.sh
+    exit 0
+fi
 
 pushd \$tmpdir >/dev/null
 `cat $script`
