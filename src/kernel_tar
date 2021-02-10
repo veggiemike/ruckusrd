@@ -110,6 +110,11 @@ cat > $tmpdir/installer <<EOF
 echo VERSION: $VERSION
 echo VERSION_NAME: $VERSION_NAME
 
+if [ -n "\$*" ]; then
+    echo "usage: install.sh"
+    exit 1
+fi
+
 echo -n "removing preexisting modules in /lib/modules/$VERSION... "
 rm -rf /lib/modules/$VERSION && echo DONE || { echo FAIL; exit 1; }
 
