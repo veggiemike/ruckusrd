@@ -28,7 +28,7 @@ rm -rf $SRP_ROOT
 
 # detect when we're running out of a source tree and avoid PATH in that case
 if [ -f $(dirname $0)/linuxrc ]; then
-    ruckusrd=$(dirname $0)/ruckusrd
+    ruckusrd=$(realpath $(dirname $0))/ruckusrd
 else
     ruckusrd=ruckusrd
 fi

@@ -19,8 +19,7 @@ shopt -s nullglob
 
 # assume we're in the source tree if $PWD/linuxrc exists
 if [ -f $(dirname $0)/linuxrc ]; then
-    LIBEXECDIR=$(dirname $0)
-    LIBDIR=$(dirname $0)
+    LIBDIR=$(realpath $(dirname $0))
 else
     LIBDIR=__LIBDIR__
 fi

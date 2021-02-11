@@ -13,7 +13,7 @@ export SRP_ROOT=$PWD/FOO
 
 # detect when we're running out of a source tree and avoid PATH in that case
 if [ -f $(dirname $0)/linuxrc ]; then
-    extractenator=$(dirname $0)/extractenator
+    extractenator=$(realpath $(dirname $0))/extractenator
 else
     extractenator=extractenator
 fi
