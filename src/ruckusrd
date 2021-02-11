@@ -215,8 +215,10 @@ eval $go || cleanup 1
 
 # Pick a compressor
 decho '********** PICKING A COMPRESSOR ************************************************'
-fast_list="zstd lz4 gzip xz"
-best_list="xz zstd gzip lz4"
+# FIXME: Tried to add lz4, but after initially thinking it worked, I can't get
+#        5.4 to boot with an lz4 compressed initrd... removed it for now.
+fast_list="zstd gzip xz"
+best_list="xz zstd gzip"
 comp_cmd=
 config=$BASEDIR/boot/config-$KERNEL
 if [ ! -f $config ]; then
