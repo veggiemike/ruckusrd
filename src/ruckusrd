@@ -239,7 +239,7 @@ else
         # check for binary
         which $comp >/dev/null || continue
         # check kernel config
-        grep -q CONFIG_RD_${comp^^} $config || continue
+        grep -q CONFIG_RD_${comp^^}=y $config || continue
         comp_cmd="$comp"
         break
     done
