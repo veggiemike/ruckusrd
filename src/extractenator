@@ -163,11 +163,16 @@ cat > $filename <<EOF
 skip=__SKIP__
 
 dryrun=
+remotes=
 while [ \$# -gt 0 ] ; do
     case "\$1" in
         --dry-run|-n)
-            dryrun=1
+            dryrun=--dry-run
             shift
+            ;;
+        --remote-nodes|-r)
+            remotes=\$2
+            shift 2
             ;;
         --)
             # stop parsing args, so users can explicitly pass arguments to
@@ -176,11 +181,22 @@ while [ \$# -gt 0 ] ; do
             break
             ;;
         --help|-h|*)
-            echo "usage: $filename [--dry-run|-n]"
+            echo "usage: $(basename $filename) [--dry-run|-n] [--remote-nodes|-r NODE1 NODE2 ...]"
             exit 0
             ;;
     esac
 done
+
+if [ -n "\$remotes" ]; then
+    echo "remote install mode: \$remotes"
+    for x in \$remotes; do
+        echo "--- \$x ---"
+        scp -p \$0 root@\$x:/tmp/\$(basename \$0) || exit 1
+        ssh root@\$x "/tmp/\$(basename \$0) \$dryrun && rm -f /tmp/\$(basename \$0)" || exit 1
+    done
+    echo all done
+    exit 0
+fi
 
 tmpdir=\`mktemp -dt \\\`basename \$0\\\`-XXXX\`
 
