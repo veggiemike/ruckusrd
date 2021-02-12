@@ -37,18 +37,62 @@ usage()
     echo
     echo "  -C, --compressor-args ARGS  Pass ARGS into the specified compressor.  If"
     echo "                              --compressor was specified, defaults to empty"
-    echo "                              string.  Otherwise, default is '-T0' to go along"
-    echo "                              with the default  xz compressor.  Can be provided"
-    echo "                              multiple times, causing argurments to be appended"
-    echo "                              (i.e., becaue you cannot have spaces in ARGS)."
+    echo "                              string.  Otherwise, default is '-T0 -10' to go"
+    echo "                              along with the default zstd compressor.  Can be"
+    echo "                              provided multiple times, causing argurments to be"
+    echo "                              appended (i.e., becaue you cannot have spaces in"
+    echo "                              ARGS)."
     # NOTE: Here's the last round of compressor benchmarking I did on a Ryzen 7
-    #       2700X (8 cores/16 threads).
+    #       2700X (8 cores/16 threads).  I beleive these were sizes and times
+    #       for running kernel_tar on a 5.4 kernel I had built.
     #
     #       xz:     62M  1:50
     #       xz -T0: 63M  0:14.8
     #       gzip:   83M  0:08.9
     #       bzip2:  76M  0:16.9
     #       zstd:   82M  0:01.8
+    #
+    # NOTE: Here's another round of benchmarks, this time kernel_tar of a 5.11
+    #       kernel.  Trying to decide what makes more sense...  strive for
+    #       smaller file to send over potentially slow network?  or faster to
+    #       extract once received...?
+    #
+    #       xz -T0:        86M 0:21.1
+    #       zstd:         105M 0:03.2
+    #       zstd -T0 -10:  97M 0:03.5
+    #       zstd -T0 -15:  96M 0:09.3
+    #       zstd -T0 -19:  91M 0:21.3
+    #       zstd -T0 -20:  90M 2:11.3
+    #
+    #       here are installation benchmarks for those.  from dom0 to dom0 and
+    #       3 domUs.
+    #       ./kernel-installer-x.y.z.sh -r "aragorn legolas gimli boromir"
+    #
+    #       xz -T0:       0:32.9
+    #       zstd:         0:24.0
+    #       zstd -T0 -10: 0:23.7
+    #       zstd -T0 -15: 0:22.9
+    #       zstd -T0 -19: 0:23.5
+    #       zstd -T0 -20: 0:23.7
+    #
+    #       here's another one, this time installing onto a dom0 at home
+    #       accross a 2.5MB/s internet connection
+    #
+    #       xz -T0:       0:42.1
+    #       zstd:         0:49.2
+    #       zstd -T0 -10: 0:44.4
+    #       zstd -T0 -15: 0:44.1
+    #       zstd -T0 -19: 0:42.0
+    #       zstd -T0 -20: 0:41.4
+    #
+    #       for the record, doing kernel_installer glorfindel (i.e., not using
+    #       kernel_tar or extractenator) takes 30s...  it's a bit quicker
+    #       because it's already using zlib compression, and when the file
+    #       transfer is done, there's nothing else to do.  the benefit of using
+    #       kernel_tar/extractenator for distributed kernel installation isn't
+    #       really speed, it's having a leftover installer to fall back to if
+    #       we upgrade and recompile our source tree.
+    #
 }
 
 
@@ -72,9 +116,9 @@ fi
 set -- $__opts
 
 # defaults
-comp="xz"
-decomp="xzcat"
-compargs="-T0"
+comp="zstd"
+decomp="zstdcat"
+compargs="-T0 -10"
 
 # parse the new positional arguments
 while true; do
