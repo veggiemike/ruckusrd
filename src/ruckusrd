@@ -212,7 +212,9 @@ done
 
 # Build module deps file so we can use modprobe
 decho '********** RUNNING DEPMOD ******************************************************'
-go="depmod -b $TEMPDIR/initramfs -v $KERNEL"
+# NOTE: $KERNEL has to be a valid kernel version... not just a directory that
+#       exists.
+go="depmod -b $TEMPDIR/initramfs -v $(basename $DESTMODDIR)"
 [ "$opt_verbose" != "1" ] && go+=" > /dev/null"
 decho $go
 eval $go || cleanup 1
