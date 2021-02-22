@@ -34,8 +34,11 @@ if [ -z "$VERSION" ]; then
    exit 1
 fi
 
-filename=$PWD/kernel-installer-$VERSION.sh
-
+if [ "$VERSION_NAME" != "test" ]; then
+    filename=$PWD/kernel-installer-$VERSION.sh
+else
+    filename=$PWD/kernel-installer-$VERSION_NAME.sh
+fi
 
 usage()
 {
