@@ -57,7 +57,7 @@ opt_allow_overwrite=0
 opt_verbose=0
 INITRAMFS_TARGET=""
 KERNEL=""
-BASEDIR=""
+BASEDIR="/"
 COMPMODE="fast"
 while [ $# -gt 0 ] ; do
     case $1 in
@@ -191,9 +191,14 @@ find $HOSTMODDIR/kernel/drivers/{ata,block,cdrom,md,nvme,scsi,usb,hid,net} \
 
 
 # Make sure none of the MODS we've installed have unmet dependencies
+#
+# NOTE: This only works propperly if depmod has already been run, so we use
+#       $BASEDIR for the modprobe call, not $DESTMODDIR.
+#
 decho '********** COPYING MODULE DEPS TO INITRAMFS ************************************'
 for m in $DESTMODDIR/*.ko{,.xz} ; do
     modprobe --set-version $KERNEL --show-depends $(basename ${m//.ko*/}) \
+        -d $BASEDIR \
         | head --lines=-1 >> $TEMPDIR/modules 2>/dev/null
 done
 
