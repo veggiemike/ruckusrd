@@ -33,8 +33,60 @@
    something  like that  to differentiate  our initramfs  messages from  kernel
    spew?
 
+ - Add support for modules-x.y.z.img and src-x.y.z.img.  The modules image
+   should contain ALL the specified kernel modules.  This would make all
+   modules available to initramfs (which is probably overkill), but could also
+   remove the onus of installing them on each filesystem.  If present, or if
+   specified via some command-line arg, the contents of /lib/modules could be
+   --bind mounted over sysroot/lib/modules to remove the possibility of
+   mismatching kernel modules in initramfs and sysroot filesystem.  Doing the
+   same thing for kernel headers would make sense for completeness, then
+   kernel_installer and kernel_tar wouldn't need to rsync /lib/modules and
+   /usr/src/ any more (which should make kernel upgrades faster/easier).
+
+   To go along with that, we should introduce a --small command line flag to
+   produce a traditional-style initramfs (i.e., bare minimum for accessing the
+   root device), --net for the current default of including network subsystem
+   and devices drivers on the initramfs, and --full that includes all the
+   modules/headers as individually extracted archives.  Default would be either
+   --small or --net.
+
+   Wait...  if we bake this right into ruckusrd (instead of tacking on extra
+   files for testing), why wouldn't we just include all the modules/headers
+   directly in the single initrd image we're creating?  There's really no nead
+   to generate them as seperate files... even though we can.  They don't need
+   to be mount-able, we're going to --bind mount them into the sysroot.
+
+   Should we also have --passthrough (or something like that) to enable linuxrc
+   code to do the bind mounting into /sysroot?  It would imply --full.
+
 
 * Could happen in a stable release
+
+ - Add script to help create firmware.img for specific hardware.
+
+   kernel command line:  dyndbg="func fw_get_filesystem_firmware +fmp"
+   dmesg |awk '/Loading firmware/ {print $NF}'| cpio -p --make-dir .
+   find . | cpio -o -H newc | zstd -T0 -10 > ../fw-aldarion.img
+
+   This becomes more important now that we're putting more modules on the
+   initramfs.  I already have problems with network modules on my laptop
+   requiring firmware.  Any module available on the initramfs gets loaded by
+   udev there instead of by the actual sysroot udev instance post-init, and if
+   they need firmware, it has to be on the initramfs.
+
+ - Add script to help create microcode.img.  Unlike the firmware.img
+   generation, we probably can't assume that the kernel is already loading
+   microcode propperly...  but really we only have 2 choiced (intel/amd) so we
+   could just detect cpu type and include everything.
+
+   Maybe we should add linux-firmware, microcode, and regulatory.db repos as
+   submodules here as well?  I was originally planning on creating my own
+   linux-firmware-mdl repo, with helper scripts and submodules...  but it might
+   be easier to just keep everything together here under one roof.
+
+   NOTE: Also, once we've tested this, we should go disable the deprecated
+         firmware loading methods in our kernel .configs.
 
  - Pretty sure I broke out-of-tree building at some point... need to fix that.
 
