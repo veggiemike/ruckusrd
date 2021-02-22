@@ -112,7 +112,7 @@ rm -f $SRP_ROOT/.hdrsrcfiles $SRP_ROOT/.hdrobjfiles
 cp -v .config $SRP_ROOT/usr/src/linux-headers-$VERSION/.config || exit 1
 
 # set stable symlinks for modules and headers
-if [ "$NOVERSION" = "stable" ]; then
+if [ -n "$NOVERSION" ]; then
     ln -vsf $VERSION $SRP_ROOT/lib/modules/$VERSION_NAME
     ln -vsf linux-headers-$VERSION $SRP_ROOT/usr/src/linux-headers-$VERSION_NAME
 fi
