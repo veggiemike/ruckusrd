@@ -208,6 +208,7 @@ skip=__SKIP__
 
 dryrun=
 remotes=
+remotes_ws=
 while [ \$# -gt 0 ] ; do
     case "\$1" in
         --dry-run|-n)
@@ -216,6 +217,7 @@ while [ \$# -gt 0 ] ; do
             ;;
         --remote-nodes|-r)
             remotes=\$2
+            remotes_ws=\${remotes//,/ }
             shift 2
             ;;
         --)
@@ -225,15 +227,15 @@ while [ \$# -gt 0 ] ; do
             break
             ;;
         --help|-h|*)
-            echo "usage: $(basename $filename) [--dry-run|-n] [--remote-nodes|-r NODE1 NODE2 ...]"
+            echo "usage: $(basename $filename) [--dry-run|-n] [--remote-nodes|-r NODE1,NODE2,...]"
             exit 0
             ;;
     esac
 done
 
 if [ -n "\$remotes" ]; then
-    echo "remote install mode: \$remotes"
-    for x in \$remotes; do
+    echo "remote install mode: \$remotes_ws"
+    for x in \$remotes_ws; do
         echo "--- \$x ---"
         scp -p \$0 root@\$x:/tmp/\$(basename \$0) || exit 1
         ssh root@\$x "/tmp/\$(basename \$0) \$dryrun && rm -f /tmp/\$(basename \$0)" || exit 1
