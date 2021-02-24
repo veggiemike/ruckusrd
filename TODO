@@ -60,14 +60,74 @@
    Should we also have --passthrough (or something like that) to enable linuxrc
    code to do the bind mounting into /sysroot?  It would imply --full.
 
+   WAIT!  There is one problem w/ --bind mount.  That's assuming that I won't
+   need anything else in /lib/modules or /usr/src.  I really didn't want to
+   copy into the rootfs (now we'd want rsync to avoid churn, but even then
+   we've got more work to do every time we boot), but what if I want to be able
+   to build an out-of-tree module against a kernel I haven't booted?  Or I want
+   to inspect the modules of a different kernel?  This might require a bit more
+   thought.  (as a side note, now that I have networking in initramfs, rsync
+   might be a good thing to have)
+
+ - What to do w/ firmware...?  If we include tons of modules in initramfs, then
+   let udev load them, we're going to run into failures due to missing
+   firmware.  I don't want to include TONS of firmware in initramfs (because
+   huge), so I was planning on just creating machine-specific fw.img files to
+   use as needed.  Multiple initramfs files can be specified to the kernel, and
+   it works fine.  BUT... BUT...  I don't think I can do that for Xen.  I can't
+   seem to get it to work via extlinux (BIOS, mboot, using additional ---
+   sections or by specifying via initrd=) or via EFI xen.cfg (haven't tried as
+   hard, but inital stab didn't work).
+
+   If I do eventually get xen.cfg working w/ a bit more testing, that would be
+   a reason to finally kick BIOS to the curb... and I guess that would be fine.
+   But if I can't, then I need to either find a bootloader that can handle Xen
+   and give it multiple initramfs images, or I have to start merging initramfs
+   images together into a single one post-kernel-install.  yucky.
+
+   Logistally annoying, but at least appending to the ruckusrd created
+   initramfs sounds trivial:
+
+   kernel command line:  dyndbg="func fw_get_filesystem_firmware +fmp"
+
+   $ cp -va /boot/initrd-x.y.z{,-fw}.img
+   $ mkdir t && pushd t
+   $ dmesg |awk '/Loading firmware/ {print $NF}'| cpio -p --make-dir .
+   $ find . | cpio -o -H newc | zstd -T0 -10 >> /boot/initrd-x.y.z-fw.img
+   $ popd
+
+   Sounds nice, and google says this should work, but doesn't seem to work for
+   me... adding -a to cpio usage also doesn't work.
+
+   Actually, that does work... for the kernel.  Doing a zstdcat | cpio
+   --ectract only results in the first archive getting extracted but the kernel
+   is smart enough to just keep on going I guess.  So good, that's an option.
+
+   We could have kernel_tar's install script do that dance
+   automatically... perhaps create an alternate img w/ -fw appended IF we
+   detect and "Loading firmware" messages in dmesg?  We could also add a
+   --fw-files flag to specify fw files to include?  Or --fw-list to specify a
+   file containing a list of firmware to include?  Or --fw specifying path to
+   fw.img to simply be appended?  We probably don't need to generate fw.img too
+   frequently, so slurping up a pre-generated fw.img is probably the best.
+   Perhaps we should just do that automagically if /boot/fw.img exists?  or
+   perhaps /boot/ruckusrd-fw.img?
+
+   If we deviate behaviorally from what kernel_installer does... should we
+   remove it?  I mean, I don't want to have to maintain stuff in two places,
+   and there's really no point in keeping kernel_installer around.  If we do
+   that, we should also consider automatically calling kernel_tar at the end of
+   kernel_builder.
+
 
 * Could happen in a stable release
 
  - Add script to help create firmware.img for specific hardware.
 
    kernel command line:  dyndbg="func fw_get_filesystem_firmware +fmp"
-   dmesg |awk '/Loading firmware/ {print $NF}'| cpio -p --make-dir .
-   find . | cpio -o -H newc | zstd -T0 -10 > ../fw-aldarion.img
+   
+   $ dmesg |awk '/Loading firmware/ {print $NF}'| cpio -p --make-dir .
+   $ find . | cpio -o -H newc | zstd -T0 -10 > ../fw-aldarion.img
 
    This becomes more important now that we're putting more modules on the
    initramfs.  I already have problems with network modules on my laptop
