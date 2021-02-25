@@ -113,6 +113,11 @@
    Perhaps we should just do that automagically if /boot/fw.img exists?  or
    perhaps /boot/ruckusrd-fw.img?
 
+   FYI, if we go with the "append /boot/fw.img to installed initrd.img" method,
+   it's as simple as cat /boot/fw.img >> /boot/initrd.img...  assuming both
+   images use the same compressor.  I guess we could check for that easily
+   enough via file.
+
    If we deviate behaviorally from what kernel_installer does... should we
    remove it?  I mean, I don't want to have to maintain stuff in two places,
    and there's really no point in keeping kernel_installer around.  If we do
