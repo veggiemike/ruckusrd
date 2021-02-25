@@ -119,6 +119,9 @@
    that, we should also consider automatically calling kernel_tar at the end of
    kernel_builder.
 
+ - Maybe add rsync to initramfs now that we have networking there.  That'll
+   almost definately need ssh (dropbear?) as well.
+
 
 * Could happen in a stable release
 
