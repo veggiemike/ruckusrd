@@ -25,3 +25,6 @@
 [submodule "subprojects/rsync"]
 	path = subprojects/rsync
 	url = https://github.com/WayneD/rsync.git
+[submodule "subprojects/dropbear"]
+	path = subprojects/dropbear
+	url = https://github.com/mkj/dropbear.git
