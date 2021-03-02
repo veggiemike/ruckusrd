@@ -30,9 +30,9 @@ usage()
     echo
     echo "  -c, --compressor COMP     Use COMP compressor in pipeline during archive"
     echo "                            creation.  Valid compressors are 'gzip', 'bzip2',"
-    echo "                            'xz', 'zstd', or 'none'.  Default is 'xz' w/"
-    echo "                            --compressor-args of -T0.  If COMP is specified as"
-    echo "                            'none', no compressor is used (e.g., if payload"
+    echo "                            'xz', 'zstd', or 'none'.  Default is 'zstd' w/"
+    echo "                            --compressor-args of -T0 -10.  If COMP is specified"
+    echo "                            as 'none', no compressor is used (e.g., if payload"
     echo "                            files are already compressed)."
     echo
     echo "  -C, --compressor-args ARGS  Pass ARGS into the specified compressor.  If"
