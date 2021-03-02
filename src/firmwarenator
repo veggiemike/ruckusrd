@@ -1,0 +1,155 @@
+#!/bin/bash
+#
+# RuckusRD - a super awesome, yet simple, mkinitrd replacement
+#
+# Copyright 2012-2021 Michael D Labriola <michael.d.labriola@gmail.com>
+#
+# Licensed under the GPLv3. See the file COPYING for details. 
+#
+# This script is a utility for creating a fw.img file containing all the
+# firmware required for the host system.
+#
+# NOTE: This depends on having the "Loading firmware from %s" printout enabled
+#       in the kernel (e.g., adding "dyndbg="func fw_get_filesystem_firmware
+#       +fmp" to kernel commandline) and the kernel ring buffer being fresh
+#       enough to still have that output available.
+#
+#       And that all depends on you already having a bootable system w/ an
+#       uptodate /lib/firmware directory, at least temporarily.
+#
+
+
+decho()
+{
+    if [ -n "$verbose" ]; then
+        echo "$*"
+    fi
+}
+
+
+usage()
+{
+    if [ -n "$*" ]; then
+        echo ERROR: $*
+        echo
+    fi
+    echo "$(basename $0) - magical creator of fw.img and unicorns"
+    echo "Copyright (C) 2012-2021 Michael D Labriola <michael.d.labriola@gmail.com>"
+    echo
+    echo "usage: `basename $0` IMGNAME"
+    echo
+    echo "  -v, --verbose             Display extra output"
+    echo
+    echo "  -c, --compressor COMP     Use COMP compressor in pipeline during archive"
+    echo "                            creation.  Valid compressors are 'gzip', 'bzip2',"
+    echo "                            'xz', 'zstd', or 'none'.  Default is 'zstd' w/"
+    echo "                            --compressor-args of -T0 -10.  If COMP is specified"
+    echo "                            as 'none', no compressor is used."
+    echo
+    echo "  -C, --compressor-args ARGS  Pass ARGS into the specified compressor.  If"
+    echo "                              --compressor was specified, defaults to empty"
+    echo "                              string.  Otherwise, default is '-T0 -10' to go"
+    echo "                              along with the default zstd compressor.  Can be"
+    echo "                              provided multiple times, causing argurments to be"
+    echo "                              appended (i.e., becaue you cannot have spaces in"
+    echo "                              ARGS)."
+}
+
+
+# call getopt
+#
+# NOTE: This handles spacing out arguments correctly for the case statement
+#       below and checks for unknown flags.  Required flags are checked for
+#       below.
+#
+# NOTE: The set -- command causes the resulting output of getopt to replace the
+#       current positional arguments (e.g, $1, $2).
+#
+__opts=$(getopt -un $(basename $0) \
+    -o hvc:C: \
+    --long help,verbose,compressor:,compressor-args: -- $@)
+if [ $? != 0 ]; then
+    echo
+    usage
+    exit 1
+fi
+set -- $__opts
+
+# defaults
+comp="zstd"
+compargs="-T0 -10"
+verbose=
+
+# parse the new positional arguments
+while true; do
+    case "$1" in
+        -v|--verbose)
+            verbose=yes
+            shift
+            ;;
+	-c|--compressor)
+            compargs=
+            case $2 in
+                gzip)
+                    comp="gzip"
+                    ;;
+                bzip2)
+                    comp="bzip2"
+                    ;;
+                xz)
+                    comp="xz"
+                    ;;
+                zstd)
+                    comp="zstd"
+                    ;;
+                none)
+                    comp="cat"
+                    ;;
+                *)
+                    usage "invalid compressor specified: $2"
+                    exit 1
+                    ;;
+            esac
+            shift 2
+            ;;
+        -C|--compressor-args)
+            compargs+=" $2"
+            shift 2
+            ;;
+	--)
+            # done parsing
+            shift
+            break
+            ;;
+	*)
+            usage
+            exit 1
+            ;;
+    esac
+done
+filename=$(realpath $1)
+
+# check for required options
+if [ -z "$filename" ]; then
+    usage "IMGNAME required"
+    exit 1
+fi
+
+decho filename: $filename
+decho verbose: $verbose
+decho comp: $comp
+decho compargs: $compargs
+
+tmpdir=$(mktemp -dt $(basename $0)-XXXX)
+decho tmpdir: $tmpdir
+
+cd $tmpdir
+dmesg | awk '/Loading firmware/ {print $NF}'| cpio -p --make-dir .
+if [ -n "$verbose" ]; then
+    cpio="cpio --verbose"
+else
+    cpio="cpio"
+fi
+find . | $cpio -o -H newc | $comp $compargs > $filename
+
+rm -rf $tmpdir
