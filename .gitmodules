@@ -31,3 +31,6 @@
 [submodule "subprojects/linux-firmware"]
 	path = subprojects/linux-firmware
 	url = git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
+[submodule "subprojects/intel-ucode"]
+	path = subprojects/intel-ucode
+	url = https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files.git
