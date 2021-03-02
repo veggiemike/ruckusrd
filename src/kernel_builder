@@ -29,8 +29,10 @@ rm -rf $SRP_ROOT
 # detect when we're running out of a source tree and avoid PATH in that case
 if [ -f $(dirname $0)/linuxrc ]; then
     ruckusrd=$(realpath $(dirname $0))/ruckusrd
+    kernel_tar=$(dirname $ruckusrd)/kernel_tar
 else
     ruckusrd=ruckusrd
+    kernel_tar=kernel_tar
 fi
 
 CPUCOUNT=`grep processor /proc/cpuinfo | wc -l`
@@ -120,5 +122,9 @@ fi
 # create initrd using ruckusrd
 $ruckusrd -v -b $SRP_ROOT $SRP_ROOT/boot/initrd-$VERSION_NAME.img $VERSION_NAME || exit 3
 
+# create kernel-installer file
+$kernel_tar || exit 4
+
+echo
 echo VERSION: $VERSION
 echo VERSION_NAME: $VERSION_NAME
