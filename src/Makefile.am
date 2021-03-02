@@ -5,6 +5,7 @@ dist_bin_SCRIPTS += firmwarenator
 dist_bin_SCRIPTS += kernel_builder
 dist_bin_SCRIPTS += kernel_installer
 dist_bin_SCRIPTS += kernel_tar
+dist_bin_SCRIPTS += microcodenator
 dist_bin_SCRIPTS += ruckusrd
 
 pkgdata_DATA =

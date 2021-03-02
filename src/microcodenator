@@ -1,0 +1,117 @@
+#!/bin/bash
+#
+# RuckusRD - a super awesome, yet simple, mkinitrd replacement
+#
+# Copyright 2012-2021 Michael D Labriola <michael.d.labriola@gmail.com>
+#
+# Licensed under the GPLv3. See the file COPYING for details. 
+#
+# This script is a utility for creating a ucode.img file containing the correct
+# microcode for the host system.
+#
+
+
+decho()
+{
+    if [ -n "$verbose" ]; then
+        echo "$*"
+    fi
+}
+
+
+usage()
+{
+    if [ -n "$*" ]; then
+        echo ERROR: $*
+        echo
+    fi
+    echo "$(basename $0) - magical creator of ucode.img and narwhals"
+    echo "Copyright (C) 2012-2021 Michael D Labriola <michael.d.labriola@gmail.com>"
+    echo
+    echo "usage: `basename $0` IMGNAME"
+}
+
+
+# call getopt
+#
+# NOTE: This handles spacing out arguments correctly for the case statement
+#       below and checks for unknown flags.  Required flags are checked for
+#       below.
+#
+# NOTE: The set -- command causes the resulting output of getopt to replace the
+#       current positional arguments (e.g, $1, $2).
+#
+__opts=$(getopt -un $(basename $0) \
+    -o hv \
+    --long help,verbose -- $@)
+if [ $? != 0 ]; then
+    echo
+    usage
+    exit 1
+fi
+set -- $__opts
+
+# defaults
+verbose=
+
+# parse the new positional arguments
+while true; do
+    case "$1" in
+        -v|--verbose)
+            verbose=yes
+            shift
+            ;;
+	--)
+            # done parsing
+            shift
+            break
+            ;;
+	*)
+            usage
+            exit 1
+            ;;
+    esac
+done
+filename=$(realpath $1)
+
+# check for required options
+if [ -z "$filename" ]; then
+    usage "IMGNAME required"
+    exit 1
+fi
+
+decho filename: $filename
+decho verbose: $verbose
+exit 0
+
+tmpdir=$(mktemp -dt $(basename $0)-XXXX)
+decho tmpdir: $tmpdir
+
+cd $tmpdir
+
+# FIXME: now what...  how do we detect which microcode files to include?  as
+#        usual, LFS to the rescue:
+#
+#        http://www.linuxfromscratch.org/blfs/view/svn/postlfs/firmware.html
+#
+
+# look at /proc/cpuinfo cpu family, model, and stepping (all in decimal but
+# needed in hex)
+
+# Intel - XX-YY-ZZ is family, model, and stepping all converted into hex.
+#
+# cp subproject/intel-ucode/intel-ucode/XX-YY-ZZ $tmpdir/kernel/x86/microcode/GenuineIntel.bin
+
+# AMD - just uses family, again in hex.  Families 10h to 14h (16 to 20) are in
+# microcode_amd.bin. Families 15h, 16h and 17h have their own containers.
+#
+# cp subproject/linux-firmware/amd-ucode/MYCONTAINER $tmpdir/kernel/x86/microcode/AuthenticAMD.bin
+
+if [ -n "$verbose" ]; then
+    cpio="cpio --verbose"
+else
+    cpio="cpio"
+fi
+find . | $cpio -o -H newc > $filename
+
+rm -rf $tmpdir
