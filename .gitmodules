@@ -28,3 +28,6 @@
 [submodule "subprojects/dropbear"]
 	path = subprojects/dropbear
 	url = https://github.com/mkj/dropbear.git
+[submodule "subprojects/linux-firmware"]
+	path = subprojects/linux-firmware
+	url = git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
