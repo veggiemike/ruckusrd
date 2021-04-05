@@ -69,6 +69,9 @@
    thought.  (as a side note, now that I have networking in initramfs, rsync
    might be a good thing to have)
 
+   After sleeping on it a few days, I think injecting the modules, src, and
+   maybe kernel/initrd/config into the rootfs sounds like the best solution.
+
  - What to do w/ firmware...?  If we include tons of modules in initramfs, then
    let udev load them, we're going to run into failures due to missing
    firmware.  I don't want to include TONS of firmware in initramfs (because
@@ -126,6 +129,16 @@
 
  - Maybe add rsync to initramfs now that we have networking there.  That'll
    almost definately need ssh (dropbear?) as well.
+
+ - Add a ruckusrd-init flag, or something like that.  Ooh, noroot maybe.  This
+   should tell the initramfs's init script to NOT switch root but to instead
+   just pass controll over to busybox's init.  This way, we can do full-blown
+   work from within our cool initramfs, but have the shell be able to control
+   processes.
+
+ - Add syslinux and efibootmgr to initramfs so we have all the tools necesary
+   to install onto the hardware we're booting off of (e.g., bootable thumb
+   drive installer).
 
 
 * Could happen in a stable release

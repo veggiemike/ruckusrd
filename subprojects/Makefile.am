@@ -3,7 +3,7 @@
 # in here for each subproject.
 
 
-all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar
+all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
@@ -17,6 +17,7 @@ clean-local:
 	cd e2fsprogs && git clean -dfx && git stash
 	cd squashfs-tools && git clean -dfx && git stash
 	cd zfs && git clean -dfx && git stash
+	rm -rf syslinux-6.03
 
 
 # FIXME: when we add --with-system-eudev to configure, we'll have to
@@ -222,4 +223,15 @@ zfs/FOO:
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf $$PWD/FOO/usr/include && \
 	rm -rf $$PWD/FOO/usr/share/zfs/zfs-tests && \
+	popd || exit 1
+
+
+syslinux-6.03.tar.xz:
+	wget https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/$@
+
+syslinux/FOO: syslinux-6.03.tar.xz
+	tar xf $< && \
+	mv syslinux-6.03 syslinux && \
+	pushd syslinux && \
+	make install INSTALLROOT=$$PWD/FOO && \
 	popd || exit 1

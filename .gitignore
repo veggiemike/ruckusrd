@@ -30,4 +30,7 @@ Makefile.in
 /subprojects/lvm2.tar
 /subprojects/mdadm.tar
 /subprojects/squashfs-tools.tar
+/subprojects/syslinux
+/subprojects/syslinux-*.tar.*
+/subprojects/syslinux.tar
 /subprojects/zfs.tar
