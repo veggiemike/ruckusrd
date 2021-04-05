@@ -25,6 +25,7 @@ Makefile.in
 /src/initramfs.cpio.xz
 /src/ruckusrd.conf
 /subprojects/busybox.tar
+/subprojects/dropbear.tar
 /subprojects/e2fsprogs.tar
 /subprojects/eudev.tar
 /subprojects/lvm2.tar

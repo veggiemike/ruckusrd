@@ -3,7 +3,7 @@
 # in here for each subproject.
 
 
-all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar
+all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
@@ -18,6 +18,7 @@ clean-local:
 	cd squashfs-tools && git clean -dfx && git stash
 	cd zfs && git clean -dfx && git stash
 	rm -rf syslinux-6.03
+	cd dropbear && git clean -dfx && git stash
 
 
 # FIXME: when we add --with-system-eudev to configure, we'll have to
@@ -234,4 +235,17 @@ syslinux/FOO: syslinux-6.03.tar.xz
 	mv syslinux-6.03 syslinux && \
 	pushd syslinux && \
 	make install INSTALLROOT=$$PWD/FOO && \
+	popd || exit 1
+
+
+dropbear/FOO:
+	pushd dropbear && \
+	rm -rf FOO && \
+	sed -i 's|ln -s $$(bindir)/|ln -s |' Makefile.in && \
+	autoreconf && \
+	./configure --prefix=/usr --bindir=/bin --sbindir=/bin && \
+	make clean && \
+	make -j$(JOBCOUNT) PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" MULTI=1 && \
+	make PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" MULTI=1 DESTDIR=$$PWD/FOO install && \
+	ln -s dbclient FOO/bin/ssh && \
 	popd || exit 1
