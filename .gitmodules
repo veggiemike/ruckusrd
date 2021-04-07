@@ -34,3 +34,6 @@
 [submodule "subprojects/intel-ucode"]
 	path = subprojects/intel-ucode
 	url = https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files.git
+[submodule "subprojects/efibootmgr"]
+	path = subprojects/efibootmgr
+	url = https://github.com/rhboot/efibootmgr.git

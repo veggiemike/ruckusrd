@@ -27,6 +27,7 @@ Makefile.in
 /subprojects/busybox.tar
 /subprojects/dropbear.tar
 /subprojects/e2fsprogs.tar
+/subprojects/efibootmgr.tar
 /subprojects/eudev.tar
 /subprojects/lvm2.tar
 /subprojects/mdadm.tar

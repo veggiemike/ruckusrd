@@ -3,7 +3,7 @@
 # in here for each subproject.
 
 
-all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar
+all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
@@ -20,6 +20,7 @@ clean-local:
 	rm -rf syslinux-6.03
 	cd dropbear && git clean -dfx && git stash
 	cd rsync && git clean -dfx && git stash
+	cd efibootmgr && git clean -dfx && git stash
 
 
 # FIXME: when we add --with-system-eudev to configure, we'll have to
@@ -264,4 +265,12 @@ rsync/FOO:
 	./configure --prefix=/usr --bindir=/bin --disable-md2man \
           --disable-xxhash --disable-zstd --disable-openssl --disable-debug && \
         make -j$(JOBCOUNT) && make DESTDIR=$$PWD/FOO install && \
+	popd || exit 1
+
+
+efibootmgr/FOO:
+	pushd efibootmgr && \
+	rm -rf FOO && \
+	make EFIDIR=ruckus && \
+	make EFIDIR=ruckus DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
