@@ -3,7 +3,7 @@
 # in here for each subproject.
 
 
-all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar
+all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
@@ -19,6 +19,7 @@ clean-local:
 	cd zfs && git clean -dfx && git stash
 	rm -rf syslinux-6.03
 	cd dropbear && git clean -dfx && git stash
+	cd rsync && git clean -dfx && git stash
 
 
 # FIXME: when we add --with-system-eudev to configure, we'll have to
@@ -245,7 +246,22 @@ dropbear/FOO:
 	autoreconf && \
 	./configure --prefix=/usr --bindir=/bin --sbindir=/bin && \
 	make clean && \
-	make -j$(JOBCOUNT) PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" MULTI=1 && \
-	make PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" MULTI=1 DESTDIR=$$PWD/FOO install && \
+	make -j$(JOBCOUNT) \
+          PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" \
+          MULTI=1 && \
+	make \
+          PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" \
+          MULTI=1 \
+          DESTDIR=$$PWD/FOO install && \
 	ln -s dbclient FOO/bin/ssh && \
+	popd || exit 1
+
+
+rsync/FOO:
+	pushd rsync && \
+	rm -rf FOO && \
+	./prepare-source && \
+	./configure --prefix=/usr --bindir=/bin --disable-md2man \
+          --disable-xxhash --disable-zstd --disable-openssl --disable-debug && \
+        make -j$(JOBCOUNT) && make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1

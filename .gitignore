@@ -30,6 +30,7 @@ Makefile.in
 /subprojects/eudev.tar
 /subprojects/lvm2.tar
 /subprojects/mdadm.tar
+/subprojects/rsync.tar
 /subprojects/squashfs-tools.tar
 /subprojects/syslinux
 /subprojects/syslinux-*.tar.*
