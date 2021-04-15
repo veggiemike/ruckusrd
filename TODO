@@ -103,7 +103,7 @@
    me... adding -a to cpio usage also doesn't work.
 
    Actually, that does work... for the kernel.  Doing a zstdcat | cpio
-   --ectract only results in the first archive getting extracted but the kernel
+   --extract only results in the first archive getting extracted but the kernel
    is smart enough to just keep on going I guess.  So good, that's an option.
 
    We could have kernel_tar's install script do that dance
@@ -130,11 +130,28 @@
  - Maybe add rsync to initramfs now that we have networking there.  That'll
    almost definately need ssh (dropbear?) as well.
 
+   UPDATE: I've added rsync and dropbear, and they both work.  However,
+   something is wonky regarding uid detection in my maint shell.  Even after
+   adding /etc/passwd and /etc/group (so id shows valid stuff), dropbear's call
+   to either getuid() or getpwuid() in cli-runopts.c is failing.  I think this
+   is forcing me to specify -i /.ssh/id_dropbear on the ssh command line to get
+   key-based auth working (as well as specifying root@).
+
+   Hmm... somewhere along the line I stopped needing to specify -i, but it's
+   still complaining. odd.  Hm, it's if I login.  Adding /etc/nsswitch.conf
+   doesn't help....
+
  - Add a ruckusrd-init flag, or something like that.  Ooh, noroot maybe.  This
    should tell the initramfs's init script to NOT switch root but to instead
    just pass controll over to busybox's init.  This way, we can do full-blown
    work from within our cool initramfs, but have the shell be able to control
    processes.
+
+   Alternatively, we could just fix our rescue/maint shell to have proper
+   suprocess controls by calling it via busybox's cttyhack.  I didn't know this
+   was an option.  Heh.  Learn something knew every day.  Calling 'setsid
+   cttyhack bash' from our maint shell does indeed create a new subshell
+   running bash with appropriate controls.
 
  - Add syslinux and efibootmgr to initramfs so we have all the tools necesary
    to install onto the hardware we're booting off of (e.g., bootable thumb
