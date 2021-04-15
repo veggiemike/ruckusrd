@@ -98,7 +98,7 @@ wait_for_udev_symlink()
         echo "Create symlink $dev and then exit this shell to continue"
         echo "the boot sequence."
         echo
-        bash
+        control_shell
     fi
 
     dmneeded="$dmneeded $(dmsetup info -c --noheadings -o name $dev 2>/dev/null || echo)"
@@ -109,7 +109,13 @@ emergency_shell()
 {
     echo "Bug in initramfs /init detected. Dropping to a shell. Good luck!"
     echo
-    bash
+    control_shell
+}
+
+
+control_shell()
+{
+    setsid cttyhack bash
 }
 
 
@@ -423,7 +429,7 @@ decho "ram_layer=$ram_layer"
 if [ -n "$shell" ]; then
     echo "Dropping directly into shell, as requested.  Enjoy!"
     echo
-    bash
+    control_shell
 fi
 
 # load loop module (if not built-in)
@@ -602,7 +608,7 @@ if [ -n "$shell_mountdevs" ]; then
     echo "Prior to exiting, ensure that rootdev is mounted ro at /sysroot, and"
     echo "sqsh_layerdev (if used) is mounted ro at /sqsh_layerdev.  Good luck!"
     echo
-    bash
+    control_shell
 
 else
 
@@ -624,7 +630,7 @@ else
         echo "Dropping to a shell. "
         echo "Mount rootdev ro at /sysroot and exit shell to continue. Good luck!"
         echo
-        bash
+        control_shell
     fi
 
     # look for sqsh_layerdev
@@ -651,7 +657,7 @@ if [ -n "$sqsh_layers" ]; then
         echo "overlay on /sysroot.  If you don't know what that entails, don't break"
         echo "here... :-/"
         echo
-        bash
+        control_shell
 
     else
 
@@ -745,7 +751,7 @@ if [ -n "$sqsh_layers" ]; then
         echo
         echo "Prior to exiting, ensure that the final overlay is mounted ro at /sysroot"
         echo
-        bash
+        control_shell
 
     else
 
@@ -1095,7 +1101,7 @@ fi
 if [ -n "$maint" ]; then
     echo "Dropping to a maintenance shell, as requested. Good luck!"
     echo
-    bash
+    control_shell
 fi
 
 # NOTE: Inside initramfs, prior to switch_root, if $init is a symlink w/
@@ -1111,7 +1117,7 @@ if [ ! -x $init_check ]; then
     echo
     echo "Dropping to a shell. Good luck!"
     echo
-    bash
+    control_shell
 fi
 
 # Leave initramfs and transition to rootfs
@@ -1132,4 +1138,4 @@ echo "---------------------------------"
 echo
 echo "Dropping to a shell. Good luck!"
 echo
-bash
+control_shell
