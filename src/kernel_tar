@@ -138,7 +138,7 @@ if [ -n "$VERSION_NAME" ]; then
     if [ -h /usr/src/linux-headers-$VERSION_NAME ]; then
         old_one=\$(readlink /usr/src/linux-headers-$VERSION_NAME)
         echo -n "following $VERSION_NAME symlink to remove headers in \$old_one... "
-        rm -rf /usr/src/linux-headers-\$old_one && echo DONE || { echo FAIL; exit 1; }
+        rm -rf /usr/src/\$old_one && echo DONE || { echo FAIL; exit 1; }
         echo -n "removing $VERSION_NAME symlink... "
         rm /usr/src/linux-headers-$VERSION_NAME && echo DONE || { echo FAIL; exit 1; }
     fi
