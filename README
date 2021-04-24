@@ -42,9 +42,30 @@ Strengths:
      protocols, device drivers) are included in the initramfs, along
      with any modules they in turn require.
 
+     Actually, as of v0.15, ALL kernel modules are included in the
+     initramfs so that everything the kernel was configured to be able
+     to do is fully availabile in the maintenence shell.
+
  3.  Swiss army knife maintenance shell of doom.  The maintenence
      shell provided is a fully functional embedded rootfs with
-     BusyBox, eudev, lvm, mdadm, e2fsprogs, squashfs-tools, and the
-     OpenZFS userland tools.
+     BusyBox, eudev, lvm, mdadm, e2fsprogs, squashfs-tools, the
+     OpenZFS userland tools, syslinux, efibootmgr, wired networking
+     utilities, rsync, and ssh.
 
 See docs/ for more ramblings.  ;-)
+
+Also included are a bunch of scripts to help make kernel
+compilation/installation as painless as possible.
+
+kernel-builder - Compiles the kernel, creates an initrd using
+ruckusrd, and packages it up into a self-extracting archive capable of
+installing itself on a list of machines.
+
+extractenator - Create your own self extracting archives with embedded
+installation script (used by kernel-builder).
+
+firmwarenator - Create a fw.img containing all the firmware needed for
+a particular host's hardware.
+
+doit - Execute a command in the background and email the output
+somewhere when done.

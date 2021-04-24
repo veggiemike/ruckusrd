@@ -9,7 +9,7 @@ all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools
 	tar -C $^ -vcf $@ .
 
 clean-local:
-	rm -fv {eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs}.tar
+	rm -fv {eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr}.tar
 	cd eudev && git clean -dfx && git stash
 	cd busybox && git clean -dfx && git stash
 	cd mdadm && git clean -dfx && git stash

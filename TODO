@@ -33,145 +33,53 @@
    something  like that  to differentiate  our initramfs  messages from  kernel
    spew?
 
- - Add support for modules-x.y.z.img and src-x.y.z.img.  The modules image
-   should contain ALL the specified kernel modules.  This would make all
-   modules available to initramfs (which is probably overkill), but could also
-   remove the onus of installing them on each filesystem.  If present, or if
-   specified via some command-line arg, the contents of /lib/modules could be
-   --bind mounted over sysroot/lib/modules to remove the possibility of
-   mismatching kernel modules in initramfs and sysroot filesystem.  Doing the
-   same thing for kernel headers would make sense for completeness, then
-   kernel_installer and kernel_tar wouldn't need to rsync /lib/modules and
-   /usr/src/ any more (which should make kernel upgrades faster/easier).
+ - Now that initrd has ALL a kernel's modules, and rsync, make sure the rootfs
+   actually has them installed and inject them if necesary.  We could actually
+   rely on this as our module installation mechanism instead of having
+   kernel_tar's embedded installer do it...  That would make kernel_builder
+   essentially depend on the user using ruckusrd for initramfs... but it
+   already does.
 
-   To go along with that, we should introduce a --small command line flag to
-   produce a traditional-style initramfs (i.e., bare minimum for accessing the
-   root device), --net for the current default of including network subsystem
-   and devices drivers on the initramfs, and --full that includes all the
-   modules/headers as individually extracted archives.  Default would be either
-   --small or --net.
+ - We need to get firmware loaded up during the initramfs stage of boot.  This
+   is because now that we include all the kernel modules, udev will be able to
+   load any module the kernel notices... and there are some that are going to
+   require firmware to be present during load.
 
-   Wait...  if we bake this right into ruckusrd (instead of tacking on extra
-   files for testing), why wouldn't we just include all the modules/headers
-   directly in the single initrd image we're creating?  There's really no nead
-   to generate them as seperate files... even though we can.  They don't need
-   to be mount-able, we're going to --bind mount them into the sysroot.
+   For now, we've got the firmwarenator util that will create a fw.img file
+   that can be appended to the initrd file pretty easily... but it would be
+   nice if this was automaticly handled.
 
-   Should we also have --passthrough (or something like that) to enable linuxrc
-   code to do the bind mounting into /sysroot?  It would imply --full.
-
-   WAIT!  There is one problem w/ --bind mount.  That's assuming that I won't
-   need anything else in /lib/modules or /usr/src.  I really didn't want to
-   copy into the rootfs (now we'd want rsync to avoid churn, but even then
-   we've got more work to do every time we boot), but what if I want to be able
-   to build an out-of-tree module against a kernel I haven't booted?  Or I want
-   to inspect the modules of a different kernel?  This might require a bit more
-   thought.  (as a side note, now that I have networking in initramfs, rsync
-   might be a good thing to have)
-
-   After sleeping on it a few days, I think injecting the modules, src, and
-   maybe kernel/initrd/config into the rootfs sounds like the best solution.
-
- - What to do w/ firmware...?  If we include tons of modules in initramfs, then
-   let udev load them, we're going to run into failures due to missing
-   firmware.  I don't want to include TONS of firmware in initramfs (because
-   huge), so I was planning on just creating machine-specific fw.img files to
-   use as needed.  Multiple initramfs files can be specified to the kernel, and
-   it works fine.  BUT... BUT...  I don't think I can do that for Xen.  I can't
-   seem to get it to work via extlinux (BIOS, mboot, using additional ---
-   sections or by specifying via initrd=) or via EFI xen.cfg (haven't tried as
-   hard, but inital stab didn't work).
-
-   If I do eventually get xen.cfg working w/ a bit more testing, that would be
-   a reason to finally kick BIOS to the curb... and I guess that would be fine.
-   But if I can't, then I need to either find a bootloader that can handle Xen
-   and give it multiple initramfs images, or I have to start merging initramfs
-   images together into a single one post-kernel-install.  yucky.
-
-   Logistally annoying, but at least appending to the ruckusrd created
+   Logistically annoying, but at least appending to the ruckusrd created
    initramfs sounds trivial:
 
-   kernel command line:  dyndbg="func fw_get_filesystem_firmware +fmp"
+   $ cat /boot/fw.img >> /boot/initrd-5.10.y.img
 
-   $ cp -va /boot/initrd-x.y.z{,-fw}.img
-   $ mkdir t && pushd t
-   $ dmesg |awk '/Loading firmware/ {print $NF}'| cpio -p --make-dir .
-   $ find . | cpio -o -H newc | zstd -T0 -10 >> /boot/initrd-x.y.z-fw.img
-   $ popd
+   That assumes that both fw.img and initrd.img use the same compressor.  If
+   that's not the case, it can be remedied like this:
 
-   Sounds nice, and google says this should work, but doesn't seem to work for
-   me... adding -a to cpio usage also doesn't work.
+   $ zstdcat /boot/fw.img | gzip >> /boot/initrd-5.4.y.img
 
-   Actually, that does work... for the kernel.  Doing a zstdcat | cpio
-   --extract only results in the first archive getting extracted but the kernel
-   is smart enough to just keep on going I guess.  So good, that's an option.
+   We should have kernel_tar's installation script do that automatically if
+   /boot/ruckusrd-fw.img exists.  I think we can simply use file to
+   detect/correct mismatched compressors.
 
-   We could have kernel_tar's install script do that dance
-   automatically... perhaps create an alternate img w/ -fw appended IF we
-   detect and "Loading firmware" messages in dmesg?  We could also add a
-   --fw-files flag to specify fw files to include?  Or --fw-list to specify a
-   file containing a list of firmware to include?  Or --fw specifying path to
-   fw.img to simply be appended?  We probably don't need to generate fw.img too
-   frequently, so slurping up a pre-generated fw.img is probably the best.
-   Perhaps we should just do that automagically if /boot/fw.img exists?  or
-   perhaps /boot/ruckusrd-fw.img?
+ - Once we've got microcodenator generating /boot/ruckusrd-ucode.img, we should
+   do the same thing we're doing with firmware?  I seem to recall that ucode
+   had to be the 1st thing seen by the kernel... so that might not work.
 
-   FYI, if we go with the "append /boot/fw.img to installed initrd.img" method,
-   it's as simple as cat /boot/fw.img >> /boot/initrd.img...  assuming both
-   images use the same compressor.  I guess we could check for that easily
-   enough via file.
 
-   If we deviate behaviorally from what kernel_installer does... should we
-   remove it?  I mean, I don't want to have to maintain stuff in two places,
-   and there's really no point in keeping kernel_installer around.  If we do
-   that, we should also consider automatically calling kernel_tar at the end of
-   kernel_builder.
+* Could happen in a stable release
 
- - Maybe add rsync to initramfs now that we have networking there.  That'll
-   almost definately need ssh (dropbear?) as well.
-
-   UPDATE: I've added rsync and dropbear, and they both work.  However,
-   something is wonky regarding uid detection in my maint shell.  Even after
-   adding /etc/passwd and /etc/group (so id shows valid stuff), dropbear's call
-   to either getuid() or getpwuid() in cli-runopts.c is failing.  I think this
-   is forcing me to specify -i /.ssh/id_dropbear on the ssh command line to get
+ - I've added rsync and dropbear, and they both work.  However, something is
+   wonky regarding uid detection in my maint shell.  Even after adding
+   /etc/passwd and /etc/group (so id shows valid stuff), dropbear's call to
+   either getuid() or getpwuid() in cli-runopts.c is failing.  I think this is
+   forcing me to specify -i /.ssh/id_dropbear on the ssh command line to get
    key-based auth working (as well as specifying root@).
 
    Hmm... somewhere along the line I stopped needing to specify -i, but it's
    still complaining. odd.  Hm, it's if I login.  Adding /etc/nsswitch.conf
    doesn't help....
-
- - Add a ruckusrd-init flag, or something like that.  Ooh, noroot maybe.  This
-   should tell the initramfs's init script to NOT switch root but to instead
-   just pass controll over to busybox's init.  This way, we can do full-blown
-   work from within our cool initramfs, but have the shell be able to control
-   processes.
-
-   Alternatively, we could just fix our rescue/maint shell to have proper
-   suprocess controls by calling it via busybox's cttyhack.  I didn't know this
-   was an option.  Heh.  Learn something knew every day.  Calling 'setsid
-   cttyhack bash' from our maint shell does indeed create a new subshell
-   running bash with appropriate controls.
-
- - Add syslinux and efibootmgr to initramfs so we have all the tools necesary
-   to install onto the hardware we're booting off of (e.g., bootable thumb
-   drive installer).
-
-
-* Could happen in a stable release
-
- - Add script to help create firmware.img for specific hardware.
-
-   kernel command line:  dyndbg="func fw_get_filesystem_firmware +fmp"
-   
-   $ dmesg |awk '/Loading firmware/ {print $NF}'| cpio -p --make-dir .
-   $ find . | cpio -o -H newc | zstd -T0 -10 > ../fw-aldarion.img
-
-   This becomes more important now that we're putting more modules on the
-   initramfs.  I already have problems with network modules on my laptop
-   requiring firmware.  Any module available on the initramfs gets loaded by
-   udev there instead of by the actual sysroot udev instance post-init, and if
-   they need firmware, it has to be on the initramfs.
 
  - Add script to help create microcode.img.  Unlike the firmware.img
    generation, we probably can't assume that the kernel is already loading
