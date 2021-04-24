@@ -8,7 +8,7 @@
 #
 # This script is a utility for building the Linux kernel and installing it and
 # all needed files into a local directory.  After doing this, you can execute
-# kernel_installer (which installs to a remote host) or kernel_tar (which
+# kernel-installer (which installs to a remote host) or kernel-tar (which
 # creates a self-extracting installer).
 
 
@@ -29,10 +29,10 @@ rm -rf $SRP_ROOT
 # detect when we're running out of a source tree and avoid PATH in that case
 if [ -f $(dirname $0)/linuxrc ]; then
     ruckusrd=$(realpath $(dirname $0))/ruckusrd
-    kernel_tar=$(dirname $ruckusrd)/kernel_tar
+    kernel_tar=$(dirname $ruckusrd)/kernel-tar
 else
     ruckusrd=ruckusrd
-    kernel_tar=kernel_tar
+    kernel_tar=kernel-tar
 fi
 
 CPUCOUNT=`grep processor /proc/cpuinfo | wc -l`

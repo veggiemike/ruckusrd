@@ -7,7 +7,7 @@
 # Licensed under the GPLv3. See the file COPYING for details. 
 #
 # This script is a utility for creating a self-extracting installer for a built
-# Linux kernel.  First run `kernel_builder`, then run this.
+# Linux kernel.  First run `kernel-builder`, then run this.
 #
 export SRP_ROOT=$PWD/FOO
 
@@ -46,13 +46,13 @@ usage()
         echo ERROR: $*
         echo
     fi
-    echo "kernel_tar - a self-extracting kernel installer creator"
+    echo "kernel-tar - a self-extracting kernel installer creator"
     echo "Copyright (C) 2012-2021 Michael D Labriola <michael.d.labriola@gmail.com>"
     echo
     echo "usage: `basename $0` OPTIONS [-- EXTRACTENATOR_OPTIONS]"
     echo
-    echo "kernel_tar uses extractenator to create a self-extracting kernel installer using"
-    echo "the build output of kernel_builder (the FOO directory).  Extractenator is"
+    echo "kernel-tar uses extractenator to create a self-extracting kernel installer using"
+    echo "the build output of kernel-builder (the FOO directory).  Extractenator is"
     echo "provided with its required --filename (kernel-installer-x.y.z.sh), --script (a"
     echo "generated installation script), and payload (the FOO directory).  Other"
     echo "extractenator options can be passed into the child process by appending them to"
