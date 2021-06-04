@@ -15,12 +15,7 @@
    configure flags.
 
 
-* For 0.15
-
- - Add config-file support (/mnt/root-true/ruckusrd.conf?).  Retain kernel
-   commandline parsing, but only needed to override what's in the config file.
-   This will allow us to update config w/out needing to mess with booloader
-   config.
+* For 0.x
 
  - Should prefix all our non-standard kernel commandline options w/
    ruckusrd.whatever.  Once we have config-file support, we should be able to
@@ -32,13 +27,6 @@
    behavior in  most distros.  Perhaps  prefix each  output w/ "ruckusrd:  " or
    something  like that  to differentiate  our initramfs  messages from  kernel
    spew?
-
- - Now that initrd has ALL a kernel's modules, and rsync, make sure the rootfs
-   actually has them installed and inject them if necesary.  We could actually
-   rely on this as our module installation mechanism instead of having
-   kernel_tar's embedded installer do it...  That would make kernel_builder
-   essentially depend on the user using ruckusrd for initramfs... but it
-   already does.
 
  - We need to get firmware loaded up during the initramfs stage of boot.  This
    is because now that we include all the kernel modules, udev will be able to
@@ -67,6 +55,113 @@
    do the same thing we're doing with firmware?  I seem to recall that ucode
    had to be the 1st thing seen by the kernel... so that might not work.
 
+ - Consider adding a `ruckusonly` flag to linuxrc to invoke busybox's init
+   instead of switching rootfs and invoking the normal system's init.  This
+   would give us a more complete system (complete with multiple TTYs to login
+   on) and opens the door for using a ruckusrd initramfs on it's own to
+   facilitate installation on blank drives.
+
+ - Once we've got our initrd acting as a kernel-installer (via modinject), we
+   could also add code to do the new sqsh_layer prep and have it work as a full
+   blown system installer.  Assuming the user has already created an upper
+   layer device and specified it as root=whatever, we could automatically do
+   the following:
+
+   1. create new /etc/hostname
+   2. create new /etc/mailname
+   3. sed hostname and domain into /etc/postfix/main.cf
+   4. create new /etc/machine-id
+   5. remove /var/log/journal/*
+   6. create new /etc/fstab
+   7. clean out NetworkManager connections (maybe?)
+
+   Of course, if we do that... it will really be distro specific.  So far, the
+   things that would get tweaked are pretty generic... it might actually work
+   in most distros.
+
+   We could even go as far as creating logvol and EXT4 fs to match
+   root=whatever if needed.  That would make installation via pre-existing
+   squashfs image super duper trivial: 1) boot up off USB stick, pick "Install
+   system" option in syslinux menu, either edit the kernel commandline to
+   provide root=whatever, hostname, domainname, or add a couple prompts during
+   boot.  Done.
+
+   When installing on a blank system, we would also have to setup boot.
+   Install syslinux (either for EFI or BIOS), install the kernel files, install
+   the squashfs.img locally somewhere, etc.
+
+
+* For 0.16
+
+ - Add config-file support (/mnt/root-true/ruckusrd.conf?).  Retain kernel
+   commandline parsing, but only needed to override what's in the config file.
+   This will allow us to update config w/out needing to mess with booloader
+   config.
+
+   It would also allow us to create initrd w/ modified default behavior (e.g.,
+   modinject enabled).  So, a ruckusrd initrd generated via kernel-builder will
+   have modinject enabled by default... but if you're using ruckusrd to create
+   an initrd for a distro kernel, modinject will be disabled by default.
+
+   We already install ruckusrd.conf in the initramfs... but currently it's
+   generated at configure time and just has the ruckusrd version in it.  I
+   suppose we could start with that, and append more settings to it when we
+   copy it into the initramfs.
+
+   This all makes perfect sense... except I don't quite recall what my original
+   intention was after rereading that 1st paragraph.  I guess it was so
+   per-host I could add root= and all those other potential command line args
+   to a global config file to tone down the mass of args going on our kernel
+   command line.  Yeah, I think that was it.  The catch here would be
+   remembering to re-run ruckusrd for each kernel after changing the installed
+   ruckusrd.conf.
+
+ - Add script to help create microcode.img.  Unlike the firmware.img
+   generation, we probably can't assume that the kernel is already loading
+   microcode propperly...  but really we only have 2 choices (intel/amd) so we
+   could just detect cpu type and include everything.
+
+   Maybe we should add linux-firmware, microcode, and regulatory.db repos as
+   submodules here as well?  I was originally planning on creating my own
+   linux-firmware-mdl repo, with helper scripts and submodules...  but it might
+   be easier to just keep everything together here under one roof.
+
+   NOTE: Also, once we've tested this, we should go disable the deprecated
+         firmware loading methods in our kernel .configs.
+
+   NOTE: Started this as microcodenator, but it's only half implemented.
+         Finish it.
+
+ - Now that initrd has ALL a kernel's modules, and rsync, make sure the rootfs
+   actually has them installed and inject them if necesary.  We could actually
+   rely on this as our module installation mechanism instead of having
+   kernel_tar's embedded installer do it...  That would make kernel_builder
+   essentially depend on the user using ruckusrd for initramfs... but it
+   already does.
+
+   NOTE: If we're going to rely on this as the installation mechanism, we
+         probably want to handle headers the same way... in which case, we need
+         to include the headers in the initramfs, which is going to get quite a
+         bit larger (/usr/src/linux-5.12.8 is about 175M).
+
+   NOTE: Technically, we weren't installing ALL the modules quite yet when I
+         wrote this.  As of 0.16, we should be installing ALL modules.
+
+ - Consider not including linux headers in the kernel-installer archives.  We
+   can add --with-headers flag to kernel-builder to override that behavior.
+   Including the headers in the installer more than doubles it's size, and I
+   usually have CONFIG_TRIM_UNUSED_KSYMS enabled which allows for better kernel
+   optimizations at the expense of breaking out-of-tree module building... plus
+   that kernel header prep and installation is lifted from some rpm spec file
+   from way back and largely untestested (again, because I don't build
+   out-of-tree modules).
+
+   Actually, we could just key off of CONFIG_TRIM_UNUSED_KSYMS in .config... We
+   wouldn't necesarily need to add any new command line flags that way.
+   Include headers if that's not set, leave them out if it is.  If we do that,
+   we'll want to at least make it super obvious via some output during
+   kernel-builder (preferablly at the end so people can actually see it?).
+
 
 * Could happen in a stable release
 
@@ -80,19 +175,6 @@
    Hmm... somewhere along the line I stopped needing to specify -i, but it's
    still complaining. odd.  Hm, it's if I login.  Adding /etc/nsswitch.conf
    doesn't help....
-
- - Add script to help create microcode.img.  Unlike the firmware.img
-   generation, we probably can't assume that the kernel is already loading
-   microcode propperly...  but really we only have 2 choiced (intel/amd) so we
-   could just detect cpu type and include everything.
-
-   Maybe we should add linux-firmware, microcode, and regulatory.db repos as
-   submodules here as well?  I was originally planning on creating my own
-   linux-firmware-mdl repo, with helper scripts and submodules...  but it might
-   be easier to just keep everything together here under one roof.
-
-   NOTE: Also, once we've tested this, we should go disable the deprecated
-         firmware loading methods in our kernel .configs.
 
  - Pretty sure I broke out-of-tree building at some point... need to fix that.
 
