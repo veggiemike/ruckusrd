@@ -175,31 +175,43 @@ decho '********** INSTALLING MODULES *******************************************
 $cp -a $(realpath $HOSTMODDIR) $DESTMODDIR || cleanup 1
 
 
-decho '********** PREPPING INITRAMFS HEADER DIR ***************************************'
-HOSTHDRDIR=$(realpath -s $BASEDIR/usr/src/linux-headers-$KERNEL)
-decho HOSTHDRDIR=$HOSTHDRDIR
-if [ -h $HOSTHDRDIR ]; then
-    HOSTHDRDIR=$(realpath $HOSTHDRDIR)
-    decho HOSTHDRDIR is a symlink pointing to $HOSTHDRDIR
-    DESTHDRDIR=$TEMPDIR/initramfs/usr/src/$(basename $HOSTHDRDIR)
-    decho DESTHDRDIR=$DESTHDRDIR
-    $mkdir $(dirname $DESTHDRDIR) || cleanup 1
-    $ln -s $(basename $HOSTHDRDIR) $TEMPDIR/initramfs/usr/src/linux-headers-$KERNEL || cleanup 1
+# FIXME: skip this whole thing if CONFIG_TRIM_UNUSED_KSYMS=y
+config=$BASEDIR/boot/config-$KERNEL
+no_headers=
+if [ ! -f $config ]; then
+    echo "WARNING: kernel config $config missing, assuming CONFIG_TRIM_UNUSED_KSYMS unset"
 else
-    DESTHDRDIR=$TEMPDIR/initramfs/usr/src/linux-headers-$KERNEL
-    decho DESTHDRDIR=$DESTHDRDIR
-    $mkdir $(dirname $DESTHDRDIR) || cleanup 1
+    no_headers=$(grep CONFIG_TRIM_UNUSED_KSYMS=y $config)
 fi
+if [ -n "$no_headers" ]; then
+    decho '********** SKIPPING HEADER INSTALLATION BECAUSE CONFIG_TRIM_UNUSED_KSYMS=y *****'
+else
+    decho '********** PREPPING INITRAMFS HEADER DIR ***************************************'
+    HOSTHDRDIR=$(realpath -s $BASEDIR/usr/src/linux-headers-$KERNEL)
+    decho HOSTHDRDIR=$HOSTHDRDIR
+    if [ -h $HOSTHDRDIR ]; then
+        HOSTHDRDIR=$(realpath $HOSTHDRDIR)
+        decho HOSTHDRDIR is a symlink pointing to $HOSTHDRDIR
+        DESTHDRDIR=$TEMPDIR/initramfs/usr/src/$(basename $HOSTHDRDIR)
+        decho DESTHDRDIR=$DESTHDRDIR
+        $mkdir $(dirname $DESTHDRDIR) || cleanup 1
+        $ln -s $(basename $HOSTHDRDIR) $TEMPDIR/initramfs/usr/src/linux-headers-$KERNEL || cleanup 1
+    else
+        DESTHDRDIR=$TEMPDIR/initramfs/usr/src/linux-headers-$KERNEL
+        decho DESTHDRDIR=$DESTHDRDIR
+        $mkdir $(dirname $DESTHDRDIR) || cleanup 1
+    fi
 
 
-decho '********** INSTALLING HEADERS **************************************************'
-# Copy headers over, too
-#
-# NOTE: This is unneeded for boot, but needed if we want to use booting our
-#       initrd as the installation method for modules and headers (e.g.,
-#       modinject).
-#
-$cp -a $HOSTHDRDIR $DESTHDRDIR || cleanup 1
+    decho '********** INSTALLING HEADERS **************************************************'
+    # Copy headers over, too
+    #
+    # NOTE: This is unneeded for boot, but needed if we want to use booting our
+    #       initrd as the installation method for modules and headers (e.g.,
+    #       modinject).
+    #
+    $cp -a $HOSTHDRDIR $DESTHDRDIR || cleanup 1
+fi
 
 
 # Pick a compressor
@@ -209,7 +221,6 @@ decho '********** PICKING A COMPRESSOR *****************************************
 fast_list="zstd gzip xz"
 best_list="xz zstd gzip"
 comp_cmd=
-config=$BASEDIR/boot/config-$KERNEL
 if [ ! -f $config ]; then
     echo "WARNING: kernel config $config missing, default to gzip compression"
     comp_cmd="gzip"
