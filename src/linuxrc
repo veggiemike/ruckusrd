@@ -1124,7 +1124,7 @@ fi
 #       via rsync.
 #
 if [ -n "$modinject" ]; then
-    echo "Injecting kernel modules and headers into /sysroot... "
+    echo -n "Injecting kernel modules and headers into /sysroot... "
     decho ""
     
     # mount rw
@@ -1160,24 +1160,27 @@ if [ -n "$modinject" ]; then
             if [ "$old_one" != "$VERSION" ]; then
                 decho "following $syslink symlink to remove modules in $old_one"
                 rm -rf /sysroot/lib/modules/$old_one
+                decho "removing $syslink symlink"
+                rm -f $syslink
             fi
-            decho "removing $syslink symlink"
-            rm -f $syslink
         elif [ -e $syslink ]; then
             decho "removing $syslink file/dir"
             rm -rf $syslink
         fi
-        go="ln"
-        [ "$quiet" != "1" ] && go="$go -v"
-        go="$go -s $VERSION $syslink"
-        decho $go
-        eval $go
+        if [ ! -h $syslink ]; then
+            go="ln"
+            [ "$quiet" != "1" ] && go="$go -v"
+            go="$go -s $VERSION $syslink"
+            decho $go
+            eval $go
+        fi
     fi
     
     # modules - rsync the new ones
     go="rsync"
-    [ "$quiet" != "1" ] && go="$go -v"
-    go="$go -a /lib/modules/$VERSION /sysroot/lib/modules/"
+    [ "$quiet" != "1" ] && go="$go --progress --stats"
+    # don't use -a, because we don't want group or owner preserved
+    go="$go -rlptD /lib/modules/$VERSION /sysroot/lib/modules/"
     decho $go
     eval $go
     
@@ -1197,24 +1200,27 @@ if [ -n "$modinject" ]; then
                 if [ "$old_one" != "linux-headers-$VERSION" ]; then
                     decho "following $syslink symlink to remove headers in $old_one"
                     rm -rf /sysroot/usr/src/$old_one
+                    decho "removing $syslink symlink"
+                    rm -f $syslink
                 fi
-                decho "removing $syslink symlink"
-                rm -f $syslink
             elif [ -e $syslink ]; then
                 decho "removing $syslink file/dir"
                 rm -rf $syslink
             fi
-            go="ln"
-            [ "$quiet" != "1" ] && go="$go -v"
-            go="$go -s $VERSION $syslink"
-            decho $go
-            eval $go
+            if [ ! -h $syslink ]; then
+                go="ln"
+                [ "$quiet" != "1" ] && go="$go -v"
+                go="$go -s linux-headers-$VERSION $syslink"
+                decho $go
+                eval $go
+            fi
         fi
         
         # headers - rsync the new ones
         go="rsync"
-        [ "$quiet" != "1" ] && go="$go -v"
-        go="$go -a /usr/src/linux-headers-$VERSION /sysroot/usr/src/"
+        [ "$quiet" != "1" ] && go="$go --progress --stats"
+        # don't use -a, because we don't want group or owner preserved
+        go="$go -rlptD /usr/src/linux-headers-$VERSION /sysroot/usr/src/"
         decho $go
         eval $go
         
