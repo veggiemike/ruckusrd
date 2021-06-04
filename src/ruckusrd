@@ -146,78 +146,33 @@ $xz -dc $LIBDIR/initramfs.cpio.xz | $cpio --extract &&
 popd >/dev/null || cleanup 1
 
 
-decho '********** PREPPING INITRAMFS KERNEL DIR ***************************************'
-HOSTMODDIR=$BASEDIR/lib/modules/$KERNEL
+decho '********** PREPPING INITRAMFS MODULE DIR ***************************************'
+HOSTMODDIR=$(realpath -s $BASEDIR/lib/modules/$KERNEL)
+decho HOSTMODDIR=$HOSTMODDIR
 if [ -h $HOSTMODDIR ]; then
-    decho HOSTMODDIR is a symlink
-    DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$(readlink $HOSTMODDIR)
-    $mkdir $DESTMODDIR || cleanup 1
-    $ln -s $(readlink $HOSTMODDIR) $TEMPDIR/initramfs/lib/modules/$KERNEL || cleanup 1
+    HOSTMODDIR=$(realpath $HOSTMODDIR)
+    decho HOSTMODDIR is a symlink pointing to $HOSTMODDIR
+    DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$(basename $HOSTMODDIR)
+    decho DESTMODDIR=$DESTMODDIR
+    $mkdir $(dirname $DESTMODDIR) || cleanup 1
+    $ln -s $(basename $HOSTMODDIR) $TEMPDIR/initramfs/lib/modules/$KERNEL || cleanup 1
 else
     DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$KERNEL
-    $mkdir $DESTMODDIR || cleanup 1
+    decho DESTMODDIR=$DESTMODDIR
+    $mkdir $(dirname $DESTMODDIR) || cleanup 1
 fi
-decho HOSTMODDIR=$HOSTMODDIR
-decho DESTMODDIR=$DESTMODDIR
-
-# Copy modules.order, modules.builtin, and other KBuild generated files
-#
-# NOTE: The depmod call below updates modules.dep and relatives, which needn't
-#       be copied here... but we don't bother weeding them out.
-#
-# FIXME: is it ok to leave modules.order full of modules that aren't being
-#        included in the initramfs?
-#
-$cp $HOSTMODDIR/modules.* $DESTMODDIR/ || cleanup 1
-
-# copy in boot-related kernel modules
-#
-# FIXME: should probably allow users to add more modules somehow, maybe a
-#        command line arg or a conf file...
-#
-# NOTE: if we ever want to add DRM drivers as well (potentially for early KMS
-#       fbcon splash screen), add drivers/gpu to the find statement below.
-#
-find $HOSTMODDIR/kernel/drivers/{ata,block,cdrom,md,nvme,scsi,usb,hid,net} \
-    $HOSTMODDIR/kernel/{fs,net} \
-    \( -name \*.ko.xz -o -name \*.ko \) \
-    -exec $cp {} $DESTMODDIR/ \; 2>/dev/null
-
-# NOTE: I was originally decompressing each .ko.xz file so that I could xz the
-#       entire initramfs at the end more optimally, but that leads to kernel
-#       taint w/ kernel signing turned on... so, i guess i won't do this.
-#
-#find $DESTMODDIR -name \*.xz -exec $xz -d {} \;
 
 
-# Make sure none of the MODS we've installed have unmet dependencies
+decho '********** INSTALLING MODULES **************************************************'
+# Copy entire modules dir over
 #
-# NOTE: This only works propperly if depmod has already been run, so we use
-#       $BASEDIR for the modprobe call, not $DESTMODDIR.
+# NOTE: Now that we're copying the entire tree as-is, we no longer have to
+#       search for missing dependencies or rerun depmod.
 #
-decho '********** COPYING MODULE DEPS TO INITRAMFS ************************************'
-for m in $DESTMODDIR/*.ko{,.xz} ; do
-    modprobe --set-version $KERNEL --show-depends $(basename ${m//.ko*/}) \
-        -d $BASEDIR \
-        | head --lines=-1 >> $TEMPDIR/modules 2>/dev/null
-done
-
-DEPMODS=`cat $TEMPDIR/modules | awk '/^insmod/ { print $2 }' | sort -u`
-for f in $DEPMODS; do
-    if [ ! -f $DESTMODDIR/$(basename $f) ]; then
-        $cp $f $DESTMODDIR/ || cleanup 1
-    fi
-done
-
-
-# Build module deps file so we can use modprobe
-decho '********** RUNNING DEPMOD ******************************************************'
-# NOTE: $KERNEL has to be a valid kernel version... not just a directory that
-#       exists.
-go="depmod -b $TEMPDIR/initramfs -v $(basename $DESTMODDIR)"
-[ "$opt_verbose" != "1" ] && go+=" > /dev/null"
-decho $go
-eval $go || cleanup 1
+# FIXME: maybe this shouldn't be the default behavior?  allow command line flag
+#        to do subset of modules? --only-needed-modules?
+#
+$cp -a $(realpath $HOSTMODDIR) $DESTMODDIR || cleanup 1
 
 
 # Pick a compressor
