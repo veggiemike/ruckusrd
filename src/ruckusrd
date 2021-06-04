@@ -175,6 +175,33 @@ decho '********** INSTALLING MODULES *******************************************
 $cp -a $(realpath $HOSTMODDIR) $DESTMODDIR || cleanup 1
 
 
+decho '********** PREPPING INITRAMFS HEADER DIR ***************************************'
+HOSTHDRDIR=$(realpath -s $BASEDIR/usr/src/linux-headers-$KERNEL)
+decho HOSTHDRDIR=$HOSTHDRDIR
+if [ -h $HOSTHDRDIR ]; then
+    HOSTHDRDIR=$(realpath $HOSTHDRDIR)
+    decho HOSTHDRDIR is a symlink pointing to $HOSTHDRDIR
+    DESTHDRDIR=$TEMPDIR/initramfs/usr/src/$(basename $HOSTHDRDIR)
+    decho DESTHDRDIR=$DESTHDRDIR
+    $mkdir $(dirname $DESTHDRDIR) || cleanup 1
+    $ln -s $(basename $HOSTHDRDIR) $TEMPDIR/initramfs/usr/src/linux-headers-$KERNEL || cleanup 1
+else
+    DESTHDRDIR=$TEMPDIR/initramfs/usr/src/linux-headers-$KERNEL
+    decho DESTHDRDIR=$DESTHDRDIR
+    $mkdir $(dirname $DESTHDRDIR) || cleanup 1
+fi
+
+
+decho '********** INSTALLING HEADERS **************************************************'
+# Copy headers over, too
+#
+# NOTE: This is unneeded for boot, but needed if we want to use booting our
+#       initrd as the installation method for modules and headers (e.g.,
+#       modinject).
+#
+$cp -a $HOSTHDRDIR $DESTHDRDIR || cleanup 1
+
+
 # Pick a compressor
 decho '********** PICKING A COMPRESSOR ************************************************'
 # FIXME: Tried to add lz4, but after initially thinking it worked, I can't get
