@@ -293,6 +293,7 @@ sqsh_layerdev=""
 sqsh_layerdir="/tmproot"
 sqsh_layerdir_rel=""
 ram_layer=""
+modinject=
 
 # Parse kernel commandline options
 #
@@ -370,6 +371,9 @@ for o in `cat /proc/cmdline` ; do
     ram_layer=*)
         ram_layer=${o#ram_layer=}
         ;;
+    modinject)
+        modinject=1
+        ;;
     *)
         # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
         #       max_loop=16" to get written in modprobe.conf...
@@ -425,6 +429,8 @@ decho "sqsh_layerdev=$sqsh_layerdev"
 decho "sqsh_layerdir=$sqsh_layerdir"
 decho "sqsh_layerdir_rel=$sqsh_layerdir_rel"
 decho "ram_layer=$ram_layer"
+decho "modinject=$modinject"
+
 
 if [ -n "$shell" ]; then
     echo "Dropping directly into shell, as requested.  Enjoy!"
@@ -1091,6 +1097,130 @@ EOF
 
     # and finally, remount /sysroot read-only because most/all systems expect /
     # to be mounted ro prior to their init systems taking over.
+    mount -o remount,ro /sysroot
+fi
+
+# inject modules/headers into rootfs
+#
+# FIXME: should we always do this?  do it unless disabled via nomodinject flag?
+#        or only do it if modinject flag passed?  it's a pretty strange thing
+#        for an initrd to be doing, in a vaccuum.  since we've always tried to
+#        keep the default behavior in line with what people would expect from
+#        an initrd, id lean towards required explicit modinject flag
+#
+#        but... if we want to be able to assume that modinject is enabled from
+#        inside kernel-builder (so we can leave modules OUT of the installer
+#        archive), we would have to enable it by default.
+#
+#        for now, we should note that modinject needs to be enabled if you're
+#        using kernel-builder's installation mechanism...  but this would be a
+#        good case for embedding desired linuxrc behavior into the generated
+#        initrd file (i.e., config file).  that's something that's bounced
+#        around for years without gaining any real use-case.
+#
+# NOTE: we don't want to completely remove and reinstall modules like the old
+#       extractenator script was doing.  that would be slow every time, and
+#       would remove built out-of-tree modules.  instead we just want to update
+#       via rsync.
+#
+if [ -n "$modinject" ]; then
+    echo "Injecting kernel modules and headers into /sysroot... "
+    decho ""
+    
+    # mount rw
+    mount -o remount,rw /sysroot
+    
+    # figure out version, if we have a .y symlink to manage, etc
+    #
+    # VERSION will always be set, and it will be a real directory (not a
+    # symlink).
+    #
+    # VERSION_NAME, if set, is the symlink name.
+    #
+    for x in /lib/modules/*; do
+        if [ -h $x ]; then
+            VERSION=$(readlink $x)
+            VERSION_NAME=$(basename $x)
+            break
+        else
+            VERSION=$(basename $x)
+        fi
+    done
+    decho VERSION=$VERSION
+    decho VERSION_NAME=$VERSION_NAME
+    
+    # modules - remove old symlinked files if different
+    #
+    # if we're installing a symlink, and the symlink already exists and points
+    # to a different version, remove what it points at and recreate the symlink
+    if [ -n "$VERSION_NAME" ]; then
+        syslink=/sysroot/lib/modules/$VERSION_NAME
+        if [ -h $syslink ]; then
+            old_one=$(readlink $syslink)
+            if [ "$old_one" != "$VERSION" ]; then
+                decho "following $syslink symlink to remove modules in $old_one"
+                rm -rf /sysroot/lib/modules/$old_one
+            fi
+            decho "removing $syslink symlink"
+            rm -f $syslink
+        elif [ -e $syslink ]; then
+            decho "removing $syslink file/dir"
+            rm -rf $syslink
+        fi
+        go="ln"
+        [ "$quiet" != "1" ] && go="$go -v"
+        go="$go -s $VERSION $syslink"
+        decho $go
+        eval $go
+    fi
+    
+    # modules - rsync the new ones
+    go="rsync"
+    [ "$quiet" != "1" ] && go="$go -v"
+    go="$go -a /lib/modules/$VERSION /sysroot/lib/modules/"
+    decho $go
+    eval $go
+    
+    # headers will be left out of the initramfs if the kernel doesn't support
+    # out-of-tree module buliding (e.g., CONFIG_TRIM_UNUSED_KSYMS=y), so check
+    # for these
+    if [ -d /usr/src/linux-headers-$VERSION ]; then
+        # headers - remove old symlinked files if different
+        #
+        # if we're installing a symlink, and the symlink already exists and
+        # points to a different version, remove what it points at and recreate
+        # the symlink
+        if [ -n "$VERSION_NAME" ]; then
+            syslink=/sysroot/usr/src/linux-headers-$VERSION_NAME
+            if [ -h $syslink ]; then
+                old_one=$(readlink $syslink)
+                if [ "$old_one" != "linux-headers-$VERSION" ]; then
+                    decho "following $syslink symlink to remove headers in $old_one"
+                    rm -rf /sysroot/usr/src/$old_one
+                fi
+                decho "removing $syslink symlink"
+                rm -f $syslink
+            elif [ -e $syslink ]; then
+                decho "removing $syslink file/dir"
+                rm -rf $syslink
+            fi
+            go="ln"
+            [ "$quiet" != "1" ] && go="$go -v"
+            go="$go -s $VERSION $syslink"
+            decho $go
+            eval $go
+        fi
+        
+        # headers - rsync the new ones
+        go="rsync"
+        [ "$quiet" != "1" ] && go="$go -v"
+        go="$go -a /usr/src/linux-headers-$VERSION /sysroot/usr/src/"
+        decho $go
+        eval $go
+        
+    fi
+    
+    # mount ro
     mount -o remount,ro /sysroot
 fi
 
