@@ -118,32 +118,6 @@ if [ -n "\$*" ]; then
     exit 1
 fi
 
-echo -n "removing preexisting modules in /lib/modules/$VERSION... "
-rm -rf /lib/modules/$VERSION && echo DONE || { echo FAIL; exit 1; }
-
-if [ -n "$VERSION_NAME" ]; then
-    if [ -h /lib/modules/$VERSION_NAME ]; then
-        old_one=\$(readlink /lib/modules/$VERSION_NAME)
-        echo -n "following $VERSION_NAME symlink to remove modules in \$old_one... "
-        rm -rf /lib/modules/\$old_one && echo DONE || { echo FAIL; exit 1; }
-        echo -n "removing $VERSION_NAME symlink... "
-        rm /lib/modules/$VERSION_NAME && echo DONE || { echo FAIL; exit 1; }
-    fi
-fi
-
-echo -n "removing preexisting headers in /usr/src/linux-headers-$VERSION... "
-rm -rf /usr/src/linux-headers-$VERSION && echo DONE || { echo FAIL; exit 1; }
-
-if [ -n "$VERSION_NAME" ]; then
-    if [ -h /usr/src/linux-headers-$VERSION_NAME ]; then
-        old_one=\$(readlink /usr/src/linux-headers-$VERSION_NAME)
-        echo -n "following $VERSION_NAME symlink to remove headers in \$old_one... "
-        rm -rf /usr/src/\$old_one && echo DONE || { echo FAIL; exit 1; }
-        echo -n "removing $VERSION_NAME symlink... "
-        rm /usr/src/linux-headers-$VERSION_NAME && echo DONE || { echo FAIL; exit 1; }
-    fi
-fi
-
 echo -n "extracting archive... "
 cp -a FOO/* / && echo DONE || { echo FAIL; exit 1; }
 
