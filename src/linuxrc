@@ -1128,7 +1128,14 @@ fi
 # FIXME: actually, rsync w/out any actual updates still takes a few
 #        seconds... maybe my test box is slow, this is actually much more of a
 #        bootup impact that i had thought.  perhaps i should just do it if the
-#        dir isn't here or the symlink is wrong?
+#        dir isn't here or the symlink is wrong?  modinject=none|fast|always ?
+#
+#        perhaps manually check timestamp of /sysroot/lib/modules/VERSION if it
+#        exists to see if its older than what's on the initramfs, and if it is,
+#        then do an rsync?  same drill for /sysroot/usr/src/linux-headers.
+#
+#        that seems like a pretty good compromise...  maybe good enough to not
+#        bother adding an argument to modinject?
 #
 if [ -n "$modinject" ]; then
     echo -n "Injecting kernel modules and headers into /sysroot... "
@@ -1160,6 +1167,8 @@ if [ -n "$modinject" ]; then
     #
     # if we're installing a symlink, and the symlink already exists and points
     # to a different version, remove what it points at and recreate the symlink
+    need_new=
+    sysdir=/sysroot/lib/modules/$VERSION
     if [ -n "$VERSION_NAME" ]; then
         syslink=/sysroot/lib/modules/$VERSION_NAME
         if [ -h $syslink ]; then
@@ -1175,6 +1184,7 @@ if [ -n "$modinject" ]; then
             rm -rf $syslink
         fi
         if [ ! -h $syslink ]; then
+            need_new=y
             go="ln"
             [ "$quiet" != "1" ] && go="$go -v"
             go="$go -s $VERSION $syslink"
@@ -1184,12 +1194,19 @@ if [ -n "$modinject" ]; then
     fi
     
     # modules - rsync the new ones
-    go="rsync"
-    [ "$quiet" != "1" ] && go="$go --stats"
-    # don't use -a, because we don't want group or owner preserved
-    go="$go -rlptD /lib/modules/$VERSION /sysroot/lib/modules/"
-    decho $go
-    eval $go
+    if [ ! -d "$sysdir" ]; then
+        need_new=y
+    elif [ /lib/modules/$VERSION -nt "$sysdir" ]; then
+        need_new=y
+    fi
+    if [ -n "$need_new" ]; then
+        go="rsync"
+        [ "$quiet" != "1" ] && go="$go --stats"
+        # don't use -a, because we don't want group or owner preserved
+        go="$go -rlptD -u /lib/modules/$VERSION /sysroot/lib/modules/"
+        decho $go
+        eval $go
+    fi
     
     # headers will be left out of the initramfs if the kernel doesn't support
     # out-of-tree module buliding (e.g., CONFIG_TRIM_UNUSED_KSYMS=y), so check
@@ -1200,6 +1217,8 @@ if [ -n "$modinject" ]; then
         # if we're installing a symlink, and the symlink already exists and
         # points to a different version, remove what it points at and recreate
         # the symlink
+        need_new=
+        sysdir=/sysroot/usr/src/linux-headers-$VERSION
         if [ -n "$VERSION_NAME" ]; then
             syslink=/sysroot/usr/src/linux-headers-$VERSION_NAME
             if [ -h $syslink ]; then
@@ -1215,6 +1234,7 @@ if [ -n "$modinject" ]; then
                 rm -rf $syslink
             fi
             if [ ! -h $syslink ]; then
+                need_new=y
                 go="ln"
                 [ "$quiet" != "1" ] && go="$go -v"
                 go="$go -s linux-headers-$VERSION $syslink"
@@ -1224,12 +1244,19 @@ if [ -n "$modinject" ]; then
         fi
         
         # headers - rsync the new ones
-        go="rsync"
-        [ "$quiet" != "1" ] && go="$go --stats"
-        # don't use -a, because we don't want group or owner preserved
-        go="$go -rlptD /usr/src/linux-headers-$VERSION /sysroot/usr/src/"
-        decho $go
-        eval $go
+        if [ ! -d "$sysdir" ]; then
+            need_new=y
+        elif [ /usr/src/linux-headers-$VERSION -nt "$sysdir" ]; then
+            need_new=y
+        fi
+        if [ -n "$need_new" ]; then
+            go="rsync"
+            [ "$quiet" != "1" ] && go="$go --stats"
+            # don't use -a, because we don't want group or owner preserved
+            go="$go -rlptD -u /usr/src/linux-headers-$VERSION /sysroot/usr/src/"
+            decho $go
+            eval $go
+        fi
         
     fi
     
