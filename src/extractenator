@@ -23,6 +23,10 @@ usage()
     echo
     echo "  -f, --filename EXEFILE    Specify output filename. (REQUIRED)"
     echo
+    echo "  -e, --exclude PATTERN     Exclude files in PAYLOAD that match PATTERN,"
+    echo "                            a glob(3)-style wildcard pattern.  Can be"
+    echo "                            specified multiple times."
+    echo
     echo "  -s, --script SCRIPT       Specify installation script to be run after"
     echo "                            extraction.  SCRIPT will be included as archive"
     echo "                            content, you don't have to also specify it as"
@@ -106,8 +110,8 @@ usage()
 #       current positional arguments (e.g, $1, $2).
 #
 __opts=$(getopt -un $(basename $0) \
-    -o hf:s:c:C: \
-    --long help,filename:,script:,compressor:,compressor-args: -- $@)
+    -o hf:e:s:c:C: \
+    --long help,filename:,exclude:,script:,compressor:,compressor-args: -- $@)
 if [ $? != 0 ]; then
     echo
     usage
@@ -119,12 +123,17 @@ set -- $__opts
 comp="zstd"
 decomp="zstdcat"
 compargs="-T0 -10"
+tarflags=
 
 # parse the new positional arguments
 while true; do
     case "$1" in
         -f|--filename)
             filename=$2
+            shift 2
+            ;;
+        -e|--exclude)
+            tarflags+=" --exclude="$2
             shift 2
             ;;
 	-s|--script)
@@ -198,6 +207,7 @@ echo comp: $comp
 echo compargs: $compargs
 echo decomp: $decomp
 echo payload: $payload
+echo tarflags: $tarflags
 
 
 # create the initial extraction script
@@ -274,7 +284,7 @@ sed -i "s|__SKIP__|$skip|" $filename
 
 # and now append the payload
 echo -n "appending payload... "
-(tar -c $payload | $comp $compargs >> $filename) || { echo FAIL; exit 1; }
+(tar -c $tarflags $payload | $comp $compargs >> $filename) || { echo FAIL; exit 1; }
 echo DONE
 
 # and make it executable
