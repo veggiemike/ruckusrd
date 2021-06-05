@@ -115,6 +115,8 @@ emergency_shell()
 
 control_shell()
 {
+    echo "uptime: $(cat /proc/uptime | cut -d' ' -f1)"
+    echo
     setsid cttyhack bash
 }
 
@@ -1123,6 +1125,11 @@ fi
 #       would remove built out-of-tree modules.  instead we just want to update
 #       via rsync.
 #
+# FIXME: actually, rsync w/out any actual updates still takes a few
+#        seconds... maybe my test box is slow, this is actually much more of a
+#        bootup impact that i had thought.  perhaps i should just do it if the
+#        dir isn't here or the symlink is wrong?
+#
 if [ -n "$modinject" ]; then
     echo -n "Injecting kernel modules and headers into /sysroot... "
     decho ""
@@ -1178,7 +1185,7 @@ if [ -n "$modinject" ]; then
     
     # modules - rsync the new ones
     go="rsync"
-    [ "$quiet" != "1" ] && go="$go --progress --stats"
+    [ "$quiet" != "1" ] && go="$go --stats"
     # don't use -a, because we don't want group or owner preserved
     go="$go -rlptD /lib/modules/$VERSION /sysroot/lib/modules/"
     decho $go
@@ -1218,7 +1225,7 @@ if [ -n "$modinject" ]; then
         
         # headers - rsync the new ones
         go="rsync"
-        [ "$quiet" != "1" ] && go="$go --progress --stats"
+        [ "$quiet" != "1" ] && go="$go --stats"
         # don't use -a, because we don't want group or owner preserved
         go="$go -rlptD /usr/src/linux-headers-$VERSION /sysroot/usr/src/"
         decho $go
@@ -1228,6 +1235,8 @@ if [ -n "$modinject" ]; then
     
     # mount ro
     mount -o remount,ro /sysroot
+
+    echo "done"
 fi
 
 
