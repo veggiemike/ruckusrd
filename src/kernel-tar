@@ -135,7 +135,9 @@ EOF
 # NOTE: $* is so we can pass additional arguments to extractenator (e.g.,
 #       --comp).
 #
-$extractenator -f $filename -s $tmpdir/installer FOO $* || exit 1
+# NOTE: We exclude lib and usr because initrd installs thost at boot now.
+#
+$extractenator -f $filename -e FOO/lib -e FOO/usr -s $tmpdir/installer FOO $* || exit 1
 
 rm -rf $tmpdir
 exit 0
