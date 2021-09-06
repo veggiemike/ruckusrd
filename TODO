@@ -139,13 +139,17 @@
    essentially depend on the user using ruckusrd for initramfs... but it
    already does.
 
+   NOTE: Technically, we weren't installing ALL the modules quite yet when I
+         wrote this.  As of 0.16, we should be installing ALL modules.
+
    NOTE: If we're going to rely on this as the installation mechanism, we
          probably want to handle headers the same way... in which case, we need
          to include the headers in the initramfs, which is going to get quite a
          bit larger (/usr/src/linux-5.12.8 is about 175M).
 
-   NOTE: Technically, we weren't installing ALL the modules quite yet when I
-         wrote this.  As of 0.16, we should be installing ALL modules.
+         Actually, I'm not that worried.  My initrd size did indeed go from 60M
+         to 75M by adding headers in, but the dracut initrd files I looked at
+         in Ubuntu 20.04 weigh in at around 90M.
 
  - Consider not including linux headers in the kernel-installer archives.  We
    can add --with-headers flag to kernel-builder to override that behavior.
