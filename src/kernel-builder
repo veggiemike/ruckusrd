@@ -120,7 +120,7 @@ if [ -n "$NOVERSION" ]; then
 fi
 
 # create initrd using ruckusrd
-$ruckusrd -v -b $SRP_ROOT $SRP_ROOT/boot/initrd-$VERSION_NAME.img $VERSION_NAME || exit 3
+$ruckusrd -v -b $SRP_ROOT -o modinject=1 $SRP_ROOT/boot/initrd-$VERSION_NAME.img $VERSION_NAME || exit 3
 
 # create kernel-installer file
 $kernel_tar || exit 4
