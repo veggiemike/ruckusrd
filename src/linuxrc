@@ -45,9 +45,6 @@
 # - bash var+= (NOPE)
 
 
-. /ruckusrd.conf
-
-
 decho()
 {
     if [ "$quiet" != "1" ]; then
@@ -296,6 +293,10 @@ sqsh_layerdir="/tmproot"
 sqsh_layerdir_rel=""
 ram_layer=""
 modinject=
+
+# parse our config file, which could possibly override some of our hardcoded
+# default behavior
+. /ruckusrd.conf
 
 # Parse kernel commandline options
 #
