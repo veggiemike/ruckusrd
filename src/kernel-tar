@@ -118,8 +118,20 @@ if [ -n "\$*" ]; then
     exit 1
 fi
 
-echo -n "extracting archive... "
-cp -a FOO/* / && echo DONE || { echo FAIL; exit 1; }
+# NOTE: Some distros symlink /lib -> /usr/lib... which causes a simple
+#       'cp -a FOO/* /' to fail.  To prevent this we check specifically for
+#       lib symlink and follow it if found.
+#
+for x in FOO/*; do
+    src=$x
+    tgt=$(realpath /$(basename $x)
+    if [ -d $tgt ]; then
+        tgt=$(dirname $tgt)
+        src="$src/*"
+    fi
+    echo -n "extracting $src to $tgt... "
+    cp -a $src $tgt && echo DONE || { echo FAIL; exit 1; }
+done
 
 echo
 echo "!! don't forget to update your bootloader (e.g., grub, extlinux) !!"
