@@ -39,7 +39,7 @@ usage()
     echo "RuckusRD v$VERSION - a super awesome, yet simple, mkinitrd replacement"
     echo "Copyright (C) 2012-2021 Michael D Labriola <michael.d.labriola@gmail.com>"
     echo
-    echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] [-b basedir] [-c best|fast] <out-initrd-image> <kernel-version>"
+    echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] [-b basedir] [-c best|fast] [-o linuxrc-option] <out-initrd-image> <kernel-version>"
     echo
     echo "example: $(basename $0) /boot/myinitramfs.img \`uname -r\`"
 }
@@ -59,6 +59,7 @@ INITRAMFS_TARGET=""
 KERNEL=""
 BASEDIR="/"
 COMPMODE="fast"
+LINUXRC_OPTS=
 while [ $# -gt 0 ] ; do
     case $1 in
         --help)
@@ -81,6 +82,10 @@ while [ $# -gt 0 ] ; do
             ;;
         -c)
             COMPMODE=$2
+            shift
+            ;;
+        -o)
+            LINUXRC_OPTS+=" $2"
             shift
             ;;
         *)
@@ -144,6 +149,15 @@ $mkdir $TEMPDIR/initramfs || cleanup 1
 pushd >/dev/null $TEMPDIR/initramfs &&
 $xz -dc $LIBDIR/initramfs.cpio.xz | $cpio --extract &&
 popd >/dev/null || cleanup 1
+
+# append to config file
+for x in $LINUXRC_OPTS; do
+    echo $x >> $TEMPDIR/initramfs/ruckusrd.conf
+done
+if [ "$opt_verbose" != 0 ]; then
+    echo '********** /ruckusrd.conf ******************************************************'
+    cat $TEMPDIR/initramfs/ruckusrd.conf
+fi
 
 
 decho '********** PREPPING INITRAMFS MODULE DIR ***************************************'
