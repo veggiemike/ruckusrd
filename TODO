@@ -28,29 +28,6 @@
    something  like that  to differentiate  our initramfs  messages from  kernel
    spew?
 
- - We need to get firmware loaded up during the initramfs stage of boot.  This
-   is because now that we include all the kernel modules, udev will be able to
-   load any module the kernel notices... and there are some that are going to
-   require firmware to be present during load.
-
-   For now, we've got the firmwarenator util that will create a fw.img file
-   that can be appended to the initrd file pretty easily... but it would be
-   nice if this was automaticly handled.
-
-   Logistically annoying, but at least appending to the ruckusrd created
-   initramfs sounds trivial:
-
-   $ cat /boot/fw.img >> /boot/initrd-5.10.y.img
-
-   That assumes that both fw.img and initrd.img use the same compressor.  If
-   that's not the case, it can be remedied like this:
-
-   $ zstdcat /boot/fw.img | gzip >> /boot/initrd-5.4.y.img
-
-   We should have kernel_tar's installation script do that automatically if
-   /boot/ruckusrd-fw.img exists.  I think we can simply use file to
-   detect/correct mismatched compressors.
-
  - Once we've got microcodenator generating /boot/ruckusrd-ucode.img, we should
    do the same thing we're doing with firmware?  I seem to recall that ucode
    had to be the 1st thing seen by the kernel... so that might not work.
@@ -91,30 +68,33 @@
    the squashfs.img locally somewhere, etc.
 
 
-* For 0.16
+* For 0.17
 
- - Add config-file support (/mnt/root-true/ruckusrd.conf?).  Retain kernel
-   commandline parsing, but only needed to override what's in the config file.
-   This will allow us to update config w/out needing to mess with booloader
-   config.
+ - We need to get firmware loaded up during the initramfs stage of boot.  This
+   is because now that we include all the kernel modules, udev will be able to
+   load any module the kernel notices... and there are some that are going to
+   require firmware to be present during load.
 
-   It would also allow us to create initrd w/ modified default behavior (e.g.,
-   modinject enabled).  So, a ruckusrd initrd generated via kernel-builder will
-   have modinject enabled by default... but if you're using ruckusrd to create
-   an initrd for a distro kernel, modinject will be disabled by default.
+   For now, we've got the firmwarenator util that will create a fw.img file
+   that can be appended to the initrd file pretty easily... but it would be
+   nice if this was automaticly handled.
 
-   We already install ruckusrd.conf in the initramfs... but currently it's
-   generated at configure time and just has the ruckusrd version in it.  I
-   suppose we could start with that, and append more settings to it when we
-   copy it into the initramfs.
+   Logistically annoying, but at least appending to the ruckusrd created
+   initramfs sounds trivial:
 
-   This all makes perfect sense... except I don't quite recall what my original
-   intention was after rereading that 1st paragraph.  I guess it was so
-   per-host I could add root= and all those other potential command line args
-   to a global config file to tone down the mass of args going on our kernel
-   command line.  Yeah, I think that was it.  The catch here would be
-   remembering to re-run ruckusrd for each kernel after changing the installed
-   ruckusrd.conf.
+   $ cat /boot/fw.img >> /boot/initrd-5.10.y.img
+
+   That assumes that both fw.img and initrd.img use the same compressor.  If
+   that's not the case, it can be remedied like this:
+
+   $ zstdcat /boot/fw.img | gzip >> /boot/initrd-5.4.y.img
+
+   We should have kernel_tar's installation script do that automatically if
+   /boot/ruckusrd-fw.img exists.  I think we can simply use file to
+   detect/correct mismatched compressors.
+
+
+* Could happen in a stable release
 
  - Add script to help create microcode.img.  Unlike the firmware.img
    generation, we probably can't assume that the kernel is already loading
@@ -131,43 +111,6 @@
 
    NOTE: Started this as microcodenator, but it's only half implemented.
          Finish it.
-
- - Now that initrd has ALL a kernel's modules, and rsync, make sure the rootfs
-   actually has them installed and inject them if necesary.  We could actually
-   rely on this as our module installation mechanism instead of having
-   kernel_tar's embedded installer do it...  That would make kernel_builder
-   essentially depend on the user using ruckusrd for initramfs... but it
-   already does.
-
-   NOTE: Technically, we weren't installing ALL the modules quite yet when I
-         wrote this.  As of 0.16, we should be installing ALL modules.
-
-   NOTE: If we're going to rely on this as the installation mechanism, we
-         probably want to handle headers the same way... in which case, we need
-         to include the headers in the initramfs, which is going to get quite a
-         bit larger (/usr/src/linux-5.12.8 is about 175M).
-
-         Actually, I'm not that worried.  My initrd size did indeed go from 60M
-         to 75M by adding headers in, but the dracut initrd files I looked at
-         in Ubuntu 20.04 weigh in at around 90M.
-
- - Consider not including linux headers in the kernel-installer archives.  We
-   can add --with-headers flag to kernel-builder to override that behavior.
-   Including the headers in the installer more than doubles it's size, and I
-   usually have CONFIG_TRIM_UNUSED_KSYMS enabled which allows for better kernel
-   optimizations at the expense of breaking out-of-tree module building... plus
-   that kernel header prep and installation is lifted from some rpm spec file
-   from way back and largely untestested (again, because I don't build
-   out-of-tree modules).
-
-   Actually, we could just key off of CONFIG_TRIM_UNUSED_KSYMS in .config... We
-   wouldn't necesarily need to add any new command line flags that way.
-   Include headers if that's not set, leave them out if it is.  If we do that,
-   we'll want to at least make it super obvious via some output during
-   kernel-builder (preferablly at the end so people can actually see it?).
-
-
-* Could happen in a stable release
 
  - I've added rsync and dropbear, and they both work.  However, something is
    wonky regarding uid detection in my maint shell.  Even after adding

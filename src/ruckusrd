@@ -45,6 +45,11 @@ usage()
 }
 
 
+# FIXME: so, we need to audit this a bit... removing the tmpdir on failure
+#        keeps us from littering /tmp with tons of garbage, but it also
+#        prevents us from actually debugging problems.  perhaps just cleanup if
+#        it's some type of user error?
+#
 cleanup()
 {
     retcode=$1

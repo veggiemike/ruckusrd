@@ -243,8 +243,6 @@ PATH=/sbin:/bin
 
 exec < /dev/console > /dev/console 2>&1
 
-echo "initramfs created with RuckusRD v$VERSION"
-
 # mount devtmpfs for /dev
 mount -n -t devtmpfs -o mode=0755 devtmpfs /dev || \
     ( echo "is CONFIG_DEVTMPFS enabled in your kernel?"; emergency_shell )
@@ -297,6 +295,8 @@ modinject=
 # parse our config file, which could possibly override some of our hardcoded
 # default behavior
 . /ruckusrd.conf
+
+echo "initramfs created with RuckusRD v$VERSION"
 
 # Parse kernel commandline options
 #

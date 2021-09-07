@@ -42,7 +42,7 @@ Strengths:
      protocols, device drivers) are included in the initramfs, along
      with any modules they in turn require.
 
-     Actually, as of v0.15, ALL kernel modules are included in the
+     Actually, as of v0.16, ALL kernel modules are included in the
      initramfs so that everything the kernel was configured to be able
      to do is fully availabile in the maintenence shell.
 
