@@ -67,9 +67,75 @@
    Install syslinux (either for EFI or BIOS), install the kernel files, install
    the squashfs.img locally somewhere, etc.
 
+ - Add zstd to initramfs?
+
 
 * For 0.17
 
+ - Add a linuxrc flag to disable loading of nonessential modules so we can get
+   to a state where we can populate /lib/firmware and then load them.  We've
+   got a chicken-and-the-egg problem regarding firmware detection.  Everything
+   I've done so far assumes you can boot up a perfect system with all the
+   appropriate firmware in place when modules load, so you can detect which
+   files are needed for your particular hardware...  So where does this perfect
+   system come from?  I essentually bootstrapped mine off a normal ubuntu 18.04
+   install to get things started... but that's not very magestic.
+
+   I tried providing all the firmware to the initramfs a while back, and it
+   blew up.  I assumed it was too large or something as it was an extra 500M or
+   so.  So, can we boot up to a pre-udev breakpoint and ask for firmware?
+   Supply it via some other block device or something?  Can't use network to
+   get it, because we might need firmware for that.
+
+   For the record, the entire linux-firmware tree is 216M compressed w/ zstd
+   and I CAN append that to the initrd and boot it up just fine.  However, that
+   leaves me with an initrd that's 300M instead of 70M, and most of that is
+   exactly the same regardless of kernel version.
+
+   To create fw-all.img, from inside a linux-firmware git clone:
+
+   find . -path ./.git\* -o -type f -print L | cpio -p --make-dir /scrap/fw-all/lib/firmware
+   pushd /scrap/fw-all
+   find . | cpio -o -H newc | zstd -T0 -10 > /scrap/fw-all.img
+   popd
+
+   Ok, the problem I remember looks like it's a syslinux efi limitation on
+   total size of payload (kernal+initrd+whateverele), so on my laptop (where I
+   need to do this) it doesn't work.  It works on a domU, but that's pointless
+   because no hardware.
+
+   New plan is to create a fw-all.sqsh file in /boot, mount it on /lib/firmware
+   at 'shell' breakpoint, then go on our merry way.  To create the image:
+
+   mksquashfs . /scrap/fw-all.sqsh -comp xz -e .git
+
+   Yes.  This works.  In fact, it might work so well it could be an every boot
+   thing completely replacing the "append fw.img to initrd" process...
+
+   1. Break at 'shell'
+   1.1. Mount the root dev
+   1.2. Mount fw-all.sqsh on /lib/firmware
+   1.3. Umount -l root dev
+   1.4. exit
+   2. Break at 'maint'
+   2.1. Umount -l /lib/firmware
+   2.2. exit
+
+   That gives you the perfect situation post boot, where ALL the kernel modules
+   are available pre-switchroot, and ALL the FIRMWARE is available as well.
+   And the fw.img is seperate from the other kernel files.
+
+   I can't see any reason to do this any differently.  I suppose we can keep
+   firmwarenator around along with my patch to print out firmware loading
+   messages for the case where we want to create a smaller initrd w/out extra
+   fw.sqsh...  but I don't really see myself using it.
+
+   Hmmm...  how do we figure out what the boot device was so we can remount it
+   to get at the fw.sqsh file?  I can do it by hand because I already KNOW what
+   device it's on.  fwdev= arg that doesn't use the udev device detection?
+   Just straight up fwdev=/dev/nvme0n1p1 and expect fw.sqsh to be sitting at
+   its root?
+   
  - We need to get firmware loaded up during the initramfs stage of boot.  This
    is because now that we include all the kernel modules, udev will be able to
    load any module the kernel notices... and there are some that are going to
@@ -93,9 +159,6 @@
    /boot/ruckusrd-fw.img exists.  I think we can simply use file to
    detect/correct mismatched compressors.
 
-
-* Could happen in a stable release
-
  - Add script to help create microcode.img.  Unlike the firmware.img
    generation, we probably can't assume that the kernel is already loading
    microcode propperly...  but really we only have 2 choices (intel/amd) so we
@@ -111,6 +174,9 @@
 
    NOTE: Started this as microcodenator, but it's only half implemented.
          Finish it.
+
+
+* Could happen in a stable release
 
  - I've added rsync and dropbear, and they both work.  However, something is
    wonky regarding uid detection in my maint shell.  Even after adding
