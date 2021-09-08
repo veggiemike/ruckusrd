@@ -29,6 +29,7 @@ Makefile.in
 /subprojects/e2fsprogs.tar
 /subprojects/efibootmgr.tar
 /subprojects/eudev.tar
+/subprojects/fw.sqsh
 /subprojects/lvm2.tar
 /subprojects/mdadm.tar
 /subprojects/rsync.tar

@@ -4,12 +4,14 @@
 
 
 all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar
+all-local: fw.sqsh
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
 
 clean-local:
 	rm -fv {eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr}.tar
+	rm -fv fw.sqsh
 	cd eudev && git clean -dfx && git stash
 	cd busybox && git clean -dfx && git stash
 	cd mdadm && git clean -dfx && git stash
@@ -274,3 +276,12 @@ efibootmgr/FOO:
 	make EFIDIR=ruckus && \
 	make EFIDIR=ruckus DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
+
+
+# FIXME: I'd like to use zstd here, but ubuntu 18.04 squashfs doesn't
+#        support it...  I could/should check via configure and use if
+#        possible.
+#
+fw.sqsh:
+	mksquashfs linux-firmware $@ -comp xz -e .git -noappend
+	mksquashfs wireless-regdb/regulatory.db* $@ -comp xz -e .git
