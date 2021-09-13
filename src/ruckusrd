@@ -165,6 +165,85 @@ if [ "$opt_verbose" != 0 ]; then
 fi
 
 
+decho '********** INSTALLING MICROCODE ************************************************'
+# Copy intel and amd microcode over
+#
+# NOTE: The microcode has to be in the initramfs for early loading to work.  As
+#       with modules, we want this to be a one-size-fits all initrd, so we copy
+#       it all despite size and speed penalties.
+#
+# FIXME: My testing indicates problems finding microcode if compressed, at
+#        least on my laptop with zstd.  If I provide just the correct firmware
+#        (not the whole catted superblob) as GenuineIntel.bin as first initrd
+#        uncompressed, it works fine.  If I compress that w/ zstd, no dice.
+#
+#        Seems like we're going to fall back to creating microcode.img via
+#        subprojects/Makefile.am like fw.sqsh and leave it to the user to
+#        install that file in /boot and tweak kernel commandline to put it as
+#        the first initrd.
+#
+#        Also, Xen behaves differently.  ucode=file can be done with EFI .cfg,
+#        but it expects a binary file (not cpio), hypervisor arg ucode=scan
+#        will look through initrd but when using EFI it can only take one (and
+#        I don't want an uncompressed initiramfs).  I need to find out if the
+#        binary format can be both AMD/Intel or wether we need to be specific,
+#        if we're host specific we may as well just get the micorocde for this
+#        particular host.
+#
+#        We should look into making a multi-part cpio archive.  There's
+#        probably a proper name for that.  I know there's a way to combine
+#        multip cpio archives into a single file... if each piece can be
+#        compressed differently, that may be the perfect solution.  We could
+#        have a single file (so Xen EFI .cfg can be happy), we can rely on the
+#        kernel's micorocde loader (which can parse through both AMD and Intel
+#        files), and we can still compress the majority of the initramfs.
+#
+#        That was stupid easy: cat ucode.img initrd.img > initrd-combined.img
+#
+#        Should we
+#
+#        1) Build ucode.img via subprojects/Makefile.am and install it in
+#        /usr/share/ruckusrd to be pulled in by ruckusrd at runtime?
+#
+#        2) Build it via subprojects/Makefile.am, let the user do what they
+#        want with it, have kernel_installer notice /boot/ucode-ruckusrd.img
+#        and combine that with initrd at install time?
+#
+#        3) Build it via subprojects/Makefile.am, assume the user puts it in
+#        /boot if they want to use it, have ruckusrd automatically combine that
+#        with the initrd it's creating at runtime?
+#
+#        This really boils down to "do we combine once for our universal
+#        initramfs" or "do we combine at install time"?  Not all boxes need
+#        microcode (e.g., virtual machines), so leaving it to install-time
+#        might allow those boxes to boot faster (but is that even going to be
+#        measurable?).  If we do it at install time, and we're requiring each
+#        machine that wants ucode to set things up, then why not have them
+#        create a smaller machine-specific ucode.img w/ microcodenator instead?
+#
+#        I'm leaning towards option 1 or 3 for a universal initramfs.  Aaaand
+#        now leaning towards 1 becasue we've so far not trusted system's
+#        /lib/firmware and we track our own using subprojects.  The down-side
+#        is that our firmware update mechanism will be rebuild ruckusrd...
+#        perhaps we can add a ruckusrd --update-firmware flag in the future to
+#        update those files?  If those files are getting updated, should they
+#        go in /var/lib or something like that instead of /usr/share?
+#
+#        Also, what do the roles of firmwarenator and microcodenator become?
+#        Small, machine-specific fw.img and ucode.img generation?  Maybe they
+#        should be used post-installation of ruckusrd to create/update fw.sqsh
+#        and ucode.img?  Perhaps with --specific and --universal flags?
+#
+# FIXME: Intel: cating together into bin works, but iucode_tool definately
+#        produces something slightly different... and i don't know why.
+#
+#DESTFWDIR=$TEMPDIR/initramfs/kernel/x86/microcode
+#$mkdir -p $DESTFWDIR
+#cat /lib/firmware/amd-ucode/microcode*.bin > $DESTFWDIR/AuthenticAMD.bin || cleanup 1
+##cat /lib/firmware/intel-ucode{,-with-caveats}/* > $DESTFWDIR/GenuineIntel.bin || cleanup 1
+#iucode_tool -w$DESTFWDIR/GenuineIntel.bin /lib/firmware/intel-ucode{,-with-caveats}/ || cleanup 1
+#
+
 decho '********** PREPPING INITRAMFS MODULE DIR ***************************************'
 HOSTMODDIR=$(realpath -s $BASEDIR/lib/modules/$KERNEL)
 decho HOSTMODDIR=$HOSTMODDIR

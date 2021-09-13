@@ -282,6 +282,12 @@ efibootmgr/FOO:
 #        support it...  I could/should check via configure and use if
 #        possible.
 #
+# FIXME: I don't think adding intel-ucode to fw.sqsh is going to
+#        trigger early loading of firmware.  Let's see.  Either way, I
+#        think for Xen I have to provide it seperately to the
+#        hypervisor...
+#
 fw.sqsh:
 	mksquashfs linux-firmware $@ -comp xz -e .git -noappend
-	mksquashfs wireless-regdb/regulatory.db* $@ -comp xz -e .git
+	mksquashfs wireless-regdb/regulatory.db* $@
+	mksquashfs intel-ucode/intel-ucode $@ -keep-as-directory
