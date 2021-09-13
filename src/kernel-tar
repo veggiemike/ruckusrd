@@ -122,12 +122,14 @@ echo -n "extracting archive... "
 cp -a FOO/* / && echo DONE || { echo FAIL; exit 1; }
 
 echo
-echo "!! don't forget to update your bootloader (e.g., grub, extlinux) !!"
-echo
-#
-# FIXME: remove this when/if we autmagically handle fw.img
-#
-echo "!! don't forget to append firmware to initrd !!"
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "!!                                                                           !!"
+echo "!! don't forget to update your bootloader (e.g., grub, extlinux)             !!"
+echo "!!                                                                           !!"
+echo "!! don't forget to provide firmware to initrd (e.g., use fwdev w/ fw.sqsh or !!"
+echo "!! append firmware to initrd)                                                !!"
+echo "!!                                                                           !!"
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo
 
 EOF

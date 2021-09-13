@@ -175,6 +175,17 @@
    NOTE: Started this as microcodenator, but it's only half implemented.
          Finish it.
 
+- Firmware/microcode should probably also get injected via modinject
+
+- Microcode needs to really be in the initrd for early loading to work.  We'll
+  still stick it in fw.sqsh as well, as that will get injected into the root
+  filesystem to maintain consistency.
+
+- Allow some dynamic device naming for fwdev= command line arg.  We need to be
+  able to do it prior to module loading, so we can't do full-blown LVM or MDADM
+  stuff... but we can probably do some block device querying for simple LABEL=
+  support... right?  blkid -L ESP should work for my laptop.
+  
 
 * Could happen in a stable release
 

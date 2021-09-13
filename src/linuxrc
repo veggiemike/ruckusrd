@@ -291,6 +291,7 @@ sqsh_layerdir="/tmproot"
 sqsh_layerdir_rel=""
 ram_layer=""
 modinject=
+fwdev=
 
 # parse our config file, which could possibly override some of our hardcoded
 # default behavior
@@ -377,6 +378,9 @@ for o in `cat /proc/cmdline` ; do
     modinject)
         modinject=1
         ;;
+    fwdev=*)
+        fwdev=${o#fwdev=}
+        ;;
     *)
         # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
         #       max_loop=16" to get written in modprobe.conf...
@@ -433,6 +437,7 @@ decho "sqsh_layerdir=$sqsh_layerdir"
 decho "sqsh_layerdir_rel=$sqsh_layerdir_rel"
 decho "ram_layer=$ram_layer"
 decho "modinject=$modinject"
+decho "fwdev=$fwdev"
 
 
 if [ -n "$shell" ]; then
@@ -458,6 +463,21 @@ fi
 #        already there.
 #
 modprobe loop max_loop=32
+
+# extra special device with fw.sqsh on it!
+mkdir -p /lib/firmware
+if [ -n "$fwdev" ]; then
+    fwdir=/fwdev
+    fwsqsh=$fwdir/fw.sqsh
+    mkdir -p $fwdir
+    mount -o ro $fwdev $fwdir
+    if [ -e $fwsqsh ]; then
+        mount -o ro $fwsqsh /lib/firmware
+    else
+        fwsqsh=
+    fi
+    umount -l $fwdir
+fi
 
 echo -n "determining what to mount... "
 
@@ -1103,40 +1123,18 @@ EOF
     mount -o remount,ro /sysroot
 fi
 
-# inject modules/headers into rootfs
+# inject modules/headers/firmware into rootfs
 #
-# FIXME: should we always do this?  do it unless disabled via nomodinject flag?
-#        or only do it if modinject flag passed?  it's a pretty strange thing
-#        for an initrd to be doing, in a vaccuum.  since we've always tried to
-#        keep the default behavior in line with what people would expect from
-#        an initrd, id lean towards required explicit modinject flag
-#
-#        but... if we want to be able to assume that modinject is enabled from
-#        inside kernel-builder (so we can leave modules OUT of the installer
-#        archive), we would have to enable it by default.
-#
-#        for now, we should note that modinject needs to be enabled if you're
-#        using kernel-builder's installation mechanism...  but this would be a
-#        good case for embedding desired linuxrc behavior into the generated
-#        initrd file (i.e., config file).  that's something that's bounced
-#        around for years without gaining any real use-case.
-#
-# NOTE: we don't want to completely remove and reinstall modules like the old
-#       extractenator script was doing.  that would be slow every time, and
-#       would remove built out-of-tree modules.  instead we just want to update
+# NOTE: We don't want to completely remove and reinstall modules like the old
+#       extractenator script was doing.  That would be slow every time, and
+#       would remove built out-of-tree modules.  Instead we just want to update
 #       via rsync.
 #
-# FIXME: actually, rsync w/out any actual updates still takes a few
-#        seconds... maybe my test box is slow, this is actually much more of a
-#        bootup impact that i had thought.  perhaps i should just do it if the
-#        dir isn't here or the symlink is wrong?  modinject=none|fast|always ?
-#
-#        perhaps manually check timestamp of /sysroot/lib/modules/VERSION if it
-#        exists to see if its older than what's on the initramfs, and if it is,
-#        then do an rsync?  same drill for /sysroot/usr/src/linux-headers.
-#
-#        that seems like a pretty good compromise...  maybe good enough to not
-#        bother adding an argument to modinject?
+#       Actually, rsync w/out any actual updates still takes a few
+#       seconds... which isn't desirable for every single bootup at all.  As a
+#       compromise, we manually check timestamp of /sysroot/lib/modules/VERSION
+#       if it exists to see if its older than what's on the initramfs, and if
+#       it is, then do an rsync.  Same drill for linux-headers and firmware.
 #
 if [ -n "$modinject" ]; then
     echo -n "Injecting kernel modules and headers into /sysroot... "
@@ -1261,6 +1259,22 @@ if [ -n "$modinject" ]; then
         
     fi
     
+    # firmware - rsync the new ones
+    sysdir=/sysroot/lib/firmware
+    if [ ! -d "$sysdir" ]; then
+        need_new=y
+    elif [ /lib/firmware -nt "$sysdir" ]; then
+        need_new=y
+    fi
+    if [ -n "$need_new" ]; then
+        go="rsync"
+        [ "$quiet" != "1" ] && go="$go --stats"
+        # don't use -a, because we don't want group or owner preserved
+        go="$go -rlptD -u /lib/firmware $(dirname $sysdir)"
+        decho $go
+        eval $go
+    fi
+
     # mount ro
     mount -o remount,ro /sysroot
 
@@ -1270,6 +1284,9 @@ fi
 
 # remount final root dev rw if requested
 [ -n "$root_rw" ] && mount -o remount,rw /sysroot
+
+# unmount fw.sqsh if we mounted it
+[ -n "$fwsqsh" ] && umount /lib/firmware
 
 if [ -n "$maint" ]; then
     echo "Dropping to a maintenance shell, as requested. Good luck!"
