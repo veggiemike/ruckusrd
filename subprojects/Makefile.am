@@ -4,14 +4,15 @@
 
 
 all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar
-all-local: fw.sqsh
+all-local: fw.sqsh ucode.img
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
 
 clean-local:
 	rm -fv {eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr}.tar
-	rm -fv fw.sqsh
+	rm -fv fw.sqsh ucode.img
+	rm -rf .build*
 	cd eudev && git clean -dfx && git stash
 	cd busybox && git clean -dfx && git stash
 	cd mdadm && git clean -dfx && git stash
@@ -282,12 +283,30 @@ efibootmgr/FOO:
 #        support it...  I could/should check via configure and use if
 #        possible.
 #
-# FIXME: I don't think adding intel-ucode to fw.sqsh is going to
-#        trigger early loading of firmware.  Let's see.  Either way, I
-#        think for Xen I have to provide it seperately to the
-#        hypervisor...
+# NOTE: We include microcode in fw.sqsh so that it will be there
+#       post-boot for consistency.  Having the ucode directories in
+#       /lib/modules is not enough for early-loading of microcode.
+#       That's handled via the generated ucode.img being preppended to
+#       our resulting initrd.
 #
 fw.sqsh:
 	mksquashfs linux-firmware $@ -comp xz -e .git -noappend
 	mksquashfs wireless-regdb/regulatory.db* $@
 	mksquashfs intel-ucode/intel-ucode $@ -keep-as-directory
+
+# NOTE: For early-loading, microcode needs to be provided as an
+#       uncompressed cpio archive with specific filenames for Intel
+#       and AMD.  Sticking to our "universal initramfs" principles, we
+#       include ALL microcode for both vendors in this image.
+#
+# FIXME: Intel: cating together into bin works, but iucode_tool definately
+#        produces something slightly different... and i don't know why.
+#
+#        iucode_tool -wGenuineIntel.bin /lib/firmware/intel-ucode{,-with-caveats}/
+#
+DESTFWDIR=$(builddir)/.build_ucode/kernel/x86/microcode
+ucode.img:
+	$(MKDIR_P) $(DESTFWDIR)
+	cat $(srcdir)/linux-firmware/amd-ucode/microcode*.bin > $(DESTFWDIR)/AuthenticAMD.bin
+	cat $(srcdir)/intel-ucode/intel-ucode{,-with-caveats}/* > $(DESTFWDIR)/GenuineIntel.bin
+	cd $(DESTFWDIR); find . | cpio -o -H newc > $@

@@ -185,7 +185,17 @@
   able to do it prior to module loading, so we can't do full-blown LVM or MDADM
   stuff... but we can probably do some block device querying for simple LABEL=
   support... right?  blkid -L ESP should work for my laptop.
-  
+
+- Our current ucode.img support is super convenient, but it's tied specific
+  checkouts of the firmware and ucode repos to specific releases of ruckusrd...
+  perhaps we can add a ruckusrd --update-firmware flag in the future to update
+  those files w/out making a new release of ruckusrd?
+
+  Also, what do the roles of firmwarenator and microcodenator become?  Small,
+  machine-specific fw.img and ucode.img generation?  Maybe they should be used
+  post-installation of ruckusrd to create/update fw.sqsh and ucode.img?
+  Perhaps with --specific and --universal flags?
+
 
 * Could happen in a stable release
 

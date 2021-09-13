@@ -24,6 +24,7 @@ Makefile.in
 /src/initramfs
 /src/initramfs.cpio.xz
 /src/ruckusrd.conf
+/subprojects/.build*
 /subprojects/busybox.tar
 /subprojects/dropbear.tar
 /subprojects/e2fsprogs.tar
