@@ -304,9 +304,10 @@ fw.sqsh:
 #
 #        iucode_tool -wGenuineIntel.bin /lib/firmware/intel-ucode{,-with-caveats}/
 #
-DESTFWDIR=$(builddir)/.build_ucode/kernel/x86/microcode
+DESTFWROOT=$(builddir)/.build_ucode
+DESTFWDIR=$(DESTFWROOT)/kernel/x86/microcode
 ucode.img:
 	$(MKDIR_P) $(DESTFWDIR)
 	cat $(srcdir)/linux-firmware/amd-ucode/microcode*.bin > $(DESTFWDIR)/AuthenticAMD.bin
 	cat $(srcdir)/intel-ucode/intel-ucode{,-with-caveats}/* > $(DESTFWDIR)/GenuineIntel.bin
-	cd $(DESTFWDIR); find . | cpio -o -H newc > $@
+	cd $(DESTFWROOT); find . | cpio -o -H newc > $(abs_builddir)/$@

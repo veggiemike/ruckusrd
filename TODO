@@ -196,6 +196,11 @@
   post-installation of ruckusrd to create/update fw.sqsh and ucode.img?
   Perhaps with --specific and --universal flags?
 
+  Time out.  That's idiotic.  We don't install fw.sqsh or ucode.img, they're
+  created in subprojects as a convenience to be copied into /boot or whatever.
+  But the code we added to ruckusrd depends on ucode.img being in LIBDIR, so
+  that has to change.  I guess it should either assuming /boot/ucode.img or
+  take another arg, --with-ucode= perhaps?
 
 * Could happen in a stable release
 

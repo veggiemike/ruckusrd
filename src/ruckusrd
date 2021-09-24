@@ -23,7 +23,7 @@ if [ -f $(dirname $0)/linuxrc ]; then
     UCODE=$LIBDIR/../subprojects/ucode.img
 else
     LIBDIR=__LIBDIR__
-    UCODE=$LIBDIR/ucode.img
+    UCODE=/boot/ucode.img
 fi
 . $LIBDIR/ruckusrd.conf
 
@@ -41,7 +41,7 @@ usage()
     echo "RuckusRD v$VERSION - a super awesome, yet simple, mkinitrd replacement"
     echo "Copyright (C) 2012-2021 Michael D Labriola <michael.d.labriola@gmail.com>"
     echo
-    echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] [-b basedir] [-c best|fast] [-o linuxrc-option] <out-initrd-image> <kernel-version>"
+    echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] [-b basedir] [-c best|fast] [-o linuxrc-option] [--with-ucode ucode_img] <out-initrd-image> <kernel-version>"
     echo
     echo "example: $(basename $0) /boot/myinitramfs.img \`uname -r\`"
 }
@@ -93,6 +93,10 @@ while [ $# -gt 0 ] ; do
             ;;
         -o)
             LINUXRC_OPTS+=" $2"
+            shift
+            ;;
+        --with-ucode)
+            UCODE=$2
             shift
             ;;
         *)
@@ -279,7 +283,7 @@ case ${comp_cmd%% *} in
         comp_cmd+=" --check=crc32"
         ;;
 esac
-echo "Chose compressor: $comp_cmd"
+decho "Chose compressor: $comp_cmd"
 
 
 # Create the compressed image
@@ -290,14 +294,22 @@ popd >/dev/null || cleanup 1
 
 
 # Combine w/ uncompressed microcode image
-decho '********** COMBINING WITH MICROCODE IMAGE **************************************'
-cat $UCODE initramfs.img > initramfs-final.img || cleanup 1
+if [ -f $UCODE ]; then
+    decho '********** COMBINING WITH MICROCODE IMAGE **************************************'
+    cat $UCODE $TEMPDIR/initramfs.img > $TEMPDIR/initramfs-final.img || cleanup 1
+    if [ "$opt_verbose" != 0 ]; then
+        ls -l $UCODE $TEMPDIR/initramfs.img $TEMPDIR/initramfs-final.img
+    fi
+else
+    mv $TEMPDIR/initramfs.img $TEMPDIR/initramfs-final.img
+    if [ "$opt_verbose" != 0 ]; then
+        ls -l $TEMPDIR/initramfs-final.img
+    fi
+fi
 
 
 # final rename/installation
 rm -f $INITRAMFS_TARGET
 $mv $TEMPDIR/initramfs-final.img $INITRAMFS_TARGET
 
-echo "Done; initramfs is $(du -h $INITRAMFS_TARGET | awk '{print $1}')."
-echo
 cleanup 0
