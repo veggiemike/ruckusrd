@@ -1,1 +1,412 @@
-See https://github.com/veggiemike/ruckusrd/commits/master
+-*- org -*-
+
+For the latest and greatest, see https://github.com/veggiemike/ruckusrd/commits/master.
+
+* v0.17.0
+Tagger: not yet
+Date: not yet
+
+RuckusRD v0.17.0
+
+Firmware and microcode handling improvements.  Building now generates fw.sqsh
+and ucode.img in subprojects.  These two files can/should be installed by the
+user into /boot, where they can ge updated independently.  If present (or
+specified explicitly) when running ruckusrd, /boot/ucode.img is prepended to
+generated initrd file to support early loading of CPU microcode.  During boot,
+if /fw.sqsh exists it is mounted to provide firmware to early loaded kernel
+modules.  The contents of fw.sqsh (i.e., /lib/firmware) are included by
+modinject to keep post-boot /lib/firmware consistent with initrd.
+
+Both fw.sqsh and ucode.img are universal images.  They have ALL the firmware
+and ALL the microcode rolled up into larger files.  For systems that don't want
+to use a big distro-style image, host-specific fw.img and ucode.img can be
+generated via the firmwarenator and microcodenator scripts.
+
+- BusyBox, linux-firmware, intel-ucode, wireless-regdb subprojectes all updated
+  to latest stable.
+- Build subprojects/fw.sqsh, added fwdev= linuxrc commandline arg to specify
+  device the user has copied it to.
+- Build subprojects/ucode.img, added --with-ucode= flag to ruckusrd to specify
+  path (default is /boot/ucode.img).
+
+* v0.16.0
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Tue Sep 7 19:35:36 2021 -0400
+
+RuckusRD v0.16.0
+
+The driving feature for this release is the inclusion of ALL kernel
+modules on the initramfs and the new modinject option in the generated
+initird's linuxrc script.  In short, you no longer have to install
+kernel modules and headers everywhere you want to run the kernel, you
+just boot it up and the initrd installs modules and headers exactly
+the same way kernel-installer used to.  An initrd built by
+kernel-builder will automatically have modinject enabled.  Any built
+by manually calling ruckusrd will keep the traditional behavior unless
+you specify '-o modinject=1'.
+
+* v0.15.0
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Fri Apr 30 12:54:31 2021 -0400
+
+RuckusRD v0.15.0
+
+This release is mostly centered around making our maint shell so
+useful you can't live without it, as well as imcremental improvements
+to kernel development scripts.
+
+- Added rsync, dropbear (ssh client), syslinux, and efibootmgr as
+  subprojects and install them in the initramfs.
+
+- Fixed a long-standing limitation/bug in maint shell so now bash can
+  have full job control.  This means you can ctrl-C out of a ping, for
+  example.
+
+- Added a new script, firmwarenator, which helps you create a custom
+  fw.img for appending to your initrd.  There isn't yet any automatic
+  generation, but you can append a fw.img to the installed initrd
+  pretty easily.
+
+- Added linux-firmware, wireless-regdb, and intel-ucode git repos as
+  subprojects.  These aren't used in any way quite yet, but are
+  planned to be used in a future release.  For now, they're a
+  convenience for development.
+
+- The kernel-builder script now calls kernel-tar at the end, and
+  kernel-installer has been removed.  I'll just be maintaining a
+  single installer now, thanks.
+
+* v0.14.0
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Wed Feb 24 17:50:11 2021 -0500
+
+RuckusRD v0.14.0
+
+This is a pretty big release, mostly centered around tidying up the
+initramfs (e.g., remove static libs), adding networking support to the
+initramfs, and adding ZFS experimental rootfs support.  There are a
+few noteable side-effects to be aware of:
+
+- The initramfs images are now a bit larger.  We're including quite a
+  bit more of the kernel's modules, and the OpenZFS userland tools,
+  and things have gotten bigger.
+
+- Because we have networking modules on the initramfs, you're more
+  likely to need to include firmware during boot.  This can be done by
+  creating a /boot/fw.img and specifying it to the kernel as an
+  additional initrd.  The only device tested that had bad heartburn
+  was my laptop, but it's a problem that will only get more common.
+
+- ZFS rootfs support is EXPERIMENTAL.  It worked for me, but I'm sure
+  needs refinement.  The syntax is root=ZFS=zpool/dataset.
+
+In addition to that, my conventient kernel build/install tools have
+overgone a bit of an overhaul.  Changes of note:
+
+- Added zstd support for initramfs.  Ruckusrd will autodetect which
+  compression method to use, tunable with -c for "best" or "fast".
+
+- Extractenator (and thus kernel_tar) now uses zstd -T0 -10 by
+  default.
+
+- Extractenator, kernel_tar, and the resulting installers, all have
+  --dry-run and --help now.
+
+- Files created by extractenator can now take a --remote-nodes flag
+  for installing onto a list of remote systems.
+
+* v0.13.2
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Thu Jul 23 16:42:40 2020 -0400
+
+RuckusRD v0.13.2
+
+Point release for 0.13:
+
+- Added .config to installed kernel headers
+- Fixed broken stable symlink for kernel headers
+- Enabled alternate compressors in squashfs-tools
+
+* v0.13.1
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Sat Jun 6 15:56:07 2020 -0400
+
+RuckusRD v0.13.1
+
+Point release for 0.13:
+
+- The ruckusrd_umount service now works propperly with systemd (i.e.,
+  everything gets unmounted propperly upon shutdown).
+
+- The kernel_builder script now creates a .y symlink when
+  NOVERSION=stable and the kernel_instaler script now removes what the
+  link points to (if it exists on the system already).  (i.e., we're
+  no long leave useless modules/headers behind when NOVERSION=stable).
+
+* v0.13.0
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Fri May 29 12:25:26 2020 -0400
+
+RuckusRD v0.13.0
+
+In addition to misc cleanup and bugfixes, this release makes a few notable
+changes to the kernel command line options and updates our submodules to the
+latest versions.
+
+ - The sqsh_layers code now looks in both rootdev and sqsh_layerdev for layers
+   (i.e., rootdev can be used to override what's in sqsh_layerdev).
+
+ - New 'overlayflags' option allows passing overlayfs mount options on kernel
+   command line.  Previously, default mount opts are used.  This can lead to
+   problems though, because OverlayFS has a bunch of tunables at kernel config
+   time that will break existing filesystems.  We need this so that we can
+   ensure tempermental kernel config options are always on or off consistently
+   regardless of how the kernel defaults are set.  For example, I had index=on
+   set as the default in my older kernels, and I'm moving away from that since
+   it doesn't look like any distro kernels do that (and I'm having multi-lower
+   sqsh problems), so I've now got some kernels w/ index=on and some w/
+   index=off... and you cannot switch back and forth w/out borking your overlay
+   forever.
+
+ - Added a bunch of initramfs breakpoints as kernel command line options
+   (shell_mountdevs, shell_sqshprep, and shell_mountoverlay).
+
+* v0.12.3
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Tue May 12 12:07:15 2020 -0400
+
+RuckusRD v0.12.3
+
+Point release for 0.12:
+
+- Added doit utility script, for running things in the background w/
+  email alert upon completion.
+
+- Use upper as additional ro layer when using ram_layer.  Otherwise,
+  using ram_layer reverts you to your base image... Oops.
+
+- Added NOVERSION=stable to kernel_builder for cleaner stable kernel
+  upgrades.
+
+- Added xvda to list of drives the early boot process waits for.
+  Without this, xen virtual machines were suffering from a 10 second
+  pause.
+
+* v0.12.2
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Sat Jul 6 15:58:15 2019 -1000
+
+RuckusRD v0.12.2
+
+Point release for 0.12 with a couple minor additions:
+
+- The kernel_builder, kernel_installer, and kernel_tar scripts now
+  handle installlation of headers in /usr/src/linux-headers-VERSION.
+
+- An example debian control file and utility script are now included
+  in the sourcetree and installed in docdir.
+
+- A 'dpkg' target has been added to the generated Makefile.  After
+  ./configure, this target will create a semi-proper .deb package that
+  can be installed via dpkg (or gdebi, if that's your style).  The
+  resulting package isn't really suitable for distribution, but it
+  does allow you to install and keep track of things via dpkg locally.
+
+* v0.12.1
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Thu Jun 27 22:45:36 2019 -1000
+
+RuckusRD v0.12.1
+
+Quick point release for 0.12.
+
+* v0.12.0
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Sun Jun 16 22:53:55 2019 -0800
+
+RuckusRD v0.12.0
+
+This release sees us moving forward with a huge development effort to rid
+ourselves of almost all host system dependencies.  We're now building our
+own busybox, eudev, lvm, mdadm, e2fsprogs, and squashfs utils to include on
+the initramfs instead of slurping them up from the host system.  Primarily,
+this means we now have a stable baseline to maintain our linuxrc script
+against.  And it's actually mostly compatible with Systemd-based systems.
+It also gives us an incredibly capable maint shell on the initramfs.
+
+This new release builds, installs, and functions well (including the
+sqsh_layers stuff) on RHEL/CentOS 7.6 and Ubuntu 18.04, so that's a huge
+improvement.
+
+* v0.11.2
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Tue Nov 13 18:21:54 2018 -0500
+
+RuckusRD v0.11.2
+
+Another quick bugfix release for 0.11.
+
+* v0.11.1
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Fri Nov 9 14:50:08 2018 -0500
+
+RuckusRD v0.11.1
+
+Quick bugfix release for 0.11.
+
+* v0.11.0
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Fri Oct 5 14:12:27 2018 -0400
+
+RuckusRD v0.11.0
+
+This release adds the new Squash Layers mode, the OverlayFS based
+successor to our old device-mapper based squashfs mode.  All the old
+squashfs boot args will remain for a release or two, but will eventually
+be removed.  See README.overlayfs.
+
+It also adds a new utility: extractenator.  This script is basically a
+generic, extensible version of portions of the kernel_tar script for
+creating self extracting executables.  kernel_tar has been modified to use
+extractenator, which does slightly change the on-disk format of the
+created executable.
+
+* v0.10.3
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Tue May 29 19:01:58 2018 -0400
+
+RuckusRD v0.10.3
+
+This release adds a few handy utility scripts for building and installing
+the Linux kernel.
+
+* v0.10.2
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Thu Mar 6 20:16:21 2014 -0500
+
+RuckusRD v0.10.2
+
+This release fixes a few bugs and adds a -b basedir flag for getting kernel
+modules from a staging area instead of /lib/modules.
+
+* v0.10.1
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Sat Feb 15 16:45:23 2014 -0500
+
+RuckusRD v0.10.1
+
+This release fixes a bunch of minor bugs, and make some minor changes under
+the hood.  Most notable:
+
+- We now include all progs (and we've added a bunch more to configure) in the
+  initramfs image.  This makes our configure.ac a little cleaner and make
+  life much easier when troubleshooting busted initramfs images.
+
+- RAID/LVM init failures are no longer treated as fatal (although, if they
+  were needed for your rootfs, you'll obviously be unbootable).
+
+- I've ironed out most (all?) of the upstream udev issues.  We now are able
+  to use either udevstart or udevadm, we use blkid but fall back to vol_id, we
+  copy /lib/udev rules into initramfs if found, etc.
+
+- We can now boot regardless of whether loop is built-in to the kernel or
+  built as a module.
+
+* v0.10.0
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Sun Jan 19 12:47:48 2014 -0500
+
+RuckusRD v0.10.0
+
+This release adds squashfs=, squashdev=, and root_true_rw boot options, and
+some rambling documentation.
+
+NOTE: This does introduce a slight usage change.  In v0.9.8 the rw flag
+      changed both the rootfs and the root-true device to read-write.  The
+      behavior has been changed such that rw ONLY effects the rootfs and the
+      new root_true_rw flag ONLY effects the root-true device.
+
+* v0.9.8
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Fri Jan 10 19:46:57 2014 +0000
+
+RuckusRD v0.9.8
+
+This release makes the initramfs not fail if fsck returns non-zero (which
+may or may not indicate a failure) and makes the rw boot arg also leave
+the root-true device mounted read-write.
+
+* v0.9.7
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Sat Jan 4 18:29:02 2014 +0000
+
+RuckusRD v0.9.7
+
+This release fixes the long-standing can't-umount-root-true on reboot
+problem, runs fsck on the root dev at bootup, and fixes some permissions
+issues w/ conf.
+
+* v0.9.6
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Wed Apr 17 13:39:23 2013 -0400
+
+RuckusRD v0.9.6
+
+This release fixes a bug that was causing symlinks in the conf dir to not
+get installed.
+
+* v0.9.5
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Wed Feb 13 23:24:33 2013 +0000
+
+RuckusRD v0.9.5
+
+This release ensures that we always overwrite symlinks and adds a chrooted
+ldconfig call into the linuxrc script (in case we're adding libs via the
+conf dir).
+
+* v0.9.4
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Fri Feb 1 18:39:57 2013 +0000
+
+RuckusRD v0.9.4
+
+This release changes the behavior regarding copying/symlinking of files in
+root-true/conf into the sysroot.  We now always copy.  Symlinking is no
+longer supported.
+
+* v0.9.3
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Mon Dec 3 17:24:11 2012 +0000
+
+RuckusRD v0.9.3
+
+This release fixes a bug that didn't allow conf symlinks to overwrite
+existing files and a bug that caused a boot failure if the user overrides
+/etc/fstab with a symlink.
+
+* v0.9.2
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Tue Nov 20 01:56:40 2012 +0000
+
+RuckusRD v0.9.2
+
+This release fixes a bug in the root-true/conf parsing code that caused
+systems to fail to boot if the conf dir existed but was empty.
+
+* v0.9.1
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Sat Nov 17 01:38:18 2012 +0000
+
+RuckusRD v0.9.1
+
+This release adds SCSI and block device drivers to the initramfs and adds
+a generic mechanism for storing config files on the resulting boot media.
+
+* v0.9.0
+Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
+Date:   Fri Jul 6 19:35:59 2012 +0000
+
+RuckusRD v0.9.0
+
+First tagged development release.
