@@ -71,136 +71,21 @@
 
 
 * For 0.17
-
- - Add a linuxrc flag to disable loading of nonessential modules so we can get
-   to a state where we can populate /lib/firmware and then load them.  We've
-   got a chicken-and-the-egg problem regarding firmware detection.  Everything
-   I've done so far assumes you can boot up a perfect system with all the
-   appropriate firmware in place when modules load, so you can detect which
-   files are needed for your particular hardware...  So where does this perfect
-   system come from?  I essentually bootstrapped mine off a normal ubuntu 18.04
-   install to get things started... but that's not very magestic.
-
-   I tried providing all the firmware to the initramfs a while back, and it
-   blew up.  I assumed it was too large or something as it was an extra 500M or
-   so.  So, can we boot up to a pre-udev breakpoint and ask for firmware?
-   Supply it via some other block device or something?  Can't use network to
-   get it, because we might need firmware for that.
-
-   For the record, the entire linux-firmware tree is 216M compressed w/ zstd
-   and I CAN append that to the initrd and boot it up just fine.  However, that
-   leaves me with an initrd that's 300M instead of 70M, and most of that is
-   exactly the same regardless of kernel version.
-
-   To create fw-all.img, from inside a linux-firmware git clone:
-
-   find . -path ./.git\* -o -type f -print L | cpio -p --make-dir /scrap/fw-all/lib/firmware
-   pushd /scrap/fw-all
-   find . | cpio -o -H newc | zstd -T0 -10 > /scrap/fw-all.img
-   popd
-
-   Ok, the problem I remember looks like it's a syslinux efi limitation on
-   total size of payload (kernal+initrd+whateverele), so on my laptop (where I
-   need to do this) it doesn't work.  It works on a domU, but that's pointless
-   because no hardware.
-
-   New plan is to create a fw-all.sqsh file in /boot, mount it on /lib/firmware
-   at 'shell' breakpoint, then go on our merry way.  To create the image:
-
-   mksquashfs . /scrap/fw-all.sqsh -comp xz -e .git
-
-   Yes.  This works.  In fact, it might work so well it could be an every boot
-   thing completely replacing the "append fw.img to initrd" process...
-
-   1. Break at 'shell'
-   1.1. Mount the root dev
-   1.2. Mount fw-all.sqsh on /lib/firmware
-   1.3. Umount -l root dev
-   1.4. exit
-   2. Break at 'maint'
-   2.1. Umount -l /lib/firmware
-   2.2. exit
-
-   That gives you the perfect situation post boot, where ALL the kernel modules
-   are available pre-switchroot, and ALL the FIRMWARE is available as well.
-   And the fw.img is seperate from the other kernel files.
-
-   I can't see any reason to do this any differently.  I suppose we can keep
-   firmwarenator around along with my patch to print out firmware loading
-   messages for the case where we want to create a smaller initrd w/out extra
-   fw.sqsh...  but I don't really see myself using it.
-
-   Hmmm...  how do we figure out what the boot device was so we can remount it
-   to get at the fw.sqsh file?  I can do it by hand because I already KNOW what
-   device it's on.  fwdev= arg that doesn't use the udev device detection?
-   Just straight up fwdev=/dev/nvme0n1p1 and expect fw.sqsh to be sitting at
-   its root?
    
- - We need to get firmware loaded up during the initramfs stage of boot.  This
-   is because now that we include all the kernel modules, udev will be able to
-   load any module the kernel notices... and there are some that are going to
-   require firmware to be present during load.
+- Finish microcodenator
 
-   For now, we've got the firmwarenator util that will create a fw.img file
-   that can be appended to the initrd file pretty easily... but it would be
-   nice if this was automaticly handled.
-
-   Logistically annoying, but at least appending to the ruckusrd created
-   initramfs sounds trivial:
-
-   $ cat /boot/fw.img >> /boot/initrd-5.10.y.img
-
-   That assumes that both fw.img and initrd.img use the same compressor.  If
-   that's not the case, it can be remedied like this:
-
-   $ zstdcat /boot/fw.img | gzip >> /boot/initrd-5.4.y.img
-
-   We should have kernel_tar's installation script do that automatically if
-   /boot/ruckusrd-fw.img exists.  I think we can simply use file to
-   detect/correct mismatched compressors.
-
- - Add script to help create microcode.img.  Unlike the firmware.img
-   generation, we probably can't assume that the kernel is already loading
-   microcode propperly...  but really we only have 2 choices (intel/amd) so we
-   could just detect cpu type and include everything.
-
-   Maybe we should add linux-firmware, microcode, and regulatory.db repos as
-   submodules here as well?  I was originally planning on creating my own
-   linux-firmware-mdl repo, with helper scripts and submodules...  but it might
-   be easier to just keep everything together here under one roof.
-
-   NOTE: Also, once we've tested this, we should go disable the deprecated
-         firmware loading methods in our kernel .configs.
-
-   NOTE: Started this as microcodenator, but it's only half implemented.
-         Finish it.
-
-- Firmware/microcode should probably also get injected via modinject
-
-- Microcode needs to really be in the initrd for early loading to work.  We'll
-  still stick it in fw.sqsh as well, as that will get injected into the root
-  filesystem to maintain consistency.
+- Should firmwarenator now create a .sqsh instead of .img?  Generating a fw.img
+  allows the user to append directly to the initrd by hand, while doing a .sqsh
+  would really only be usable by ruckusrd-based systems.  Could add --sqsh and
+  --img flags and support both.
 
 - Allow some dynamic device naming for fwdev= command line arg.  We need to be
   able to do it prior to module loading, so we can't do full-blown LVM or MDADM
   stuff... but we can probably do some block device querying for simple LABEL=
   support... right?  blkid -L ESP should work for my laptop.
 
-- Our current ucode.img support is super convenient, but it's tied specific
-  checkouts of the firmware and ucode repos to specific releases of ruckusrd...
-  perhaps we can add a ruckusrd --update-firmware flag in the future to update
-  those files w/out making a new release of ruckusrd?
-
-  Also, what do the roles of firmwarenator and microcodenator become?  Small,
-  machine-specific fw.img and ucode.img generation?  Maybe they should be used
-  post-installation of ruckusrd to create/update fw.sqsh and ucode.img?
-  Perhaps with --specific and --universal flags?
-
-  Time out.  That's idiotic.  We don't install fw.sqsh or ucode.img, they're
-  created in subprojects as a convenience to be copied into /boot or whatever.
-  But the code we added to ruckusrd depends on ucode.img being in LIBDIR, so
-  that has to change.  I guess it should either assuming /boot/ucode.img or
-  take another arg, --with-ucode= perhaps?
+  Actually, LABEL= and UUID= work right out of the box because mount can just
+  do the lookup (even in busybox!)
 
 * Could happen in a stable release
 
