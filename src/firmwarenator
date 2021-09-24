@@ -53,6 +53,15 @@ usage()
     echo "                              provided multiple times, causing argurments to be"
     echo "                              appended (i.e., becaue you cannot have spaces in"
     echo "                              ARGS)."
+    echo
+    echo "  -s, --sqsh                Instead of building a cpio archive suitable for"
+    echo "                            appending to initrd, build a squashfs image.  This"
+    echo "                            can be used by the initrd to supply firmware during"
+    echo "                            the early stages of boot.  It's arguably better"
+    echo "                            than the cpio method (assuming you're using an"
+    echo "                            initrd generated using ruckusrd), because you don't"
+    echo "                            have to recreate your initrd after updating"
+    echo "                            fw.sqsh."
 }
 
 
@@ -66,8 +75,8 @@ usage()
 #       current positional arguments (e.g, $1, $2).
 #
 __opts=$(getopt -un $(basename $0) \
-    -o hvc:C: \
-    --long help,verbose,compressor:,compressor-args: -- $@)
+    -o hvc:C:s \
+    --long help,verbose,compressor:,compressor-args:,sqsh -- $@)
 if [ $? != 0 ]; then
     echo
     usage
@@ -79,6 +88,7 @@ set -- $__opts
 comp="zstd"
 compargs="-T0 -10"
 verbose=
+use_sqsh=
 
 # parse the new positional arguments
 while true; do
@@ -116,6 +126,10 @@ while true; do
             compargs+=" $2"
             shift 2
             ;;
+        -s|--sqsh)
+            use_sqsh=y
+            shift
+            ;;
 	--)
             # done parsing
             shift
@@ -139,6 +153,7 @@ decho filename: $filename
 decho verbose: $verbose
 decho comp: $comp
 decho compargs: $compargs
+decho use_sqsh: $use_sqsh
 
 tmpdir=$(mktemp -dt $(basename $0)-XXXX)
 decho tmpdir: $tmpdir
@@ -150,6 +165,11 @@ if [ -n "$verbose" ]; then
 else
     cpio="cpio"
 fi
-find . | $cpio -o -H newc | $comp $compargs > $filename
+
+if [ -n "$use_sqsh" ] ; then
+    mksquashfs . $filename -comp xz -e .git -noappend
+else
+    find . | $cpio -o -H newc | $comp $compargs > $filename
+fi
 
 rm -rf $tmpdir
