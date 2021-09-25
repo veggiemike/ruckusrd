@@ -111,9 +111,9 @@ eval $(cat /proc/cpuinfo | awk '{if ($1=="processor" && $3==1) exit; \
     if ($0~"^model[[:space:]]*:") printf "cpu_model=%s\n", $NF; \
     if ($0~"^stepping[[:space:]]*:") printf "cpu_stepping=%s\n", $NF; \
     }')
-cpu_family=$(printf "%x" $cpu_family)
-cpu_model=$(printf "%x" $cpu_model)
-cpu_stepping=$(printf "%x" $cpu_stepping)
+cpu_family=$(printf "%02x" $cpu_family)
+cpu_model=$(printf "%02x" $cpu_model)
+cpu_stepping=$(printf "%02x" $cpu_stepping)
 decho vendor_id: $vendor_id
 decho cpu_family: $cpu_family
 decho cpu_model: $cpu_model
