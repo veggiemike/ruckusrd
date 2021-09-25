@@ -28,10 +28,6 @@
    something  like that  to differentiate  our initramfs  messages from  kernel
    spew?
 
- - Once we've got microcodenator generating /boot/ruckusrd-ucode.img, we should
-   do the same thing we're doing with firmware?  I seem to recall that ucode
-   had to be the 1st thing seen by the kernel... so that might not work.
-
  - Consider adding a `ruckusonly` flag to linuxrc to invoke busybox's init
    instead of switching rootfs and invoking the normal system's init.  This
    would give us a more complete system (complete with multiple TTYs to login
@@ -67,11 +63,10 @@
    Install syslinux (either for EFI or BIOS), install the kernel files, install
    the squashfs.img locally somewhere, etc.
 
- - Add zstd to initramfs?
+ - Add zstd to initramfs?  Unless it gets added to busybox first...
 
 
 * For 0.18
-
 
 * Could happen in a stable release
 
