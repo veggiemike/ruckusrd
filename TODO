@@ -70,22 +70,8 @@
  - Add zstd to initramfs?
 
 
-* For 0.17
-   
-- Finish microcodenator
+* For 0.18
 
-- Should firmwarenator now create a .sqsh instead of .img?  Generating a fw.img
-  allows the user to append directly to the initrd by hand, while doing a .sqsh
-  would really only be usable by ruckusrd-based systems.  Could add --sqsh and
-  --img flags and support both.
-
-- Allow some dynamic device naming for fwdev= command line arg.  We need to be
-  able to do it prior to module loading, so we can't do full-blown LVM or MDADM
-  stuff... but we can probably do some block device querying for simple LABEL=
-  support... right?  blkid -L ESP should work for my laptop.
-
-  Actually, LABEL= and UUID= work right out of the box because mount can just
-  do the lookup (even in busybox!)
 
 * Could happen in a stable release
 

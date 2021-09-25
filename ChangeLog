@@ -10,8 +10,8 @@ RuckusRD v0.17.0
 
 Firmware and microcode handling improvements.  Building now generates fw.sqsh
 and ucode.img in subprojects.  These two files can/should be installed by the
-user into /boot, where they can ge updated independently.  If present (or
-specified explicitly) when running ruckusrd, /boot/ucode.img is prepended to
+user into /boot, where they can then be updated independently.  If present (or
+specified explicitly) when running ruckusrd, /boot/ucode.img is prepended to a
 generated initrd file to support early loading of CPU microcode.  During boot,
 if /fw.sqsh exists it is mounted to provide firmware to early loaded kernel
 modules.  The contents of fw.sqsh (i.e., /lib/firmware) are included by
@@ -28,6 +28,9 @@ generated via the firmwarenator and microcodenator scripts.
   device the user has copied it to.
 - Build subprojects/ucode.img, added --with-ucode= flag to ruckusrd to specify
   path (default is /boot/ucode.img).
+- Added --sqsh to firmwarenator, causing it to create a squahsfs image instead
+  of a cpio archive.
+- Finished initial implementation of firmwarenator
 
 * v0.16.0
 Tagger: Michael D Labriola <michael.d.labriola@gmail.com>
