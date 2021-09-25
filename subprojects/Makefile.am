@@ -219,6 +219,7 @@ squashfs-tools/FOO:
 zfs/FOO:
 	pushd zfs && \
 	rm -rf FOO && \
+	echo "AC_DEFUN([ZFS_AC_KERNEL_TEST_RESULT], [])" >> config/kernel.m4 && \
 	./autogen.sh && \
 	./configure --prefix=/usr --sbindir=/sbin --sysconfdir=/etc \
 	  --localstatedir=/var --with-systemdunitdir=/lib/systemd/system \
