@@ -1,5 +1,5 @@
 AC_PREREQ([2.65])
-AC_INIT([ruckusrd], [0.18.0-dev], [michael.d.labriola@gmail.com])
+AC_INIT([ruckusrd], [0.18.0-dev], [veggiemike@sourceruckus.org])
 
 AM_INIT_AUTOMAKE([dist-xz no-dist-gzip foreign])
 
