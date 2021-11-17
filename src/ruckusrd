@@ -2,7 +2,7 @@
 #
 # RuckusRD - a super awesome, yet simple, mkinitrd replacement
 #
-# Copyright 2012-2021 Michael D Labriola <michael.d.labriola@gmail.com>
+# Copyright 2012-2021 Michael D Labriola <veggiemike@sourceruckus.org>
 #
 # Licensed under the GPLv3. See the file COPYING for details. 
 #
@@ -39,7 +39,7 @@ decho()
 usage()
 {
     echo "RuckusRD v$VERSION - a super awesome, yet simple, mkinitrd replacement"
-    echo "Copyright (C) 2012-2021 Michael D Labriola <michael.d.labriola@gmail.com>"
+    echo "Copyright (C) 2012-2021 Michael D Labriola <veggiemike@sourceruckus.org>"
     echo
     echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] [-b basedir] [-c best|fast] [-o linuxrc-option] [--with-ucode ucode_img] <out-initrd-image> <kernel-version>"
     echo
