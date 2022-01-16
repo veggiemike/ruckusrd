@@ -1166,6 +1166,7 @@ if [ -n "$modinject" ]; then
     #
     # if we're installing a symlink, and the symlink already exists and points
     # to a different version, remove what it points at and recreate the symlink
+    mkdir -p /sysroot/lib/modules
     need_new=
     sysdir=/sysroot/lib/modules/$VERSION
     if [ -n "$VERSION_NAME" ]; then
@@ -1216,6 +1217,7 @@ if [ -n "$modinject" ]; then
         # if we're installing a symlink, and the symlink already exists and
         # points to a different version, remove what it points at and recreate
         # the symlink
+        mkdir -p /sysroot/usr/src
         need_new=
         sysdir=/sysroot/usr/src/linux-headers-$VERSION
         if [ -n "$VERSION_NAME" ]; then
