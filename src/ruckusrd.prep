@@ -144,9 +144,37 @@ echo '********** MAKING CONDITIONAL SYMLINKS ***********************************
 
 # Bail if we've created any broken symlinks
 echo '********** CHECKING FOR BROKEN SYMLINKS ****************************************'
-go="find initramfs -xtype l -printf '%p '"
-echo $go
-blarg=$(eval $go)
+# NOTE: Using 'find initramfs -xtype l' really only works for relative
+#       links... absolute paths are being checked against the host system, not
+#       the initramfs.  So we have to do it by hand with some careful path
+#       manipulation.
+#
+# NOTE: Also, we touch /dev/null here to avoid failures with links pointing to
+#       non-existent /dev/null.  We cannot create /dev/null w/out root
+#       privileges, so we just create a normal file.  It will get overwritten
+#       during boot.
+#
+touch initramfs/dev/null
+links=$(find initramfs -type l)
+blarg=
+for l in $links; do
+    t=$(readlink $l)
+    #echo "$l -> $t"
+    if (echo $t | grep -q "^/"); then
+        #echo -n "ABSOLUTE, "
+        checkit=initramfs$t
+    else
+        #echo -n "RELATIVE, "
+        checkit=$(dirname $l)/$t
+    fi
+    #echo -n "checking for $checkit "
+    if [ ! -e $checkit ]; then
+        #echo FAILED
+        blarg+=" $l"
+    #else
+    #    echo passed
+    fi
+done
 if [ -n "$blarg" ]; then
     echo "ERROR: broken link(s) detected: $blarg"
     exit 1
