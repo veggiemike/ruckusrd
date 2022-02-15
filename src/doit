@@ -2,7 +2,7 @@
 #
 # RuckusRD - a super awesome, yet simple, mkinitrd replacement
 #
-# Copyright 2012-2021 Michael D Labriola <veggiemike@sourceruckus.org>
+# Copyright 2020-2022 Michael D Labriola <veggiemike@sourceruckus.org>
 #
 # Licensed under the GPLv3. See the file COPYING for details. 
 #
@@ -18,7 +18,7 @@ usage()
         echo
     fi
     echo "doit - run something in the background w/ emailed output"
-    echo "Copyright (C) 2012-2021 Michael D Labriola <veggiemike@sourceruckus.org>"
+    echo "Copyright (C) 2020-2022 Michael D Labriola <veggiemike@sourceruckus.org>"
     echo
     echo "usage: `basename $0` OPTIONS CMD..."
     echo
