@@ -66,6 +66,3 @@ installation script (used by kernel-builder).
 
 firmwarenator - Create a fw.img containing all the firmware needed for
 a particular host's hardware.
-
-doit - Execute a command in the background and email the output
-somewhere when done.
