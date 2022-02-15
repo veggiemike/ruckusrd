@@ -68,6 +68,11 @@
 
 * For 0.18
 
+ - Maybe split utils out into independent packages?  doit, extractenator,
+   kernel-builder/kernel-tar, firmwarenator, microcodenator
+
+ - Add help2man-generated manpage?
+
  - Add zstd to initramfs?  Unless it gets added to busybox first...
 
  - Add dialog to initramfs.  Then we can start playing with installer options.

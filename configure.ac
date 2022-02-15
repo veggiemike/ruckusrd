@@ -1,5 +1,19 @@
 AC_PREREQ([2.65])
-AC_INIT([ruckusrd], [0.18.0-dev], [veggiemike@sourceruckus.org])
+
+m4_define(ruckusrd_major_version, 0)
+m4_define(ruckusrd_minor_version, 18)
+m4_define(ruckusrd_micro_version, 0)
+m4_define(ruckusrd_devtag, [dev])
+m4_ifnblank(ruckusrd_devtag,
+	[m4_define(ruckusrd_version, ruckusrd_major_version.ruckusrd_minor_version.ruckusrd_micro_version-ruckusrd_devtag)],
+	[m4_define(ruckusrd_version, ruckusrd_major_version.ruckusrd_minor_version.ruckusrd_micro_version)])
+
+AC_INIT([RuckusRD], [ruckusrd_version], [veggiemike@sourceruckus.org], [ruckusrd])
+
+AC_SUBST(RUCKUSRD_MAJOR_VERSION, ruckusrd_major_version)
+AC_SUBST(RUCKUSRD_MINOR_VERSION, ruckusrd_minor_version)
+AC_SUBST(RUCKUSRD_MICRO_VERSION, ruckusrd_micro_version)
+AC_SUBST(RUCKUSRD_DEVTAG, ruckusrd_devtag)
 
 AM_INIT_AUTOMAKE([dist-xz no-dist-gzip foreign])
 
@@ -75,3 +89,45 @@ AC_CONFIG_FILES([Makefile
 		 subprojects/Makefile
 		 src/ruckusrd.conf])
 AC_OUTPUT
+
+
+# Create a fully expanded variable out of one with embedded path variables.
+#
+# NOTE: This might not be the best way to fully expand the variable, but it
+#       works for me.  It might be portable.  It might not.  Fingers
+#       crossed.
+#
+# NOTE: This only works if we make sure $prefix has been set already...
+#       otherwise we end up with NONE in our path.
+#
+expandit()
+{
+  test "$prefix" = "NONE" && prefix=/usr/local
+  result=$1
+  while :; do
+    temp=`eval echo $result`
+    test "$temp" = "$result" && break
+    result=$temp
+  done
+  echo $result
+}
+
+
+echo
+echo
+echo
+echo "------------------------------------------------------------------------"
+echo "$PACKAGE_STRING"
+echo "------------------------------------------------------------------------"
+echo
+echo "Configuration Options Summary:"
+echo
+echo "Build:"
+echo "  CPUCOUNT.............: $CPUCOUNT"
+echo "  JOBCOUNT.............: $JOBCOUNT"
+echo "  JOBCOUNT_KBUILD......: $JOBCOUNT_KBUILD"
+echo
+echo "Installation:"
+echo "  prefix...............: $prefix"
+echo "  pkgdatadir...........: `expandit $datadir/$PACKAGE_TARNAME`"
+echo
