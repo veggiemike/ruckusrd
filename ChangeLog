@@ -5,6 +5,20 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 * v0.18.0
 in development
 
+* v0.17.2
+2022-01-16: RuckusRD v0.17.2
+
+Point release fixing a couple minor issues:
+
+- Apt was reporting installed size as 16K instead of around 1M.
+- Kernel/header injection (modinject) was failing if /lib/modules didn't
+  already exist.
+- Broken symlink checking was checking symlinks with absolute paths against the
+  host system, resulting in false positives during building (e.g., zfs wasn't
+  installed on host system).
+- Tweaked build rules for subprojects to get them building on my embedded
+  Ubuntu 20.04 test system.
+
 * v0.17.1
 2021-11-17: RuckusRD v0.17.1
 

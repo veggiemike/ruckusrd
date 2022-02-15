@@ -160,9 +160,9 @@ lvm2/FOO: eudev.tar
 	  --enable-udev-rule-exec-detection \
 	  UDEV_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
 	  UDEV_LIBS="-L$$PWD/../eudev/FOO/lib/ -ludev" \
-	  CPPFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
+	  CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
 	  LDFLAGS="-L$$PWD/../eudev/FOO/lib/" \
-	  PKG_CONFIG_PATH=$PWD/../eudev/FOO/lib/pkgconfig:$PWD/../eudev/FOO/usr/share/pkgconfig && \
+	  PKG_CONFIG_PATH=$$PWD/../eudev/FOO/lib/pkgconfig:$$PWD/../eudev/FOO/usr/share/pkgconfig && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf FOO/usr/share && \
@@ -197,6 +197,10 @@ e2fsprogs/FOO:
 #        have to conditionally replace this rule w/ one that copies
 #        files from the host system.
 #
+# FIXME: 2nd sed statement was added to fix compilation problems on
+#        Ubuntu 20.04...  hopefully this isn't needed when we upgrade
+#        from upstream.
+#
 squashfs-tools/FOO:
 	pushd squashfs-tools && \
 	rm -rf FOO && \
@@ -207,6 +211,10 @@ squashfs-tools/FOO:
 	    -e 's|^#LZMA_XZ_SUPPORT|LZMA_XZ_SUPPORT|' \
 	    -e 's|^#ZSTD_SUPPORT|ZSTD_SUPPORT|' \
 	    squashfs-tools/Makefile && \
+	sed -i \
+	    -e 's|^#include <sys/types.h>|#include <sys/types.h>\n#include <sys/sysmacros.h>|' \
+	    squashfs-tools/mksquashfs.c \
+	    squashfs-tools/unsquashfs.c && \
 	make -j$(JOBCOUNT) -C squashfs-tools && \
 	make -C squashfs-tools INSTALL_DIR=$$PWD/FOO/usr/sbin install && \
 	popd || exit 1
@@ -221,7 +229,10 @@ zfs/FOO:
 	rm -rf FOO && \
 	echo "AC_DEFUN([ZFS_AC_KERNEL_TEST_RESULT], [])" >> config/kernel.m4 && \
 	./autogen.sh && \
-	./configure --prefix=/usr --sbindir=/sbin --sysconfdir=/etc \
+	LIBUDEV_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
+	  LIBUDEV_LIBS="-L$$PWD/../eudev/FOO/lib/ -ludev" \
+	  PKG_CONFIG_PATH=$$PWD/../eudev/FOO/lib/pkgconfig:$$PWD/../eudev/FOO/usr/share/pkgconfig \
+	  ./configure --prefix=/usr --sbindir=/sbin --sysconfdir=/etc \
 	  --localstatedir=/var --with-systemdunitdir=/lib/systemd/system \
 	  --with-systemdpresetdir=/lib/systemd/system-preset \
 	  --with-systemdgeneratordir=/lib/systemd/system-generator \
@@ -236,10 +247,17 @@ zfs/FOO:
 syslinux-6.03.tar.xz:
 	wget https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/$@
 
+# FIXME: the sed statement was added to fix compilation problems on
+#        Ubuntu 20.04...  hopefully this isn't needed when we upgrade
+#        from upstream.
+#
 syslinux/FOO: syslinux-6.03.tar.xz
 	tar xf $< && \
 	mv syslinux-6.03 syslinux && \
 	pushd syslinux && \
+	sed -i \
+	    -e 's|^#include <sys/types.h>|#include <sys/types.h>\n#include <sys/sysmacros.h>|' \
+	    extlinux/main.c && \
 	make install INSTALLROOT=$$PWD/FOO && \
 	popd || exit 1
 
