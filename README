@@ -61,8 +61,5 @@ kernel-builder - Compiles the kernel, creates an initrd using
 ruckusrd, and packages it up into a self-extracting archive capable of
 installing itself on a list of machines.
 
-extractenator - Create your own self extracting archives with embedded
-installation script (used by kernel-builder).
-
 firmwarenator - Create a fw.img containing all the firmware needed for
 a particular host's hardware.

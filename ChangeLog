@@ -6,6 +6,7 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 in development
 
 - Removed doit, which moved into its own package.
+- Removed extractenator, which moved into its own package.
 
 * v0.17.2
 2022-01-16: RuckusRD v0.17.2

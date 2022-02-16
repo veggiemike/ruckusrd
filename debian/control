@@ -5,7 +5,7 @@ Priority: optional
 Architecture: __arch__
 Installed-Size: __size__
 Depends: bash
-Recommends: doit
+Recommends: doit, extractenator
 Maintainer: Michael D Labriola <veggiemike@sourceruckus.org>
 Homepage: http://git.sourceruckus.org/?p=ruckusrd.git
 Description: RuckusRD - a super awesome, yet simple, mkinitrd replacement
