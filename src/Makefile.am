@@ -1,7 +1,5 @@
 dist_bin_SCRIPTS =
 dist_bin_SCRIPTS += firmwarenator
-dist_bin_SCRIPTS += kernel-builder
-dist_bin_SCRIPTS += kernel-tar
 dist_bin_SCRIPTS += microcodenator
 dist_bin_SCRIPTS += ruckusrd
 

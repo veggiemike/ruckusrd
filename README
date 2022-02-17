@@ -1,4 +1,5 @@
 RuckusRD - a super awesome, yet simple, mkinitrd replacement
+============================================================
 
 Copyright 2012-2022 Michael D Labriola <veggiemike@sourceruckus.org>
 
@@ -57,9 +58,7 @@ See docs/ for more ramblings.  ;-)
 Also included are a bunch of scripts to help make kernel
 compilation/installation as painless as possible.
 
-kernel-builder - Compiles the kernel, creates an initrd using
-ruckusrd, and packages it up into a self-extracting archive capable of
-installing itself on a list of machines.
-
 firmwarenator - Create a fw.img containing all the firmware needed for
 a particular host's hardware.
+
+Get the latest and greatest from https://github.com/sourceruckus/ruckusrd.
