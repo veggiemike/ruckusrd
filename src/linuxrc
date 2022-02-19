@@ -126,7 +126,11 @@ modprobe()
 
 autoload_fs_module()
 {
-    eval $(blkid $1 | sed 's|.*: ||')
+    TYPE=
+    # NOTE: Normal blkid can be given LABEL=whatever here and do the right
+    #       thing.  The busybox version doesn't like it, though.  But busybox
+    #       does provide findfs, which can do the lookup for us.
+    eval $(blkid $(findfs $1) | sed 's|.*: ||')
     [ -n "$TYPE" ] && modprobe $TYPE
 }
 
