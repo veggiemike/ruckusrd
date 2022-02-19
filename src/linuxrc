@@ -471,6 +471,37 @@ modprobe loop max_loop=32
 # extra special device with fw.sqsh on it!
 mkdir -p /lib/firmware
 if [ -n "$fwdev" ]; then
+    # load some modules needed for block device access
+    #
+    # NOTE: Some is the keyword here.  We need to provide access specifically
+    #       to the fwdev here, which wouldn't make sense for some devices
+    #       (e.g., floppy, because fwdev needs to be 200-300M).  The likely
+    #       scenarios are: 1) SATA disk using AHCI, 2) USB disk, 3) NVME disk,
+    #       4) CD/DVD.
+    #
+    # NOTE: I've always built all the block layer stuff directly into the
+    #       kernel because I view it as "core functionality", but we really
+    #       want this to work with distro-syle or poorly configured custom
+    #       kernels even if they are brain-dead in this regard.
+    #
+    # scsi disk - should pull in sg, scsi_mod, scsi_common if needed
+    modprobe sd_mod
+    # scsi cdrom - not sure if it pulls in cdrom, so we add that explicitly
+    modprobe sr_mod
+    modprobe cdrom
+    # sata ahci - should pull in libahci
+    modprobe ahci
+    # nvme - should pull in nvme_core
+    modprobe nvme
+    # usb disks - added USB Attached Storage (just in case) and the XHCI PCI
+    # driver
+    modprobe usb_storage
+    modprobe uas
+    modprobe xhci_pci
+
+    # load modules needed for whatever fs is on fwdev
+    autoload_fs_module $fwdev
+    # now get it mounted
     fwdir=/fwdev
     fwsqsh=$fwdir/fw.sqsh
     mkdir -p $fwdir
