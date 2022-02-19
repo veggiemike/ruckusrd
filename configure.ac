@@ -78,7 +78,11 @@ AS_IF([test "$BASH_SHELL" = ""], [AC_MSG_ERROR([Could not find bash])])
 
 CPUCOUNT=$(grep ^vendor_id /proc/cpuinfo | wc -l)
 JOBCOUNT=$((CPUCOUNT+1))
-JOBCOUNT_KBUILD=$((CPUCOUNT*4))
+# FIXME: doing CPUCOUNT*4 for KBUILD projects used to be needed in
+#        order to peg all cpus do to the recursive nature of
+#        KBUILD... that doesn't appear to be needed anymore, and I
+#        have no idea when/why that changed.
+JOBCOUNT_KBUILD=$((CPUCOUNT+1))
 AC_SUBST(CPUCOUNT)
 AC_SUBST(JOBCOUNT)
 AC_SUBST(JOBCOUNT_KBUILD)
