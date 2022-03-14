@@ -73,10 +73,10 @@ wait_for_udev_symlink()
     msg="waiting up to $x seconds for $dev symlink..."
     while [ ! -e $dev -a "$x" != "0" ]; do
         if [ -n "$msg" ]; then
-            echo -n $msg
+            decho -n $msg
             msg=""
         else
-            echo -n "."
+            decho -n "."
         fi
         x=$(($x-1))
         # just in case we need to activate LVM on a freshly plugged device
@@ -90,7 +90,7 @@ wait_for_udev_symlink()
     #       missing.
     #
     if [ -b $dev ] ; then
-        [ -z "$msg" ] && echo " done"
+        [ -z "$msg" ] && decho " done"
         decho2 "$dev symlink exists"
     else
         echo
@@ -309,7 +309,7 @@ fwdev=
 # default behavior
 . /ruckusrd.conf
 
-echo "initramfs created with RuckusRD v$VERSION"
+decho "initramfs created with RuckusRD v$VERSION"
 
 # Parse kernel commandline options
 #
@@ -527,7 +527,7 @@ if [ -n "$fwdev" ]; then
     umount -l $fwdir
 fi
 
-echo -n "determining what to mount... "
+decho -n "determining what to mount... "
 
 cat <<EOF > etc/udev/rules.d/99-ruckusrd.rules
 ACTION!="add|change", GOTO="ruckusrd_end"
@@ -544,7 +544,7 @@ cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
 LABEL="ruckusrd_end"
 EOF
 
-echo "$thingtomount"
+decho "$thingtomount"
 
 # prep udev hwdb
 go="/sbin/udevadm"
@@ -580,19 +580,19 @@ x=10
 msg="waiting up to $x seconds for at least one hdd to appear..."
 while [ ! -e /dev/sda -a ! -e /dev/nvme0n1 -a ! -e /dev/xvda -a "$x" != "0" ]; do
     if [ -n "$msg" ]; then
-        echo -n $msg
+        decho -n $msg
         msg=""
     else
-        echo -n "."
+        decho -n "."
     fi
     x=$(($x-1))
     sleep 1
 done
 if [ -z "$msg" ]; then
-    echo -n "."
+    decho -n "."
     # and one more second just to be safe
     sleep 1
-    echo " done"
+    decho " done"
 fi
 
 # activate LVM
@@ -747,7 +747,7 @@ if [ -n "$sqsh_layers" ]; then
         #       for future usage (e.g., creating virtual machines, installing).
         #
         if [ -n "$to_ram" ]; then
-            echo -n "Copying squashfs layer(s) to RAM... "
+            decho -n "Copying squashfs layer(s) to RAM... "
             mkdir -p /sqsh_layerdev
             decho2 ""
             go="cp -a"
@@ -758,7 +758,7 @@ if [ -n "$sqsh_layers" ]; then
             go="$go /sqsh_layerdev"
             decho2 $go
             eval $go
-	    echo "done"
+	    decho "done"
             sqsh_layerdir=/sqsh_layerdev
         fi
 
@@ -1025,8 +1025,8 @@ EOF
         #       /sysroot/etc/fstab with a symlink that's broken until we hand
         #       off control via switch_root.
         #
-        echo "" >> /sysroot/etc/fstab || echo -n
-        echo "/dev/root-true /mnt/root-true auto noauto,$root_true_rw 0 0" >> /sysroot/etc/fstab || echo -n
+        echo "" >> /sysroot/etc/fstab || decho -n
+        echo "/dev/root-true /mnt/root-true auto noauto,$root_true_rw 0 0" >> /sysroot/etc/fstab || decho -n
 
         # unmount it (so we can eject removable media)
         decho2 "unmounting /tmproot"
@@ -1185,7 +1185,7 @@ fi
 #       it is, then do an rsync.  Same drill for linux-headers and firmware.
 #
 if [ -n "$modinject" ]; then
-    echo -n "Injecting kernel modules, headers, and firmware into /sysroot... "
+    decho -n "Injecting kernel modules, headers, and firmware into /sysroot... "
     decho2 ""
     
     # mount rw
@@ -1328,7 +1328,7 @@ if [ -n "$modinject" ]; then
     # mount ro
     mount -o remount,ro /sysroot
 
-    echo "done"
+    decho "done"
 fi
 
 
