@@ -511,6 +511,8 @@ if [ -n "$fwdev" ]; then
     modprobe usb_storage
     modprobe uas
     modprobe xhci_pci
+    # raid - software raid, at least
+    modprobe raid1
 
     # load modules needed for whatever fs is on fwdev
     autoload_fs_module $fwdev
