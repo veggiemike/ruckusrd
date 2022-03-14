@@ -47,7 +47,14 @@
 
 decho()
 {
-    if [ "$quiet" != "1" ]; then
+    if [ -z "$quiet" ]; then
+        echo "$*"
+    fi
+}
+
+decho2()
+{
+    if [ -n "$verbose" ]; then
         echo "$*"
     fi
 }
@@ -84,7 +91,7 @@ wait_for_udev_symlink()
     #
     if [ -b $dev ] ; then
         [ -z "$msg" ] && echo " done"
-        decho "$dev symlink exists"
+        decho2 "$dev symlink exists"
     else
         echo
         echo
@@ -166,7 +173,7 @@ generate_udev_rules()
             cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
 SUBSYSTEM=="block", KERNEL=="sr[0-9]*", ENV{ID_FS_LABEL_ENC}=="$CDLABEL", SYMLINK+="$name"
 EOF
-            decho "Added udev rule for CDLABEL=='$CDLABEL'"
+            decho2 "Added udev rule for CDLABEL=='$CDLABEL'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root
             fi
@@ -176,7 +183,7 @@ EOF
             cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
 SUBSYSTEM=="block", KERNEL!="sr[0-9]", ENV{ID_FS_LABEL_ENC}=="$LABEL", SYMLINK+="$name"
 EOF
-            decho "Added udev rule for LABEL=='$LABEL'"
+            decho2 "Added udev rule for LABEL=='$LABEL'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root
             fi
@@ -186,7 +193,7 @@ EOF
             cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
 SUBSYSTEM=="block", ENV{ID_FS_UUID_ENC}=="$UUID", SYMLINK+="$name"
 EOF
-            decho "Added udev rule for UUID=='$UUID'"
+            decho2 "Added udev rule for UUID=='$UUID'"
             if [ "$name" = "root" ]; then
                 thingtomount=/dev/root
             fi
@@ -288,7 +295,8 @@ shell_mountoverlay=""
 
 maint="" # just before switch_root and handover to init
 hoststamp=""
-quiet=0
+quiet=
+verbose=
 sqsh_layers=""
 sqsh_layerdev=""
 sqsh_layerdir="/tmproot"
@@ -320,6 +328,11 @@ for o in `cat /proc/cmdline` ; do
         ;;
     quiet)
         quiet=1
+        verbose=
+        ;;
+    verbose)
+        verbose=1
+        quiet=
         ;;
     to_ram)
         to_ram=1
@@ -420,28 +433,28 @@ else
 fi
 
 
-decho "kernel commandline: `cat /proc/cmdline`"
-decho "init=$init"
-decho "root=$root"
-decho "root_rw=$root_rw"
-decho "root_true_rw=$root_true_rw"
-decho "rootflags=$rootflags"
-decho "rootfstype=$rootfstype"
-decho "overlayflags=$overlayflags"
-decho "to_ram=$to_ram"
-decho "shell=$shell"
-decho "shell_mountdevs=$shell_mountdevs"
-decho "shell_sqshprep=$shell_sqshprep"
-decho "shell_mountoverlay=$shell_mountoverlay"
-decho "maint=$maint"
-decho "hoststamp=$hoststamp"
-decho "sqsh_layers=$sqsh_layers"
-decho "sqsh_layerdev=$sqsh_layerdev"
-decho "sqsh_layerdir=$sqsh_layerdir"
-decho "sqsh_layerdir_rel=$sqsh_layerdir_rel"
-decho "ram_layer=$ram_layer"
-decho "modinject=$modinject"
-decho "fwdev=$fwdev"
+decho2 "kernel commandline: `cat /proc/cmdline`"
+decho2 "init=$init"
+decho2 "root=$root"
+decho2 "root_rw=$root_rw"
+decho2 "root_true_rw=$root_true_rw"
+decho2 "rootflags=$rootflags"
+decho2 "rootfstype=$rootfstype"
+decho2 "overlayflags=$overlayflags"
+decho2 "to_ram=$to_ram"
+decho2 "shell=$shell"
+decho2 "shell_mountdevs=$shell_mountdevs"
+decho2 "shell_sqshprep=$shell_sqshprep"
+decho2 "shell_mountoverlay=$shell_mountoverlay"
+decho2 "maint=$maint"
+decho2 "hoststamp=$hoststamp"
+decho2 "sqsh_layers=$sqsh_layers"
+decho2 "sqsh_layerdev=$sqsh_layerdev"
+decho2 "sqsh_layerdir=$sqsh_layerdir"
+decho2 "sqsh_layerdir_rel=$sqsh_layerdir_rel"
+decho2 "ram_layer=$ram_layer"
+decho2 "modinject=$modinject"
+decho2 "fwdev=$fwdev"
 
 
 if [ -n "$shell" ]; then
@@ -537,10 +550,10 @@ echo "$thingtomount"
 go="/sbin/udevadm"
 [ "$quiet" != "1" ] && go="$go --debug"
 go="$go hwdb --update"
-decho $go
+decho2 $go
 eval $go
 
-decho "starting udevd"
+decho2 "starting udevd"
 /sbin/udevd --daemon --resolve-names=never
 
 # tell udevd to start processing its queue
@@ -590,7 +603,7 @@ fi
 #       to hang for 90 seconds flailing around w/ already activated logvols
 #       unless we do this.
 #
-decho "activating LVM"
+decho2 "activating LVM"
 vgchange -a y --quiet --quiet
 
 # do ZFS initialization
@@ -630,7 +643,7 @@ fi
 # FIXME: what if i just deactivate all after mounting /sysroot... will it
 #        politely refuse to deactive mounted logvols?
 #
-decho "deactivating unneeded LVM (dmneeded='$dmneeded')"
+decho2 "deactivating unneeded LVM (dmneeded='$dmneeded')"
 vgchange -a n --quiet --quiet
 for x in $dmneeded; do
     lvchange -a y /dev/mapper/$x --quiet --quiet
@@ -656,7 +669,7 @@ done
 #
 if ! (echo $root | grep -q "CDLABEL=\|ZFS="); then
     go="fsck -TC $thingtomount"
-    decho $go
+    decho2 $go
     eval $go || echo "WARNING: fsck of rootdev exited non-zero"
 fi
 
@@ -682,7 +695,7 @@ else
     fi
 
     go="mount -t $rootfstype $mountoptions $thingtomount /sysroot"
-    decho $go
+    decho2 $go
     eval $go
     RES=$?
 
@@ -701,7 +714,7 @@ else
     if [ -h /dev/sqsh_layerdev ]; then
         # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
         go="mount -t $sqshfstype -o ro /dev/sqsh_layerdev /sqsh_layerdev"
-        decho $go
+        decho2 $go
         eval $go
     fi
 fi
@@ -709,7 +722,7 @@ fi
 
 if [ -n "$sqsh_layers" ]; then
     # move /sysroot to /tmproot so we can do sqsh_layer magic
-    decho "moving /sysroot to /tmproot"
+    decho2 "moving /sysroot to /tmproot"
     mkdir -p /tmproot
     mount --move /sysroot /tmproot
 
@@ -725,7 +738,7 @@ if [ -n "$sqsh_layers" ]; then
 
     else
 
-        decho "setting up sqsh_layers for eventual OverlayFS mount"
+        decho2 "setting up sqsh_layers for eventual OverlayFS mount"
 
         # copy to ram if requested
         #
@@ -736,14 +749,14 @@ if [ -n "$sqsh_layers" ]; then
         if [ -n "$to_ram" ]; then
             echo -n "Copying squashfs layer(s) to RAM... "
             mkdir -p /sqsh_layerdev
-            decho ""
+            decho2 ""
             go="cp -a"
             [ "$quiet" != "1" ] && go="$go -v"
             for x in $sqsh_layers_ws; do
                 go="$go $(lookup_layer $x)"
             done
             go="$go /sqsh_layerdev"
-            decho $go
+            decho2 $go
             eval $go
 	    echo "done"
             sqsh_layerdir=/sqsh_layerdev
@@ -765,27 +778,27 @@ if [ -n "$sqsh_layers" ]; then
             ln -s $loopdev /dev/sqsh_layer-$x
             mkdir -p /sqsh_layer-$x
             go="mount -o ro /dev/sqsh_layer-$x /sqsh_layer-$x"
-            decho $go
+            decho2 $go
             eval $go
         done
 
         # create ram layer if requested
         if [ -n "$ram_layer" ]; then
-            decho "creating ram_layer w/ size=$ram_layer"
+            decho2 "creating ram_layer w/ size=$ram_layer"
             mkdir -p /upper
             mount -t tmpfs -o size=$ram_layer ram_layer /upper
             mkdir -p /upper/upper /upper/work
-            decho "converting retentive upper to non-retentive lower layer"
+            decho2 "converting retentive upper to non-retentive lower layer"
             mkdir -p /sqsh_layer-upper
             go="mount -o ro,bind /tmproot/upper/upper /sqsh_layer-upper"
-            decho $go
+            decho2 $go
             eval $go
             sqsh_layers=upper:$sqsh_layers
             sqsh_layers_ws="upper $sqsh_layers_ws"
             upper=upper
         else
             # need to remount rootfs rw so we can write into upper layer
-            decho "remounting /tmproot rw"
+            decho2 "remounting /tmproot rw"
             mount -o remount,rw /tmproot
             mkdir -p /tmproot/upper/upper /tmproot/upper/work
             upper=/tmproot/upper
@@ -820,7 +833,7 @@ if [ -n "$sqsh_layers" ]; then
     else
 
         # mount the merged filesystem
-        decho "mounting overlayfs at /sysroot"
+        decho2 "mounting overlayfs at /sysroot"
         lower=/sqsh_layer-${sqsh_layers//:/:/sqsh_layer-}
         layers=lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work
         if [ -n "$overlayflags" ]; then
@@ -829,12 +842,12 @@ if [ -n "$sqsh_layers" ]; then
             overlayflags=$layers
         fi
         go="mount -t overlay -o $overlayflags rootfs /sysroot"
-        decho $go
+        decho2 $go
         eval $go
     fi
 
     # extra sqsh_layer finalization
-    decho "doing extra sqsh_layer finalization"
+    decho2 "doing extra sqsh_layer finalization"
 
     # this leaves us with /boot containing the merged contents of the layers...
     # but the ACTUAL boot files will end up living in /mnt/root-true/boot/...
@@ -860,12 +873,12 @@ if [ -n "$sqsh_layers" ]; then
         if [ -n "`find /tmproot -maxdepth 1 -name vmlinuz\* 2>/dev/null`" ]; then
             # there's a kernel directly in /tmproot, so it's probably a /boot
             # partition.  bind mount it as such.
-            decho "bind mounting /tmproot to /sysroot/boot"
+            decho2 "bind mounting /tmproot to /sysroot/boot"
             mount --bind /tmproot /sysroot/boot
         elif [ -n "`find /tmproot/boot -maxdepth 1 -name vmlinuz\* 2>/dev/null`" ]; then
             # there's a kernel inside a boot dir inside /tmproot, bind mount
             # it!
-            decho "bind mounting /tmproot/boot to /sysroot/boot"
+            decho2 "bind mounting /tmproot/boot to /sysroot/boot"
             mount --bind /tmproot/boot /sysroot/boot
         else
             # odd... couldn't find a kernel...?
@@ -876,7 +889,7 @@ if [ -n "$sqsh_layers" ]; then
             #       the case, the host sytem will mount the ESP via its fstab
             #       normally.
             #
-            decho "couldn't find /boot tree to bind mount, but might be fine"
+            decho2 "couldn't find /boot tree to bind mount, but might be fine"
         fi
     fi
 
@@ -896,7 +909,7 @@ if [ -n "$sqsh_layers" ]; then
     # append a timestamp to system hostname if configured
     if [ -n "$hoststamp" ]; then
         stamp=`date +%s`
-        decho "appending timestamp to hostname: $stamp"
+        decho2 "appending timestamp to hostname: $stamp"
         if [ -f /sysroot/etc/hostname ]; then
             # systemd
             HOSTNAME=$(cat /sysroot/etc/hostname)-$stamp
@@ -953,7 +966,7 @@ EOF
 
     # move /sqsh_layerdev into /sysroot
     if [ -h /dev/sqsh_layerdev ]; then
-        decho "moving /sqsh_layerdev to /sysroot/mnt/"
+        decho2 "moving /sqsh_layerdev to /sysroot/mnt/"
 	mkdir -p /sysroot/mnt/sqsh_layerdev
         mount --move /sqsh_layerdev /sysroot/mnt/sqsh_layerdev
 	if [ -n "$RCLOCAL" ]; then
@@ -965,7 +978,7 @@ EOF
 
     # move individual layer mounts into /sysroot
     for x in $sqsh_layers_ws; do
-        decho "moving /sqsh_layer-$x to /sysroot/mnt/"
+        decho2 "moving /sqsh_layer-$x to /sysroot/mnt/"
         mkdir -p /sysroot/mnt/sqsh_layer-$x
         mount --move /sqsh_layer-$x /sysroot/mnt/sqsh_layer-$x
         # NOTE: We don't forge mtab entries for these because it just clutters
@@ -974,7 +987,7 @@ EOF
 
     # move ram layer if needed
     if [ -n "$ram_layer" ]; then
-        decho "moving /upper to /sysroot/mnt/"
+        decho2 "moving /upper to /sysroot/mnt/"
         mkdir -p /sysroot/mnt/upper
         mount --move /upper /sysroot/mnt/upper
         # NOTE: We don't forge an mtab entry for this because overlayfs is
@@ -989,7 +1002,7 @@ EOF
     #
     mkdir -p /sysroot/mnt/root-true
     if [ -z "$to_ram" ]; then
-        decho "moving /tmproot to /sysroot/mnt/root-true"
+        decho2 "moving /tmproot to /sysroot/mnt/root-true"
 	mount --move /tmproot /sysroot/mnt/root-true
         # NOTE: I considered not adding this mtab entry when root-true is being
         #       used for upperdir, because you essentially get root-true's
@@ -1016,7 +1029,7 @@ EOF
         echo "/dev/root-true /mnt/root-true auto noauto,$root_true_rw 0 0" >> /sysroot/etc/fstab || echo -n
 
         # unmount it (so we can eject removable media)
-        decho "unmounting /tmproot"
+        decho2 "unmounting /tmproot"
         umount /tmproot
 
         # we copied sqsh_layers into RAM.  make them visible in the baby
@@ -1173,7 +1186,7 @@ fi
 #
 if [ -n "$modinject" ]; then
     echo -n "Injecting kernel modules, headers, and firmware into /sysroot... "
-    decho ""
+    decho2 ""
     
     # mount rw
     mount -o remount,rw /sysroot
@@ -1194,8 +1207,8 @@ if [ -n "$modinject" ]; then
             VERSION=$(basename $x)
         fi
     done
-    decho VERSION=$VERSION
-    decho VERSION_NAME=$VERSION_NAME
+    decho2 VERSION=$VERSION
+    decho2 VERSION_NAME=$VERSION_NAME
     
     # modules - remove old symlinked files if different
     #
@@ -1209,13 +1222,13 @@ if [ -n "$modinject" ]; then
         if [ -h $syslink ]; then
             old_one=$(readlink $syslink)
             if [ "$old_one" != "$VERSION" ]; then
-                decho "following $syslink symlink to remove modules in $old_one"
+                decho2 "following $syslink symlink to remove modules in $old_one"
                 rm -rf /sysroot/lib/modules/$old_one
-                decho "removing $syslink symlink"
+                decho2 "removing $syslink symlink"
                 rm -f $syslink
             fi
         elif [ -e $syslink ]; then
-            decho "removing $syslink file/dir"
+            decho2 "removing $syslink file/dir"
             rm -rf $syslink
         fi
         if [ ! -h $syslink ]; then
@@ -1223,7 +1236,7 @@ if [ -n "$modinject" ]; then
             go="ln"
             [ "$quiet" != "1" ] && go="$go -v"
             go="$go -s $VERSION $syslink"
-            decho $go
+            decho2 $go
             eval $go
         fi
     fi
@@ -1239,7 +1252,7 @@ if [ -n "$modinject" ]; then
         [ "$quiet" != "1" ] && go="$go --stats"
         # don't use -a, because we don't want group or owner preserved
         go="$go -rlptD -u /lib/modules/$VERSION /sysroot/lib/modules/"
-        decho $go
+        decho2 $go
         eval $go
     fi
     
@@ -1260,13 +1273,13 @@ if [ -n "$modinject" ]; then
             if [ -h $syslink ]; then
                 old_one=$(readlink $syslink)
                 if [ "$old_one" != "linux-headers-$VERSION" ]; then
-                    decho "following $syslink symlink to remove headers in $old_one"
+                    decho2 "following $syslink symlink to remove headers in $old_one"
                     rm -rf /sysroot/usr/src/$old_one
-                    decho "removing $syslink symlink"
+                    decho2 "removing $syslink symlink"
                     rm -f $syslink
                 fi
             elif [ -e $syslink ]; then
-                decho "removing $syslink file/dir"
+                decho2 "removing $syslink file/dir"
                 rm -rf $syslink
             fi
             if [ ! -h $syslink ]; then
@@ -1274,7 +1287,7 @@ if [ -n "$modinject" ]; then
                 go="ln"
                 [ "$quiet" != "1" ] && go="$go -v"
                 go="$go -s linux-headers-$VERSION $syslink"
-                decho $go
+                decho2 $go
                 eval $go
             fi
         fi
@@ -1290,7 +1303,7 @@ if [ -n "$modinject" ]; then
             [ "$quiet" != "1" ] && go="$go --stats"
             # don't use -a, because we don't want group or owner preserved
             go="$go -rlptD -u /usr/src/linux-headers-$VERSION /sysroot/usr/src/"
-            decho $go
+            decho2 $go
             eval $go
         fi
         
@@ -1308,7 +1321,7 @@ if [ -n "$modinject" ]; then
         [ "$quiet" != "1" ] && go="$go --stats"
         # don't use -a, because we don't want group or owner preserved
         go="$go -rlptD -u /lib/firmware $(dirname $sysdir)"
-        decho $go
+        decho2 $go
         eval $go
     fi
 
@@ -1353,9 +1366,9 @@ fi
 #
 kill `pidof udevd`
 
-decho "switching to real rootfs..."
+decho2 "switching to real rootfs..."
 go="exec switch_root /sysroot $init $initargs"
-decho $go
+decho2 $go
 eval $go
 
 
