@@ -309,8 +309,6 @@ fwdev=
 # default behavior
 . /ruckusrd.conf
 
-decho "initramfs created with RuckusRD v$VERSION"
-
 # Parse kernel commandline options
 #
 # NOTE: By default, when this script hands off control the the underlying
@@ -415,6 +413,8 @@ for o in `cat /proc/cmdline` ; do
         ;;
     esac
 done
+
+decho "initramfs created with RuckusRD v$VERSION"
 
 # if user provided sqsh_layerdir, append it to the device mountpoint
 if [ -n "$sqsh_layerdir_rel" ]; then
@@ -670,7 +670,10 @@ done
 #        can't umount once we've put things together (unless to_ram?).
 #
 if ! (echo $root | grep -q "CDLABEL=\|ZFS="); then
-    go="fsck -TC $thingtomount"
+    go="fsck -p $thingtomount"
+    if [ -n "$quiet" ]; then
+        go="$go >/dev/null 2>&1"
+    fi
     decho2 $go
     eval $go || echo "WARNING: fsck of rootdev exited non-zero"
 fi
