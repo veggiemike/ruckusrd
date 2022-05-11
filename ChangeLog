@@ -9,6 +9,7 @@ in development
 - Removed extractenator, which moved into its own package.
 - Removed kernel-builder and kernel-tar, which moved into the new
   kernel-builder package.
+- Removed firmwarenator, which moved into its own package.
 
 * v0.17.2
 2022-01-16: RuckusRD v0.17.2

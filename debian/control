@@ -5,9 +5,9 @@ Priority: optional
 Architecture: __arch__
 Installed-Size: __size__
 Depends: bash
-Recommends: doit, extractenator, kernel-builder
+Recommends: doit, extractenator, kernel-builder, firmwarenator
 Maintainer: Michael D Labriola <veggiemike@sourceruckus.org>
-Homepage: http://git.sourceruckus.org/?p=ruckusrd.git
+Homepage: https://github.com/sourceruckus/ruckusrd
 Description: RuckusRD - a super awesome, yet simple, mkinitrd replacement
  RuckusRD provides you with an initramfs capable of 1) creating a
  Layered Squashfs Root Filesystem (great for baselining!), 2) being

@@ -55,10 +55,4 @@ Strengths:
 
 See docs/ for more ramblings.  ;-)
 
-Also included are a bunch of scripts to help make kernel
-compilation/installation as painless as possible.
-
-firmwarenator - Create a fw.img containing all the firmware needed for
-a particular host's hardware.
-
 Get the latest and greatest from https://github.com/sourceruckus/ruckusrd.
