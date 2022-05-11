@@ -10,6 +10,7 @@ in development
 - Removed kernel-builder and kernel-tar, which moved into the new
   kernel-builder package.
 - Removed firmwarenator, which moved into its own package.
+- Removed microcodenator, which moved into its own package.
 - Cleaned up initrd output, now completely quiet when `quiet` specified on
   kernel command line, added `verbose` for traditionally noisey output.
 - Preload common modules needed for accessing fwdev.
