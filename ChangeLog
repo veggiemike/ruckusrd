@@ -10,6 +10,13 @@ in development
 - Removed kernel-builder and kernel-tar, which moved into the new
   kernel-builder package.
 - Removed firmwarenator, which moved into its own package.
+- Cleaned up initrd output, now completely quiet when `quiet` specified on
+  kernel command line, added `verbose` for traditionally noisey output.
+- Preload common modules needed for accessing fwdev.
+- Copy host sytem modprobe config into initramfs.
+- Don't append command line modprobe options to system modprobe config.
+- Allow fwdev=DEV1,DEV2,... on command line
+- Upgraded busybox, linux-firmware, intel-ucode, wireless-regdb, zfs.
 
 * v0.17.2
 2022-01-16: RuckusRD v0.17.2
