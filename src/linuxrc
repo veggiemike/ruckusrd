@@ -283,7 +283,7 @@ sqsh_layerdir="/tmproot"
 sqsh_layerdir_rel=""
 ram_layer=""
 modinject=
-fwdev=
+fwdevspec=
 
 # parse our config file, which could possibly override some of our hardcoded
 # default behavior
@@ -374,7 +374,7 @@ for o in `cat /proc/cmdline` ; do
         modinject=1
         ;;
     fwdev=*)
-        fwdev=${o#fwdev=}
+        fwdevspec=${o#fwdev=}
         ;;
     *)
         # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
@@ -434,7 +434,7 @@ decho2 "sqsh_layerdir=$sqsh_layerdir"
 decho2 "sqsh_layerdir_rel=$sqsh_layerdir_rel"
 decho2 "ram_layer=$ram_layer"
 decho2 "modinject=$modinject"
-decho2 "fwdev=$fwdev"
+decho2 "fwdevspec=$fwdev"
 
 
 if [ -n "$shell" ]; then
@@ -463,7 +463,7 @@ modprobe loop max_loop=32
 
 # extra special device with fw.sqsh on it!
 mkdir -p /lib/firmware
-if [ -n "$fwdev" ]; then
+if [ -n "$fwdevspec" ]; then
     # load some modules needed for block device access
     #
     # NOTE: Some is the keyword here.  We need to provide access specifically
@@ -494,19 +494,25 @@ if [ -n "$fwdev" ]; then
     # raid - software raid, at least
     modprobe raid1
 
-    # load modules needed for whatever fs is on fwdev
-    autoload_fs_module $fwdev
-    # now get it mounted
-    fwdir=/fwdev
-    fwsqsh=$fwdir/fw.sqsh
-    mkdir -p $fwdir
-    mount -o ro $fwdev $fwdir
-    if [ -e $fwsqsh ]; then
-        mount -o ro $fwsqsh /lib/firmware
-    else
-        fwsqsh=
-    fi
-    umount -l $fwdir
+    # split fwdevspec on ',' and iterate over the results until we actually
+    # successfully mount one
+    for fwdev in ${fwdevspec/,/ }; do
+        # load modules needed for whatever fs is on fwdev
+        autoload_fs_module $fwdev
+        # now get it mounted
+        fwdir=/fwdev
+        fwsqsh=$fwdir/fw.sqsh
+        mkdir -p $fwdir
+        mount -o ro $fwdev $fwdir || continue
+        if [ -e $fwsqsh ]; then
+            mount -o ro $fwsqsh /lib/firmware
+        else
+            fwsqsh=
+        fi
+        umount -l $fwdir
+        # got to the end - we found an appropriate device, stop looping
+        break
+    done
 fi
 
 decho -n "determining what to mount... "
