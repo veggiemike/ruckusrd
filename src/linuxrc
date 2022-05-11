@@ -13,26 +13,6 @@
 # flash drives, live CDs, and normal desktop Linux systems.  See the file
 # README for details.
 #
-# NOTE: At the moment, and this might change, we're not loading KMS video
-#       drivers in here.  I was planning on doing just that, but I couldn't
-#       quite get things working the way I wanted.
-#
-#       For example, using nouveau on one of our old dual-Xeons, even if the
-#       very fist line of the script is 'modprobe nouveau', you don't get
-#       penguin logos.  However, if nouveau is actually built into the kernel,
-#       you get penguins a split second after booting starts, but you also get a
-#       big white box that obscures some of the output.  So the best way to
-#       ensure you get the penguin logos appears to still be to set
-#       vga=something to initialize the vga framebuffer for a few seconds before
-#       the KMS video driver gets loaded.  And If we do that and then load the
-#       KMS driver in the initrd, you get two modesets within a 1-2 second
-#       window... which just looks strange.
-#
-#       If we ever decide to play with plymouth or some other nice splash screen
-#       utility, we might want to revisit this and just ditch the penguin logos
-#       (although I kinda like being able to see right off the bat how many CPUs
-#       have been detected).
-#
 # ---- BUSYBOX COMPAT NOTE ----
 # So far, this script uses the following non-basic features that I should
 # double-check for busybox applet compatibility moving forward:
@@ -361,7 +341,7 @@ for o in `cat /proc/cmdline` ; do
         ;;
     blacklist=*)
         blacklist=${o#blacklist=}
-        echo "blacklist $blacklist" >> /etc/modprobe.conf
+        echo "blacklist $blacklist" >> /etc/modprobe.d/ruckusrd-blacklist.conf
         ;;
     root=*)
         root=${o#root=}
@@ -409,7 +389,7 @@ for o in `cat /proc/cmdline` ; do
         if [ -z "$p" -o -z "$v" ]; then
           continue
         fi
-        echo "options $m $p=$v" >> /etc/modprobe.conf
+        echo "options $m $p=$v" >> /etc/modprobe.d/ruckusrd-options.conf
         ;;
     esac
 done
@@ -896,19 +876,6 @@ if [ -n "$sqsh_layers" ]; then
             #
             decho2 "couldn't find /boot tree to bind mount, but might be fine"
         fi
-    fi
-
-    # copy over module options
-    #
-    # NOTE: we really want to do this. without it there's no way to update
-    #       modeprobe.conf before modules get loaded... can't exactly edit
-    #       modprobe.conf and reboot, as our changes get lost.  (e.g., module
-    #       blacklisting or module options on kernel command line)
-    #
-    # NOTE: but we don't want this if sqsh_layers w/out ram_overlay
-    #
-    if [ -z "$ram_layer" ]; then
-        [ -f /etc/modprobe.conf ] && cat /etc/modprobe.conf >> /sysroot/etc/modprobe.conf
     fi
 
     # append a timestamp to system hostname if configured

@@ -109,16 +109,26 @@ eval $go
 
 # Copy modprobe.conf and friends over
 #
-# FIXME: Most mkinitrd scripts I've looked at copy /etc/modprobe.conf and
-#        /etc/modprobe.d from the host system to the initramfs...  My initial
-#        testing indicates that this is not necesary, so I'm not going to do it.
+# NOTE: For a while, we did not do this, in an effor to keep the initrd as
+#       generic as possible.  However, now that we're loading potentually tons
+#       of modules via udev during initrd stage, we probably want to do this.
+#       Otherwise, carefully written distro modprobe.conf files will have no
+#       effect.  For the record, my review of the Ubuntu 18.04 and 20.04
+#       modprobe configs makes it look like mostly generic blacklisting of
+#       known problem modules (e.g., old modules that have been replaced by new
+#       drivers but the old one is still around).
 #
-#echo '********** COPYING HOST SYSTEM MODPROBE CONFIG *********************************'
-#if [ -e /etc/modprobe.conf ] ; then
-#    cp /etc/modprobe.conf initramfs/etc
-#fi
-#cp -R /etc/modprobe.d initramfs/etc
-
+echo '********** COPYING HOST SYSTEM MODPROBE CONFIG *********************************'
+if [ -e /etc/modprobe.conf ] ; then
+    go="cp -vL /etc/modprobe.conf initramfs/etc"
+    echo $go
+    eval $go
+fi
+if [ -d /etc/modprobe.d ]; then
+    go="cp -vLR /etc/modprobe.d initramfs/etc"
+    echo $go
+    eval $go
+fi
 
 # Write fstab
 echo '********** GENERATING FSTAB ****************************************************'
