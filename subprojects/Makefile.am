@@ -295,12 +295,29 @@ dropbear/FOO:
 	popd || exit 1
 
 
+# NOTE: We disable openssl because we've installed dropbear instead of
+#       openssl/openssh
+#
+# FIXME: Ubuntu 18.04 doesn't have a compatible Python commonmark
+#       package.  There's a python3-commonmark-bkrs package but it
+#       seems like the methods are all capitalized differently... so
+#       disabling with --disable-md2man.
+#
+# NOTE: Ubuntu 18.04 need xxhash and xxhash-dev packages or
+#       --disable-xxhash here.
+#
+# FIXME: We disable zstd support because it looks like bionic's zstd
+#        lib is missing some features.
+#
 rsync/FOO:
 	pushd rsync && \
 	rm -rf FOO && \
 	./prepare-source && \
-	./configure --prefix=/usr --bindir=/bin --disable-md2man \
-          --disable-xxhash --disable-zstd --disable-openssl --disable-debug && \
+	sed -i 's|import commonmark|import CommonMark_bkrs as commonmark|' md-convert && \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static \
+          --disable-openssl --disable-md2man --disable-zstd --disable-debug && \
         make -j$(JOBCOUNT) && make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
 
