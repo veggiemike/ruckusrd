@@ -81,7 +81,7 @@ eudev/FOO: util-linux.tar
 	  --disable-introspection --disable-selinux \
 	  --enable-blkid --enable-kmod \
 	  BLKID_CFLAGS="-I$$PWD/../util-linux/FOO/usr/include" \
-	  BLKID_LIBS="-L$$PWD/../util-linux/FOO/lib/ -lblkid" && \
+	  BLKID_LIBS="-L$$PWD/../util-linux/FOO/usr/lib/ -lblkid" && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
