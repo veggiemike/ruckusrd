@@ -66,6 +66,10 @@ util-linux/FOO:
 # NOTE: This compiles and links against our freshly built libblkid
 #       (util-linux).
 #
+# NOTE: Make sure nothing links against the host system's libudev,
+#       otherwise we'll end up with library conflicts on the
+#       initramfs.
+#
 eudev/FOO: util-linux.tar
 	pushd eudev && \
 	rm -rf FOO && \
