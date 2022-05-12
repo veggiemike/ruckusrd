@@ -46,8 +46,8 @@ util-linux/FOO:
 	rm -rf FOO && \
 	./autogen.sh && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
-	  --localstatedir=/var --bindir=/bin --sbindir=/sbin \
-          --disable-manpages --disable-static \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static \
 	  --disable-all-programs \
 	  --enable-fdisks --enable-libfdisk --enable-libuuid \
 	  --enable-libsmartcols --enable-libblkid --enable-blkid \
@@ -55,8 +55,8 @@ util-linux/FOO:
 	  --without-btrfs --disable-bash-completion && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
+	rmdir $$PWD/FOO/usr/{bin,sbin} && \
 	rm -rf $$PWD/FOO/usr/share && \
-	rmdir $$PWD/FOO/bin $$PWD/FOO/usr/{bin,sbin} && \
 	popd || exit 1
 
 
@@ -75,8 +75,8 @@ eudev/FOO: util-linux.tar
 	rm -rf FOO && \
 	autoreconf -f -i -s && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
-	  --localstatedir=/var --bindir=/bin --sbindir=/sbin \
-          --disable-static --disable-manpages \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static \
 	  --with-rootprefix= \
 	  --disable-introspection --disable-selinux \
 	  --enable-blkid --enable-kmod \
@@ -87,22 +87,6 @@ eudev/FOO: util-linux.tar
 	popd || exit 1
 
 
-# FIXME: when we add --with-system-busybox to configure, we'll have to
-#        conditionally replace this rule w/ one that copies files from
-#        the host system.
-#
-# FIXME: play with busybox.config to make things smaller.  right now,
-#        we're installing everything under the sun.  also, we might
-#        get smaller size if we switch to hard links.
-#
-#        so, not only did using hardlinks not save any space on the
-#        initramfs, it caused the invocation of ruckusrd.prep to take
-#        waaaaaay longer.
-#
-#        disabling all of Netowrking, Printing, and Mail only cut our
-#        final initramfs by .1M and our build time by ~10
-#        seconds... not sure that's worth it.
-#
 # NOTE: We remove a couple bb symlinks here because some of our other
 #       subprojects provide them.  We could stop compiling them by
 #       tweaking .config, but this seems easier (and more flexible)
@@ -122,26 +106,12 @@ busybox/FOO:
 	popd || exit 1
 
 
-# FIXME: when we add --with-system-mdadm to configure, we'll have to
-#        conditionally replace this rule w/ one that copies files from
-#        the host system.
-#
-# FIXME: since this installs a bunch of udev rules, maybe we shouldn't
-#        allow --with-system-mdadm?
-#
-# NOTE: We let udev rules get installed in /usr/lib/udev, which just
-#       ends up being the right place in initramfs via symlinks.
-#
-# NOTE: We remove manpages here because we don't want them on the
-#       initramfs.
-#
-mdadm/FOO: eudev.tar
+mdadm/FOO:
 	pushd mdadm && \
 	rm -rf FOO && \
 	sed -i 's|-Werror||g' Makefile && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
-	rm -rf FOO/usr/share && \
 	popd || exit 1
 
 
@@ -162,8 +132,8 @@ lvm2/FOO: eudev.tar
 	pushd lvm2 && \
 	rm -rf FOO && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
-	  --localstatedir=/var --bindir=/bin --sbindir=/sbin \
-          --disable-static --disable-manpages \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static \
 	  --disable-notify-dbus --enable-pkgconfig \
 	  --disable-udev-systemd-background-jobs --disable-selinux \
 	  --enable-udev_sync --enable-udev_rules \
@@ -174,7 +144,6 @@ lvm2/FOO: eudev.tar
 	  UDEV_LIBS="-L$$PWD/../eudev/FOO/usr/lib/ -ludev" && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
-	rm -rf FOO/usr/share &&  \
 	popd || exit 1
 
 
@@ -198,8 +167,8 @@ e2fsprogs/FOO: util-linux.tar eudev.tar
 	pushd e2fsprogs && \
 	rm -rf FOO && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
-	  --localstatedir=/var --bindir=/bin --sbindir=/sbin \
-          --disable-static --disable-manpages \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static \
 	  --enable-elf-shlibs --disable-libuuid --disable-libblkid \
 	  PKG_CONFIG_LIBDIR="$$PWD/../util-linux/FOO/usr/lib/pkgconfig:$$PWD/../eudev/FOO/usr/lib/pkgconfig:$$PWD/../eudev/FOO/usr/share/pkgconfig" \
 	  CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid -I$$PWD/../eudev/FOO/usr/include" \
@@ -208,7 +177,6 @@ e2fsprogs/FOO: util-linux.tar eudev.tar
 	  udev_LIBS="-L$$PWD/../eudev/FOO/usr/lib/ -ludev" && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
-	rm -rf FOO/usr/share && \
 	rm -rf FOO/usr/lib/*.a && \
 	popd || exit 1
 
@@ -223,13 +191,16 @@ squashfs-tools/FOO:
 	    -e 's|^#ZSTD_SUPPORT|ZSTD_SUPPORT|' \
 	    squashfs-tools/Makefile && \
 	make -j$(JOBCOUNT) -C squashfs-tools && \
-	make -C squashfs-tools INSTALL_DIR=$$PWD/FOO/sbin \
-	  INSTALL_MANPAGES_DIR= install && \
+	make -C squashfs-tools INSTALL_DIR=$$PWD/FOO/bin \
+	  INSTALL_MANPAGES_DIR=$$PWD/FOO/usr/share/man/man1 install && \
 	popd || exit 1
 
 
 # NOTE: This compiles and links against our freshly built libblkid and
 #       libuuid (util-linux) and libudev (eudev).
+#
+# NOTE: We remove includes here because it saves us 3.5M and nothing
+#       else is compiling against zfs libs.
 #
 zfs/FOO: util-linux.tar eudev.tar
 	pushd zfs && \
@@ -237,8 +208,8 @@ zfs/FOO: util-linux.tar eudev.tar
 	echo "AC_DEFUN([ZFS_AC_KERNEL_TEST_RESULT], [])" >> config/kernel.m4 && \
 	./autogen.sh && \
 	  ./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
-	  --localstatedir=/var --bindir=/bin --sbindir=/sbin \
-          --disable-static --disable-manpages \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static \
 	  --disable-systemd \
 	  --enable-linux-builtin \
 	  LIBBLKID_CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid" \
@@ -251,7 +222,7 @@ zfs/FOO: util-linux.tar eudev.tar
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf $$PWD/FOO/usr/include && \
 	rm -rf $$PWD/FOO/usr/lib/dracut && \
-	rm -rf $$PWD/FOO/usr/share/{initramfs-tools,man} && \
+	rm -rf $$PWD/FOO/usr/share/initramfs-tools && \
 	rm -rf $$PWD/FOO/usr/share/zfs/zfs-tests && \
 	popd || exit 1
 
@@ -272,7 +243,6 @@ syslinux/FOO: syslinux-6.03.tar.xz
 	    extlinux/main.c && \
 	make install INSTALLROOT=$$PWD/FOO && \
 	popd || exit 1
-
 
 
 dropbear/FOO:
@@ -344,6 +314,7 @@ fw.sqsh:
 	mksquashfs linux-firmware $@ -comp xz -e .git -noappend
 	mksquashfs wireless-regdb/regulatory.db* $@
 	mksquashfs intel-ucode/intel-ucode $@ -keep-as-directory
+
 
 # NOTE: For early-loading, microcode needs to be provided as an
 #       uncompressed cpio archive with specific filenames for Intel
