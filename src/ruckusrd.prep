@@ -62,7 +62,7 @@ done
 
 # Copy all required shared libs
 echo '********** COPYING NEEDED LIBS TO INITRAMFS ************************************'
-DEPLIBS=$(find initramfs -type f -exec ldd {} 2>/dev/null \; \
+DEPLIBS=$(LD_LIBRARY_PATH=initramfs/lib find initramfs -type f -exec ldd {} 2>/dev/null \; \
     | sed 's|.*=>||g' | awk '/\// { print $1 }' | sort | uniq)
 #
 # NOTE: Deref symlinks, otherwise we'll end up with a bunch of broken symlinks
@@ -87,6 +87,19 @@ for f in $DEPLIBS; do
 done
 
 
+# Remove static libs
+echo '********** REMOVING UNNEEDED FILES *********************************************'
+go="find initramfs \( -type f -a -name \*.h \) -exec rm -v --interactive=never {} \;"
+echo $go
+eval $go
+go="find initramfs \( -type f -a -name \*.a \) -exec rm -v --interactive=never {} \;"
+echo $go
+eval $go
+go="find initramfs \( -type f -a -name \*.la \) -exec rm -v --interactive=never {} \;"
+echo $go
+eval $go
+
+
 # Strip debug info
 #
 # NOTE: We have to chmod a couple files to allow strip to work.  We re-chmod to
@@ -100,9 +113,16 @@ eval $go
 chmod -w initramfs/bin/{dmsetup,lvm} initramfs/lib/libdevmapper.so.*
 
 
-# Remove static libs
-echo '********** REMOVING STATIC LIBRARIES *******************************************'
-go="rm -v --interactive=never initramfs/lib/*.a"
+# Uncompress manpages
+#
+# NOTE: The entire nitramfs is compressed, so we uncompress compressed files
+#       here.
+#
+echo '********** UNCOMPRESSING FILES (because entire initramfs gets compressed) ******'
+go="find initramfs \( -type f -a -name \*.gz \) -exec gunzip -v {} \;"
+echo $go
+eval $go
+go="find initramfs \( -type f -a -name \*.xz \) -exec unxz -v {} \;"
 echo $go
 eval $go
 
