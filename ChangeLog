@@ -16,7 +16,9 @@ in development
 - Preload common modules needed for accessing fwdev.
 - Copy host sytem modprobe config into initramfs.
 - Don't append command line modprobe options to system modprobe config.
-- Allow fwdev=DEV1,DEV2,... on command line
+- Allow fwdev=DEV1,DEV2,... on command line.
+- Added libuuid, libblkid, fdisk, cfdisk, sfdisk, and blkid from util-linux
+  because busybox fdisk didn't like manipilating GPTs.
 - Upgraded busybox, linux-firmware, intel-ucode, wireless-regdb, zfs.
 
 * v0.17.2

@@ -37,3 +37,6 @@
 [submodule "subprojects/efibootmgr"]
 	path = subprojects/efibootmgr
 	url = https://github.com/rhboot/efibootmgr.git
+[submodule "subprojects/util-linux"]
+	path = subprojects/util-linux
+	url = https://github.com/util-linux/util-linux.git

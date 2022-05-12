@@ -39,4 +39,5 @@ Makefile.in
 /subprojects/syslinux-*.tar.*
 /subprojects/syslinux.tar
 /subprojects/ucode.img
+/subprojects/util-linux.tar
 /subprojects/zfs.tar

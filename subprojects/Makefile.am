@@ -3,16 +3,17 @@
 # in here for each subproject.
 
 
-all-local: eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar
+all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar
 all-local: fw.sqsh ucode.img
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
 
 clean-local:
-	rm -fv {eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr}.tar
+	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr}.tar
 	rm -fv fw.sqsh ucode.img
 	rm -rf .build*
+	cd util-linux && git clean -dfx && git stash
 	cd eudev && git clean -dfx && git stash
 	cd busybox && git clean -dfx && git stash
 	cd mdadm && git clean -dfx && git stash
@@ -24,6 +25,35 @@ clean-local:
 	cd dropbear && git clean -dfx && git stash
 	cd rsync && git clean -dfx && git stash
 	cd efibootmgr && git clean -dfx && git stash
+
+
+# NOTE: This is added because the busybox fdisk applet doesn't work
+#       for GPT and that kinda sucks.  The util-linux version requires
+#       libuuid, so that's enabled too... and then we enable libblkid
+#       because it's need alongside libuuid for a bunch of other
+#       things wer're building and using one from host system and one
+#       from our ruckusrd subprojects seems like a bad idea.  And at
+#       that point, why not add the real blkid too.
+#
+# FIXME: Might want to consider mount, libmount, losetup, fsck
+#
+util-linux/FOO:
+	pushd util-linux && \
+	rm -rf FOO && \
+	./autogen.sh && \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/sbin \
+          --disable-manpages --disable-static \
+	  --disable-all-programs \
+	  --enable-fdisks --enable-libfdisk --enable-libuuid \
+	  --enable-libsmartcols --enable-libblkid --enable-blkid \
+	  --disable-asciidoc --without-python --without-systemd \
+	  --without-btrfs --disable-bash-completion && \
+	make -j$(JOBCOUNT) && \
+	make DESTDIR=$$PWD/FOO install && \
+	rm -rf $$PWD/FOO/usr/share && \
+	rmdir $$PWD/FOO/bin $$PWD/FOO/usr/{bin,sbin} && \
+	popd || exit 1
 
 
 # FIXME: when we add --with-system-eudev to configure, we'll have to
