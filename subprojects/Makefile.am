@@ -228,26 +228,30 @@ squashfs-tools/FOO:
 	popd || exit 1
 
 
-# FIXME: when we add --with-system-zfs to configure, we'll have to
-#        conditionally replace this rule w/ one that copies files from
-#        the host system.
+# NOTE: This compiles and links against our freshly built libblkid and
+#       libuuid (util-linux) and libudev (eudev).
 #
-zfs/FOO:
+zfs/FOO: util-linux.tar eudev.tar
 	pushd zfs && \
 	rm -rf FOO && \
 	echo "AC_DEFUN([ZFS_AC_KERNEL_TEST_RESULT], [])" >> config/kernel.m4 && \
 	./autogen.sh && \
-	LIBUDEV_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
-	  LIBUDEV_LIBS="-L$$PWD/../eudev/FOO/lib/ -ludev" \
-	  PKG_CONFIG_PATH=$$PWD/../eudev/FOO/lib/pkgconfig:$$PWD/../eudev/FOO/usr/share/pkgconfig \
-	  ./configure --prefix=/usr --sbindir=/sbin --sysconfdir=/etc \
-	  --localstatedir=/var --with-systemdunitdir=/lib/systemd/system \
-	  --with-systemdpresetdir=/lib/systemd/system-preset \
-	  --with-systemdgeneratordir=/lib/systemd/system-generator \
-	  --enable-linux-builtin && \
+	  ./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/sbin \
+          --disable-static --disable-manpages \
+	  --disable-systemd \
+	  --enable-linux-builtin \
+	  LIBBLKID_CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid" \
+	  LIBBLKID_LIBS="-L$$PWD/../util-linux/FOO/usr/lib/ -lblkid" \
+	  LIBUUID_CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/uuid" \
+	  LIBUUID_LIBS="-L$$PWD/../util-linux/FOO/usr/lib/ -luuid" \
+	  LIBUDEV_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
+	  LIBUDEV_LIBS="-L$$PWD/../eudev/FOO/usr/lib/ -ludev" && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf $$PWD/FOO/usr/include && \
+	rm -rf $$PWD/FOO/usr/lib/dracut && \
+	rm -rf $$PWD/FOO/usr/share/{initramfs-tools,man} && \
 	rm -rf $$PWD/FOO/usr/share/zfs/zfs-tests && \
 	popd || exit 1
 
