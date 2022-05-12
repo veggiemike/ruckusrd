@@ -178,13 +178,6 @@ lvm2/FOO: eudev.tar
 	popd || exit 1
 
 
-# FIXME: when we add --with-system-e2fsprogs to configure, we'll have to
-#        conditionally replace this rule w/ one that copies files from
-#        the host system.
-#
-# NOTE: We remove manpages here because we don't want them on the
-#       initramfs.
-#
 # NOTE: A bunch of programs installed here overlap w/ busybox (e.g.,
 #       chattr, lsatter, tune2fs, fsck).  For now, we'll use the
 #       full-featured variants because I think we care more about that
@@ -192,13 +185,31 @@ lvm2/FOO: eudev.tar
 #       borking, we remove the unneeded bb symlinks in the busybox
 #       build script.
 #
-e2fsprogs/FOO:
+# NOTE: It's not as pretty as I'd like, but we are compiling and
+#       linking against our freshly built libblkid and libuuid
+#       (util-linux).  The configure script doesn't apear to use
+#       pkg-config 100% of the time, so I've added the appropriate
+#       flags to CFLAGS and LDDFLAGS so all the lib check tests use
+#       the right libs.  Also, it doesn't look like this needs libudev
+#       at all... the pkg-config checks must be for determining paths
+#       for udev helpers.
+#
+e2fsprogs/FOO: util-linux.tar eudev.tar
 	pushd e2fsprogs && \
 	rm -rf FOO && \
-	./configure --prefix=/usr && \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/sbin \
+          --disable-static --disable-manpages \
+	  --enable-elf-shlibs --disable-libuuid --disable-libblkid \
+	  PKG_CONFIG_LIBDIR="$$PWD/../util-linux/FOO/usr/lib/pkgconfig:$$PWD/../eudev/FOO/usr/lib/pkgconfig:$$PWD/../eudev/FOO/usr/share/pkgconfig" \
+	  CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid -I$$PWD/../eudev/FOO/usr/include" \
+	  LDFLAGS="-L$$PWD/../util-linux/FOO/usr/lib/ -L$$PWD/../eudev/FOO/usr/lib/" \
+	  udev_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
+	  udev_LIBS="-L$$PWD/../eudev/FOO/usr/lib/ -ludev" && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf FOO/usr/share && \
+	rm -rf FOO/usr/lib/*.a && \
 	popd || exit 1
 
 
