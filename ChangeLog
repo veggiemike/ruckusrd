@@ -17,6 +17,7 @@ in development
 - Copy host sytem modprobe config into initramfs.
 - Don't append command line modprobe options to system modprobe config.
 - Allow fwdev=DEV1,DEV2,... on command line.
+- Added /etc/ruckusrd.conf and ~/.ruckusrd.conf config file support.
 - Added libuuid, libblkid, fdisk, cfdisk, sfdisk, and blkid from util-linux
   because busybox fdisk didn't like manipilating GPTs.
 - Upgraded busybox, eudev, lvm2, e2fsprogs, squashfs-tools, dropbear,

@@ -23,7 +23,7 @@ Makefile.in
 # built files
 /src/initramfs
 /src/initramfs.cpio.xz
-/src/ruckusrd.conf
+/src/ruckusrd.sh
 /subprojects/.build*
 /subprojects/busybox.tar
 /subprojects/dropbear.tar

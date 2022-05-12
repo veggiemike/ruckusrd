@@ -91,7 +91,7 @@ AC_CONFIG_FILES([Makefile
 		 docs/Makefile
 		 src/Makefile
 		 subprojects/Makefile
-		 src/ruckusrd.conf])
+		 src/ruckusrd.sh])
 AC_OUTPUT
 
 

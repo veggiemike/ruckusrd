@@ -7,7 +7,7 @@
 # This script should get executed by the build system to create lower.sqsh,
 # which should get installed by the install target.
 
-. ruckusrd.conf
+. ruckusrd.sh
 
 # make sure we're starting clean
 rm -rf initramfs initramfs.cpio.xz
@@ -164,7 +164,7 @@ EOF
 # Install our initramfs init script
 echo '********** COPYING LINUXRC TO INITRAMFS ****************************************'
 install -vp linuxrc initramfs/init &&
-cp -va ruckusrd.conf initramfs/ || exit 1
+cp -va ruckusrd.sh initramfs/ || exit 1
 
 
 # Make a couple extra symlinks, if needed

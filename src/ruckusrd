@@ -20,12 +20,16 @@ shopt -s nullglob
 # assume we're in the source tree if $PWD/linuxrc exists
 if [ -f $(dirname $0)/linuxrc ]; then
     LIBDIR=$(realpath $(dirname $0))
+    CONFDIR=$LIBDIR
     UCODE=$LIBDIR/../subprojects/ucode.img
 else
     LIBDIR=__LIBDIR__
+    CONFDIR=__CONFDIR__
     UCODE=/boot/ucode.img
 fi
-. $LIBDIR/ruckusrd.conf
+. $LIBDIR/ruckusrd.sh
+[ -f $CONFDIR/ruckusrd.conf ] && . $CONFDIR/ruckusrd.conf
+[ -f ~/.ruckusrd.conf ] && . ~/.ruckusrd.conf
 
 
 decho()
@@ -161,13 +165,13 @@ pushd >/dev/null $TEMPDIR/initramfs &&
 $xz -dc $LIBDIR/initramfs.cpio.xz | $cpio --extract &&
 popd >/dev/null || cleanup 1
 
-# append to config file
+# append runtime options to .sh file
 for x in $LINUXRC_OPTS; do
-    echo $x >> $TEMPDIR/initramfs/ruckusrd.conf
+    echo $x >> $TEMPDIR/initramfs/ruckusrd.sh
 done
 if [ "$opt_verbose" != 0 ]; then
-    echo '********** /ruckusrd.conf ******************************************************'
-    cat $TEMPDIR/initramfs/ruckusrd.conf
+    echo '********** /ruckusrd.sh ********************************************************'
+    cat $TEMPDIR/initramfs/ruckusrd.sh
 fi
 
 
