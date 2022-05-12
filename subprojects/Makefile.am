@@ -274,12 +274,15 @@ syslinux/FOO: syslinux-6.03.tar.xz
 	popd || exit 1
 
 
+
 dropbear/FOO:
 	pushd dropbear && \
 	rm -rf FOO && \
 	sed -i 's|ln -s $$(bindir)/|ln -s |' Makefile.in && \
 	autoreconf && \
-	./configure --prefix=/usr --bindir=/bin --sbindir=/bin && \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static && \
 	make clean && \
 	make -j$(JOBCOUNT) \
           PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" \
