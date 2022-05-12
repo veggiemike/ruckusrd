@@ -145,10 +145,6 @@ mdadm/FOO: eudev.tar
 	popd || exit 1
 
 
-# FIXME: when we add --with-system-lvm2 to configure, we'll have to
-#        conditionally replace this rule w/ one that copies files from
-#        the host system.
-#
 # NOTE: We need to make sure nothing else we're installing links
 #       against the host sytem's libdevmapper... otherwise we have a
 #       library conflict on the initramfs.
@@ -159,21 +155,26 @@ mdadm/FOO: eudev.tar
 # NOTE: We disable systemd bits, but enable udev stuff and point to
 #       our eudev subproject.
 #
+# NOTE: This compiles and links against our freshly built libblkid
+#       (util-linux) and libudev (eudev).
+#
 lvm2/FOO: eudev.tar
 	pushd lvm2 && \
 	rm -rf FOO && \
-	./configure --prefix=/usr --disable-notify-dbus \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/sbin \
+          --disable-static --disable-manpages \
+	  --disable-notify-dbus --enable-pkgconfig \
 	  --disable-udev-systemd-background-jobs --disable-selinux \
 	  --enable-udev_sync --enable-udev_rules \
 	  --enable-udev-rule-exec-detection \
+	  BLKID_CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid" \
+	  BLKID_LIBS="-L$$PWD/../util-linux/FOO/lib/ -lblkid" \
 	  UDEV_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
-	  UDEV_LIBS="-L$$PWD/../eudev/FOO/lib/ -ludev" \
-	  CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
-	  LDFLAGS="-L$$PWD/../eudev/FOO/lib/" \
-	  PKG_CONFIG_PATH=$$PWD/../eudev/FOO/lib/pkgconfig:$$PWD/../eudev/FOO/usr/share/pkgconfig && \
+	  UDEV_LIBS="-L$$PWD/../eudev/FOO/lib/ -ludev" && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
-	rm -rf FOO/usr/share && \
+	rm -rf FOO/usr/share &&  \
 	popd || exit 1
 
 
