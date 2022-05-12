@@ -169,9 +169,9 @@ lvm2/FOO: eudev.tar
 	  --enable-udev_sync --enable-udev_rules \
 	  --enable-udev-rule-exec-detection \
 	  BLKID_CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid" \
-	  BLKID_LIBS="-L$$PWD/../util-linux/FOO/lib/ -lblkid" \
+	  BLKID_LIBS="-L$$PWD/../util-linux/FOO/usr/lib/ -lblkid" \
 	  UDEV_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
-	  UDEV_LIBS="-L$$PWD/../eudev/FOO/lib/ -ludev" && \
+	  UDEV_LIBS="-L$$PWD/../eudev/FOO/usr/lib/ -ludev" && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf FOO/usr/share &&  \
