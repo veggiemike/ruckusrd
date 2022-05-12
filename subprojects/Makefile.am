@@ -35,6 +35,10 @@ clean-local:
 #       from our ruckusrd subprojects seems like a bad idea.  And at
 #       that point, why not add the real blkid too.
 #
+# NOTE: Make sure nothing links against the host system's libblkid or
+#       libuuid, otherwise we'll end up with library conflicts on the
+#       initramfs.
+#
 # FIXME: Might want to consider mount, libmount, losetup, fsck
 #
 util-linux/FOO:
@@ -109,6 +113,7 @@ busybox/FOO:
 	make -j$(JOBCOUNT_KBUILD) && \
 	make CONFIG_PREFIX=$$PWD/FOO install && \
 	rm -f FOO/bin/{lsattr,chattr} && \
+	rm -f FOO/sbin/{fdisk,sfdisk,cfdisk,blkid} && \
 	rm -f FOO/sbin/{fsck,tune2fs,mke2fs,mkfs.ext2} && \
 	popd || exit 1
 
