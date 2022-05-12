@@ -19,8 +19,8 @@ in development
 - Allow fwdev=DEV1,DEV2,... on command line.
 - Added libuuid, libblkid, fdisk, cfdisk, sfdisk, and blkid from util-linux
   because busybox fdisk didn't like manipilating GPTs.
-- Upgraded busybox, eudev, lvm2, e2fsprogs, linux-firmware, intel-ucode,
-  wireless-regdb, zfs.
+- Upgraded busybox, eudev, lvm2, e2fsprogs, squashfs-tools, linux-firmware,
+  intel-ucode, wireless-regdb, zfs.
 
 * v0.17.2
 2022-01-16: RuckusRD v0.17.2

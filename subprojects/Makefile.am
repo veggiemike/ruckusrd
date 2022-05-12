@@ -213,14 +213,6 @@ e2fsprogs/FOO: util-linux.tar eudev.tar
 	popd || exit 1
 
 
-# FIXME: when we add --with-system-squashfs-tools to configure, we'll
-#        have to conditionally replace this rule w/ one that copies
-#        files from the host system.
-#
-# FIXME: 2nd sed statement was added to fix compilation problems on
-#        Ubuntu 20.04...  hopefully this isn't needed when we upgrade
-#        from upstream.
-#
 squashfs-tools/FOO:
 	pushd squashfs-tools && \
 	rm -rf FOO && \
@@ -228,15 +220,11 @@ squashfs-tools/FOO:
 	    -e 's|^#XZ_SUPPORT|XZ_SUPPORT|' \
 	    -e 's|^#LZO_SUPPORT|LZO_SUPPORT|' \
 	    -e 's|^#LZ4_SUPPORT|LZ4_SUPPORT|' \
-	    -e 's|^#LZMA_XZ_SUPPORT|LZMA_XZ_SUPPORT|' \
 	    -e 's|^#ZSTD_SUPPORT|ZSTD_SUPPORT|' \
 	    squashfs-tools/Makefile && \
-	sed -i \
-	    -e 's|^#include <sys/types.h>|#include <sys/types.h>\n#include <sys/sysmacros.h>|' \
-	    squashfs-tools/mksquashfs.c \
-	    squashfs-tools/unsquashfs.c && \
 	make -j$(JOBCOUNT) -C squashfs-tools && \
-	make -C squashfs-tools INSTALL_DIR=$$PWD/FOO/usr/sbin install && \
+	make -C squashfs-tools INSTALL_DIR=$$PWD/FOO/sbin \
+	  INSTALL_MANPAGES_DIR= install && \
 	popd || exit 1
 
 
