@@ -287,7 +287,7 @@ fwdevspec=
 
 # parse our config file, which could possibly override some of our hardcoded
 # default behavior
-. /ruckusrd.conf
+. /ruckusrd.sh
 
 # Parse kernel commandline options
 #
