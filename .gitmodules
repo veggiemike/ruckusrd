@@ -15,7 +15,7 @@
 	url = git://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git
 [submodule "subprojects/squashfs-tools"]
 	path = subprojects/squashfs-tools
-	url = git://git.kernel.org/pub/scm/fs/squashfs/squashfs-tools.git
+	url = https://github.com/plougher/squashfs-tools.git
 [submodule "subprojects/zfs"]
 	path = subprojects/zfs
 	url = https://github.com/openzfs/zfs.git
