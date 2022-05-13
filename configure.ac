@@ -3,7 +3,7 @@ AC_PREREQ([2.65])
 m4_define(ruckusrd_major_version, 0)
 m4_define(ruckusrd_minor_version, 18)
 m4_define(ruckusrd_micro_version, 0)
-m4_define(ruckusrd_devtag, [rc1])
+m4_define(ruckusrd_devtag, [rc1+])
 m4_ifnblank(ruckusrd_devtag,
 	[m4_define(ruckusrd_version, ruckusrd_major_version.ruckusrd_minor_version.ruckusrd_micro_version-ruckusrd_devtag)],
 	[m4_define(ruckusrd_version, ruckusrd_major_version.ruckusrd_minor_version.ruckusrd_micro_version)])

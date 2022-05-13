@@ -51,6 +51,9 @@ $(DEBFILE): $(DEBCTRL)
 	rm -rf $(DPKGDIR)
 
 $(DPKGDIR):
+	./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var
+	$(MAKE) clean
+	$(MAKE) all
 	$(MAKE) DESTDIR=$@ install
 
 $(DEBDIR): $(DPKGDIR)
