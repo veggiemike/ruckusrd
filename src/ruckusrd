@@ -34,7 +34,7 @@ fi
 
 decho()
 {
-    if [ "$opt_verbose" != "0" ]; then
+    if [ -n "$opt_verbose" ]; then
         echo "$*"
     fi
 }
@@ -106,10 +106,10 @@ if [ $? != 0 ]; then
 fi
 set -- $__opts
 
-opt_allow_overwrite=0
-opt_verbose=0
-INITRAMFS_TARGET=""
-KERNEL=""
+opt_allow_overwrite=
+opt_verbose=
+INITRAMFS_TARGET=
+KERNEL=
 BASEDIR="/"
 COMPMODE="fast"
 LINUXRC_OPTS=
@@ -124,11 +124,11 @@ while true; do
 	    exit 0
 	    ;;
         -v|--verbose)
-            opt_verbose=1
+            opt_verbose=yes
             shift
             ;;
         -f|--force)
-            opt_allow_overwrite=1
+            opt_allow_overwrite=yes
             shift
             ;;
         -b|--basedir)
@@ -175,11 +175,9 @@ if [ "$COMPMODE" != "best" -a "$COMPMODE" != "fast" ]; then
     exit 1
 fi
 
-if [  "$opt_allow_overwrite" == "0" ] ; then
-    if [ -e $INITRAMFS_TARGET ] ; then
-	echo "Image $INITRAMFS_TARGET already exists. Use -f to overwrite"
-	exit 1
-    fi
+if [ -e $INITRAMFS_TARGET -a -z "$opt_allow_overwrite" ]; then
+    echo "Image $INITRAMFS_TARGET already exists. Use -f to overwrite."
+    exit 1
 fi
 
 decho opt_allow_overwrite: $opt_allow_overwrite
@@ -200,7 +198,7 @@ mkdir="mkdir -p"
 mv="mv"
 xz="xz"
 ln="ln"
-if [ "$opt_verbose" != "0" ]; then
+if [ -n "$opt_verbose" ]; then
     cp+=" -v"
     mkdir+=" -v"
     mv+=" -v"
@@ -224,7 +222,7 @@ popd >/dev/null || cleanup 1
 for x in $LINUXRC_OPTS; do
     echo $x >> $TEMPDIR/initramfs/ruckusrd.sh
 done
-if [ "$opt_verbose" != 0 ]; then
+if [ -n "$opt_verbose" ]; then
     echo '********** /ruckusrd.sh ********************************************************'
     cat $TEMPDIR/initramfs/ruckusrd.sh
 fi
@@ -331,7 +329,7 @@ else
 fi
 if [ -z "$comp_cmd" ]; then
     comp_cmd="cat"
-elif [ "$opt_verbose" != 0 ]; then
+elif [ -n "$opt_verbose" ]; then
     comp_cmd+=" -v"
 fi
 case ${comp_cmd%% *} in
@@ -356,12 +354,12 @@ popd >/dev/null || cleanup 1
 if [ -f $UCODE ]; then
     decho '********** COMBINING WITH MICROCODE IMAGE **************************************'
     cat $UCODE $TEMPDIR/initramfs.img > $TEMPDIR/initramfs-final.img || cleanup 1
-    if [ "$opt_verbose" != 0 ]; then
+    if [ -n "$opt_verbose" ]; then
         ls -l $UCODE $TEMPDIR/initramfs.img $TEMPDIR/initramfs-final.img
     fi
 else
     mv $TEMPDIR/initramfs.img $TEMPDIR/initramfs-final.img
-    if [ "$opt_verbose" != 0 ]; then
+    if [ -n "$opt_verbose" ]; then
         ls -l $TEMPDIR/initramfs-final.img
     fi
 fi
