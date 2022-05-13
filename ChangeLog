@@ -31,6 +31,7 @@ in development
   linux-firmware, intel-ucode, wireless-regdb, zfs.
 - Overhauled command line parsing using getopt with better usage description.
 - Added help2man generated man page.
+- The fw.sqsh file generated in subprojects now uses zstd for compression.
 
 * v0.17.2
 2022-01-16: RuckusRD v0.17.2

@@ -340,9 +340,10 @@ groff/FOO:
 	popd || exit 1
 
 
-# FIXME: I'd like to use zstd here, but ubuntu 18.04 squashfs doesn't
-#        support it...  I could/should check via configure and use if
-#        possible.
+# NOTE: We use the mksquashfs we've built against our libztd to ensure
+#       that old systems (e.g., Ubuntu 18.04) have a workig mksquashfs
+#       that can use zstd.  The resulting .sqsh file is slightly
+#       larger, but unpacks faster during boot.
 #
 # NOTE: We include microcode in fw.sqsh so that it will be there
 #       post-boot for consistency.  Having the ucode directories in
@@ -350,10 +351,13 @@ groff/FOO:
 #       That's handled via the generated ucode.img being preppended to
 #       our resulting initrd.
 #
-fw.sqsh:
-	mksquashfs linux-firmware $@ -comp xz -e .git -noappend
-	mksquashfs wireless-regdb/regulatory.db* $@
-	mksquashfs intel-ucode/intel-ucode $@ -keep-as-directory
+fw.sqsh: squashfs-tools.tar
+	LD_LIBRARY_PATH=$PWD/zstd/FOO/usr/lib \
+	  ./squashfs-tools/FOO/bin/mksquashfs linux-firmware $@ -comp zstd -e .git -noappend
+	LD_LIBRARY_PATH=$PWD/zstd/FOO/usr/lib \
+	  ./squashfs-tools/FOO/bin/mksquashfs wireless-regdb/regulatory.db* $@
+	LD_LIBRARY_PATH=$PWD/zstd/FOO/usr/lib \
+	  ./squashfs-tools/FOO/bin/mksquashfs intel-ucode/intel-ucode $@ -keep-as-directory
 
 
 # NOTE: For early-loading, microcode needs to be provided as an
