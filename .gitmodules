@@ -40,3 +40,6 @@
 [submodule "subprojects/util-linux"]
 	path = subprojects/util-linux
 	url = https://github.com/util-linux/util-linux.git
+[submodule "subprojects/groff"]
+	path = subprojects/groff
+	url = https://git.savannah.gnu.org/git/groff.git

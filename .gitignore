@@ -32,6 +32,7 @@ Makefile.in
 /subprojects/efibootmgr.tar
 /subprojects/eudev.tar
 /subprojects/fw.sqsh
+/subprojects/groff.tar
 /subprojects/lvm2.tar
 /subprojects/mdadm.tar
 /subprojects/rsync.tar

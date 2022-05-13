@@ -3,14 +3,14 @@
 # in here for each subproject.
 
 
-all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar
+all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar
 all-local: fw.sqsh ucode.img
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
 
 clean-local:
-	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr}.tar
+	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff}.tar
 	rm -fv fw.sqsh ucode.img
 	rm -rf .build*
 	cd util-linux && git clean -dfx && git stash
@@ -25,6 +25,7 @@ clean-local:
 	cd dropbear && git clean -dfx && git stash
 	cd rsync && git clean -dfx && git stash
 	cd efibootmgr && git clean -dfx && git stash
+	cd groff && git clean -dfx && git stash
 
 
 # NOTE: This is added because the busybox fdisk applet doesn't work
@@ -297,6 +298,28 @@ efibootmgr/FOO:
 	rm -rf FOO && \
 	make EFIDIR=ruckus && \
 	make EFIDIR=ruckus DESTDIR=$$PWD/FOO install && \
+	popd || exit 1
+
+
+# FIXME: ugh, gnulib.  i think this is the only thing using it at this
+#        point, but if we end up with multiple subprojects all cloning
+#        gnulib we should pull it out and have a single instance in
+#        subprojects/gnulib
+#
+#        does git clean -dfx nuke the clone? no, it doesn't.
+#
+# NOTE: We delete /usr/share/doc because it's 12M of html/pdf docs
+#       we'll never see.
+#
+groff/FOO:
+	pushd groff && \
+	rm -rf FOO && \
+	./bootstrap && \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static && \
+        make -j$(JOBCOUNT) && make DESTDIR=$$PWD/FOO install && \
+	rm -rf $$PWD/FOO/usr/share/doc/ && \
 	popd || exit 1
 
 

@@ -20,6 +20,8 @@ in development
 - Added /etc/ruckusrd.conf and ~/.ruckusrd.conf config file support.
 - Added libuuid, libblkid, fdisk, cfdisk, sfdisk, and blkid from util-linux
   because busybox fdisk didn't like manipilating GPTs.
+- Added groff because the busybox man applet just wraps around it (i.e., it
+  doesn't work unless you also have groff).
 - Upgraded busybox, eudev, lvm2, e2fsprogs, squashfs-tools, dropbear,
   linux-firmware, intel-ucode, wireless-regdb, zfs.
 - Overhauled command line parsing using getopt with better usage description.
