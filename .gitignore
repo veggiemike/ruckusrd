@@ -33,6 +33,7 @@ Makefile.in
 /subprojects/eudev.tar
 /subprojects/fw.sqsh
 /subprojects/groff.tar
+/subprojects/less.tar
 /subprojects/lvm2.tar
 /subprojects/mdadm.tar
 /subprojects/rsync.tar

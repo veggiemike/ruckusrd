@@ -46,3 +46,6 @@
 [submodule "subprojects/zstd"]
 	path = subprojects/zstd
 	url = https://github.com/facebook/zstd.git
+[submodule "subprojects/less"]
+	path = subprojects/less
+	url = https://github.com/gwsw/less.git

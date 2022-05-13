@@ -50,7 +50,7 @@ ln -vs lib initramfs/lib64 || exit 1
 
 # Copy all the PROGS into the initramfs
 echo '********** COPYING PROGS TO INITRAMFS ******************************************'
-for x in ../subprojects/{busybox,util-linux,eudev,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,zstd}.tar; do
+for x in ../subprojects/{busybox,util-linux,eudev,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,zstd,less}.tar; do
     # NOTE: We use --keep-old-files here to prevent replacement of
     #       usr/{bin,sbin,lib,lib64} symlnks.  It would be nice if we could
     #       find a better way to do that, while allowing us to overwrite

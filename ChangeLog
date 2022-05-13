@@ -25,6 +25,7 @@ in development
   to the initramfs because busybox fdisk didn't like manipilating GPTs.
 - Added groff to the initramfs because the busybox man applet just wraps around
   it (i.e., it doesn't work unless you also have groff).
+- Added less to the initramfs to make manpages look nicer.
 - Added zstd to initramfs so we can use it in squashfs, rsync, and zfs, as well
   as have it available in the maint shell.
 - Upgraded busybox, eudev, lvm2, e2fsprogs, squashfs-tools, dropbear,

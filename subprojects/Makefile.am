@@ -3,14 +3,14 @@
 # in here for each subproject.
 
 
-all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar
+all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar
 all-local: fw.sqsh ucode.img
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
 
 clean-local:
-	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff}.tar
+	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,less}.tar
 	rm -fv fw.sqsh ucode.img
 	rm -rf .build*
 	cd util-linux && git clean -dfx && git stash
@@ -26,6 +26,7 @@ clean-local:
 	cd rsync && git clean -dfx && git stash
 	cd efibootmgr && git clean -dfx && git stash
 	cd groff && git clean -dfx && git stash
+	cd less && git clean -dfx && git stash
 
 
 # NOTE: This is added because the busybox fdisk applet doesn't work
@@ -101,7 +102,7 @@ busybox/FOO:
 	make oldconfig && \
 	make -j$(JOBCOUNT_KBUILD) && \
 	make CONFIG_PREFIX=$$PWD/FOO install && \
-	rm -f FOO/bin/{lsattr,chattr} && \
+	rm -f FOO/bin/{lsattr,chattr,less} && \
 	rm -f FOO/sbin/{fdisk,sfdisk,cfdisk,blkid} && \
 	rm -f FOO/sbin/{fsck,tune2fs,mke2fs,mkfs.ext2} && \
 	popd || exit 1
@@ -337,6 +338,20 @@ groff/FOO:
           --disable-static && \
         make -j$(JOBCOUNT) && make DESTDIR=$$PWD/FOO install && \
 	rm -rf $$PWD/FOO/usr/share/doc/ && \
+	popd || exit 1
+
+
+less/FOO:
+	pushd less && \
+	rm -rf FOO && \
+	autoreconf -f -i -s && \
+	make -f Makefile.aut && \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static && \
+        make -j$(JOBCOUNT) && \
+	make -f Makefile.aut less.nro lesskey.nro lessecho.nro && \
+	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
 
 
