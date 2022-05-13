@@ -49,6 +49,7 @@
    5. remove /var/log/journal/*
    6. create new /etc/fstab
    7. clean out NetworkManager connections (maybe?)
+   8. dpkg-reconfigure locale, tzdata, postfix, ...?
 
    Of course, if we do that... it will really be distro specific.  So far, the
    things that would get tweaked are pretty generic... it might actually work
@@ -66,20 +67,12 @@
    the squashfs.img locally somewhere, etc.
 
 
-* For 0.18
-
- - Maybe split utils out into independent packages?  doit, extractenator,
-   kernel-builder/kernel-tar, firmwarenator, microcodenator
-
- - Add help2man-generated manpage?
-
- - Add zstd to initramfs?  Unless it gets added to busybox first...
+* For 0.19
 
  - Add dialog to initramfs.  Then we can start playing with installer options.
 
- - Tidy up linuxrc output.  "quiet"  mode should  be silent to  match expected
-   behavior in  most distros.  Perhaps  prefix each  output w/ "ruckusrd:  " or
-   something  like that  to differentiate  our initramfs  messages from  kernel
+ - Tidy up linuxrc output.  Perhaps prefix each output w/ "ruckusrd: " or
+   something like that to differentiate our initramfs messages from kernel
    spew?
 
 
