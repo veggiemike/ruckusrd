@@ -101,7 +101,7 @@ control_shell()
 {
     echo "uptime: $(cat /proc/uptime | cut -d' ' -f1)"
     echo
-    setsid cttyhack bash
+    setsid cttyhack env LESS=-cMR bash
 }
 
 
