@@ -3,7 +3,12 @@
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
 * v0.18.0
-in development
+2022-05-13: RuckusRD v0.18.0
+
+This release is primarily focused on two things: 1) build system overhaul
+stemming from splitting utils out into seperate packages, and 2) adding more
+comfort (e.g, man pages) and capability (e.g., real fdisk w/ GPT support) to
+the initramfs maint shell.  Plus bug-fixes and subproject updates.
 
 - Removed doit, which moved into its own package.
 - Removed extractenator, which moved into its own package.
