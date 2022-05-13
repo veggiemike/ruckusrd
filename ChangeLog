@@ -22,6 +22,7 @@ in development
   because busybox fdisk didn't like manipilating GPTs.
 - Upgraded busybox, eudev, lvm2, e2fsprogs, squashfs-tools, dropbear,
   linux-firmware, intel-ucode, wireless-regdb, zfs.
+- Overhauled command line parsing using getopt with better usage description.
 
 * v0.17.2
 2022-01-16: RuckusRD v0.17.2

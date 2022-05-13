@@ -42,10 +42,33 @@ decho()
 
 usage()
 {
-    echo "RuckusRD v$VERSION - a super awesome, yet simple, mkinitrd replacement"
+    if [ -n "$*" ]; then
+        echo ERROR: $*
+        echo
+    fi
+    echo "RuckusRD - a super awesome, yet simple, mkinitrd replacement"
     echo "Copyright (C) 2012-2022 Michael D Labriola <veggiemike@sourceruckus.org>"
     echo
-    echo "usage: $(basename $0) [--help] [--verbose] [--version] [-f] [-b basedir] [-c best|fast] [-o linuxrc-option] [--with-ucode ucode_img] <out-initrd-image> <kernel-version>"
+    echo "usage: $(basename $0) OPTIONS <out-initrd-image> <kernel-version>"
+    echo
+    echo "  -h, --help                  Show this help message and exit."
+    echo
+    echo "  -V, --version               Show version string and exit."
+    echo
+    echo "  -v, --verbose               Show verbose output."
+    echo
+    echo "  -f, --force                 Force overwrite existing file."
+    echo
+    echo "  -b, --basedir BASEDIR       Use BASEDIR as prefix to all paths."
+    echo
+    echo "  -c, --compressor COMPMODE   Pick compressor mode.  Valid options are 'best'"
+    echo "                              and 'fast'.  Default is 'fast'."
+    echo
+    echo "  -o, --options LINUXRCOPTS   Specifiy runtime options to pass to the linuxrc"
+    echo "                              init script in the generated initramfs."
+    echo
+    echo "  -U, --with-ucode UCODE_IMG  Include ucode.img in generated initramfs.  Default"
+    echo "                              is /boot/ucode.img"
     echo
     echo "example: $(basename $0) /boot/myinitramfs.img \`uname -r\`"
 }
@@ -64,6 +87,25 @@ cleanup()
 }
 
 
+# call getopt
+#
+# NOTE: This handles spacing out arguments correctly for the case statement
+#       below and checks for unknown flags.  Required flags are checked for
+#       below.
+#
+# NOTE: The set -- command causes the resulting output of getopt to replace the
+#       current positional arguments (e.g, $1, $2).
+#
+__opts=$(getopt -un $0 \
+    -o hVvfb:c:o:U: \
+    --long help,version,verbose,force,basedir,compressor,options,with-ucode -- $@)
+if [ $? != 0 ]; then
+    echo
+    usage
+    exit 1
+fi
+set -- $__opts
+
 opt_allow_overwrite=0
 opt_verbose=0
 INITRAMFS_TARGET=""
@@ -71,59 +113,65 @@ KERNEL=""
 BASEDIR="/"
 COMPMODE="fast"
 LINUXRC_OPTS=
-while [ $# -gt 0 ] ; do
-    case $1 in
+while true; do
+    case "$1" in
         --help)
             usage
             exit 0
             ;;
 	-V|--version)
-	    echo v$VERSION
+	    echo "Ruckusrd $VERSION"
 	    exit 0
 	    ;;
-        -f)
-            opt_allow_overwrite=1
-            ;;
         -v|--verbose)
             opt_verbose=1
+            shift
             ;;
-        -b)
+        -f|--force)
+            opt_allow_overwrite=1
+            shift
+            ;;
+        -b|--basedir)
             BASEDIR=$2
-            shift
+            shift 2
             ;;
-        -c)
+        -c|--compressor)
             COMPMODE=$2
-            shift
+            shift 2
             ;;
-        -o)
+        -o|--options)
             LINUXRC_OPTS+=" $2"
-            shift
+            shift 2
             ;;
-        --with-ucode)
+        -U|--with-ucode)
             UCODE=$2
+            shift 2
+            ;;
+        --)
+            # done parsing
             shift
+            break
             ;;
         *)
-            if [ -z "$INITRAMFS_TARGET" ] ; then
-                INITRAMFS_TARGET=$1
-            elif [ -z "$KERNEL" ] ; then
-                KERNEL=$1
-            else
-                echo "Unknown option or parameter \"$1\""
-                echo
-                usage
-                exit 1
-            fi
-            ;;
-        *)
+            usage "invalid usage"
+            exit 1
             ;;
     esac
-
-    shift
 done
+INITRAMFS_TARGET=$1
+KERNEL=$2
 
-if [ -z "$INITRAMFS_TARGET" -o -z "$KERNEL" ] ; then
-    usage
+# check for required options
+if [ -z "$INITRAMFS_TARGET" ] ; then
+    usage output file required
+    exit 1
+fi
+if [ -z "$KERNEL" ] ; then
+    usage kernel version required
+    exit 1
+fi
+if [ "$COMPMODE" != "best" -a "$COMPMODE" != "fast" ]; then
+    usage invalid COMPMODE
     exit 1
 fi
 
@@ -134,6 +182,13 @@ if [  "$opt_allow_overwrite" == "0" ] ; then
     fi
 fi
 
+decho opt_allow_overwrite: $opt_allow_overwrite
+decho opt_verbose: $opt_verbose
+decho INITRAMFS_TARGET: $INITRAMFS_TARGET
+decho KERNEL: $KERNEL
+decho BASEDIR: $BASEDIR
+decho COMPMODE: $COMPMODE
+decho LINUXRC_OPTS: $LINUXRC_OPTS
 echo "Building an initramfs at $INITRAMFS_TARGET for kernel $KERNEL"
 
 
