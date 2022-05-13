@@ -9,6 +9,9 @@ deb_examples = debian/control debian/get_deps
 EXTRA_DIST =
 EXTRA_DIST += $(top_docs)
 EXTRA_DIST += $(deb_examples)
+EXTRA_DIST += ruckusrd.1.include
+
+man1_MANS = ruckusrd.1
 
 install-data-local:
 	$(MKDIR_P) $(DESTDIR)$(docdir)/debian
@@ -18,6 +21,12 @@ install-data-local:
 uninstall-local:
 	rm -f $(top_docs:%=$(DESTDIR)$(docdir)/%)
 	rm -f $(deb_examples:%=$(DESTDIR)$(docdir)/%)
+
+distclean-local:
+	rm -f $(builddir)/ruckusrd.1
+
+ruckusrd.1: $(srcdir)/src/ruckusrd config.log $(srcdir)/ruckusrd.1.include
+	help2man -o $@ --no-info --include $(srcdir)/ruckusrd.1.include $<
 
 
 # i know this isn't the right way to do this... but it's how i've been

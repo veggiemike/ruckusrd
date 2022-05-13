@@ -41,7 +41,7 @@ AC_CHECK_FUNC([signalfd], [],
 
 # Needed to BUILD ruckusrd (not including subprojects)
 #
-# bash, mv, cp, find, cpio, xz, tar, sed, install
+# bash, mv, cp, find, cpio, xz, unxz, gunzip, tar, sed, install, help2man
 #
 #
 # Needed to RUN ruckusrd
@@ -55,8 +55,11 @@ AC_DEFUN([NEEDED_PROGS],
 	  find
 	  cpio
 	  xz
+	  unxz
+	  gunzip
 	  tar
 	  sed
+	  help2man
 	  ldd
 	  awk
 	  head

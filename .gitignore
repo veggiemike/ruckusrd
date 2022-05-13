@@ -21,6 +21,7 @@ Makefile.in
 /test-driver
 
 # built files
+/ruckusrd.1
 /src/initramfs
 /src/initramfs.cpio.xz
 /src/ruckusrd.sh

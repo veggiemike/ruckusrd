@@ -1,0 +1,10 @@
+[files]
+.TP
+.I /etc/ruckusrd.conf
+System-wide default config file.
+.TP
+.I ~/.ruckusrd.conf
+User config file, which is read last.
+.TP
+.I /boot/ucode.img
+Default path to microcode image to be prepended to generated initrd file.
