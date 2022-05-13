@@ -43,3 +43,4 @@ Makefile.in
 /subprojects/ucode.img
 /subprojects/util-linux.tar
 /subprojects/zfs.tar
+/subprojects/zstd.tar

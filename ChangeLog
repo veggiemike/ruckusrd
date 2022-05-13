@@ -17,11 +17,16 @@ in development
 - Copy host sytem modprobe config into initramfs.
 - Don't append command line modprobe options to system modprobe config.
 - Allow fwdev=DEV1,DEV2,... on command line.
+- Put manpages back in initramfs.  We had been removing them to save space, but
+  our initramfs is hopelessly large and super useful now... we might find
+  ourselves wanted manpages.
 - Added /etc/ruckusrd.conf and ~/.ruckusrd.conf config file support.
 - Added libuuid, libblkid, fdisk, cfdisk, sfdisk, and blkid from util-linux
-  because busybox fdisk didn't like manipilating GPTs.
-- Added groff because the busybox man applet just wraps around it (i.e., it
-  doesn't work unless you also have groff).
+  to the initramfs because busybox fdisk didn't like manipilating GPTs.
+- Added groff to the initramfs because the busybox man applet just wraps around
+  it (i.e., it doesn't work unless you also have groff).
+- Added zstd to initramfs so we can use it in squashfs, rsync, and zfs, as well
+  as have it available in the maint shell.
 - Upgraded busybox, eudev, lvm2, e2fsprogs, squashfs-tools, dropbear,
   linux-firmware, intel-ucode, wireless-regdb, zfs.
 - Overhauled command line parsing using getopt with better usage description.

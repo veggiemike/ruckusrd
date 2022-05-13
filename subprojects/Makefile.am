@@ -182,7 +182,19 @@ e2fsprogs/FOO: util-linux.tar eudev.tar
 	popd || exit 1
 
 
-squashfs-tools/FOO:
+zstd/FOO:
+	pushd zstd && \
+	rm -rf FOO && \
+	make -j$(JOBCOUNT) && \
+	make DESTDIR=$$PWD/FOO PREFIX=/usr BINDIR=/bin install && \
+	rm -rf $$PWD/FOO/usr/lib/*.a && \
+	popd || exit 1
+
+
+# NOTE: The sed statement enables all the additional compressors and
+#       points the build at our built zstd subproject.
+#
+squashfs-tools/FOO: zstd.tar
 	pushd squashfs-tools && \
 	rm -rf FOO && \
 	sed -i \
@@ -190,6 +202,8 @@ squashfs-tools/FOO:
 	    -e 's|^#LZO_SUPPORT|LZO_SUPPORT|' \
 	    -e 's|^#LZ4_SUPPORT|LZ4_SUPPORT|' \
 	    -e 's|^#ZSTD_SUPPORT|ZSTD_SUPPORT|' \
+	    -e 's|-DZSTD_SUPPORT|-DZSTD_SUPPORT -I /scrap/ruckusrd/subprojects/zstd/FOO/usr/include|' \
+	    -e 's|-lzstd|-L /scrap/ruckusrd/subprojects/zstd/FOO/usr/lib -lzstd|' \
 	    squashfs-tools/Makefile && \
 	make -j$(JOBCOUNT) -C squashfs-tools && \
 	make -C squashfs-tools INSTALL_DIR=$$PWD/FOO/bin \
@@ -202,6 +216,9 @@ squashfs-tools/FOO:
 #
 # NOTE: We remove includes here because it saves us 3.5M and nothing
 #       else is compiling against zfs libs.
+#
+# NOTE: Zfs uses it's own internal zstd implementation and does not
+#       depend on our zstd.tar target.
 #
 zfs/FOO: util-linux.tar eudev.tar
 	pushd zfs && \
@@ -277,18 +294,18 @@ dropbear/FOO:
 # NOTE: Ubuntu 18.04 need xxhash and xxhash-dev packages or
 #       --disable-xxhash here.
 #
-# FIXME: We disable zstd support because it looks like bionic's zstd
-#        lib is missing some features.
+# NOTE: This compiles and links against our freshly built libzstd.
 #
-rsync/FOO:
+rsync/FOO: zstd.tar
 	pushd rsync && \
 	rm -rf FOO && \
 	./prepare-source && \
-	sed -i 's|import commonmark|import CommonMark_bkrs as commonmark|' md-convert && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
           --disable-static \
-          --disable-openssl --disable-md2man --disable-zstd --disable-debug && \
+          --disable-openssl --disable-md2man --disable-debug \
+	  CFLAGS=-I$$PWD/../zstd/FOO/usr/include \
+	  LDFLAGS=-L$$PWD/../zstd/FOO/usr/lib && \
         make -j$(JOBCOUNT) && make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
 

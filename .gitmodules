@@ -43,3 +43,6 @@
 [submodule "subprojects/groff"]
 	path = subprojects/groff
 	url = https://git.savannah.gnu.org/git/groff.git
+[submodule "subprojects/zstd"]
+	path = subprojects/zstd
+	url = https://github.com/facebook/zstd.git
