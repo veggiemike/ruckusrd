@@ -3,7 +3,7 @@ SUBDIRS += subprojects
 SUBDIRS += src
 SUBDIRS += docs
 
-top_docs = README COPYING AUTHORS TODO
+top_docs = README.md COPYING AUTHORS TODO
 deb_examples = debian/control debian/get_deps
 
 EXTRA_DIST =
