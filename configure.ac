@@ -43,6 +43,10 @@ AC_CHECK_FUNC([signalfd], [],
 #
 # bash, mv, cp, find, cpio, xz, unxz, gunzip, tar, sed, install, help2man
 #
+# Extra things needed for building subprojects that have bit me
+# (certainly not an exhaustive list)
+#
+# xpmtoppm (netpbm)
 #
 # Needed to RUN ruckusrd
 #
@@ -60,6 +64,7 @@ AC_DEFUN([NEEDED_PROGS],
 	  tar
 	  sed
 	  help2man
+	  xpmtoppm
 	  ldd
 	  awk
 	  head
