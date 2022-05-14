@@ -9,7 +9,7 @@ all-local: fw.sqsh ucode.img
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
 
-clean-local:
+distclean-local:
 	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,less}.tar
 	rm -fv fw.sqsh ucode.img
 	rm -rf .build*
@@ -27,6 +27,7 @@ clean-local:
 	cd efibootmgr && git clean -dfx && git stash
 	cd groff && git clean -dfx && git stash
 	cd less && git clean -dfx && git stash
+	rm -rf syslinux*
 
 
 # NOTE: This is added because the busybox fdisk applet doesn't work
