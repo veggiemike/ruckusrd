@@ -32,7 +32,9 @@ ruckusrd.1: $(srcdir)/src/ruckusrd config.log $(srcdir)/ruckusrd.1.include
 # i know this isn't the right way to do this... but it's how i've been
 # occasionally making .pkg files to install, now documented/automated
 # to make life easier.
-DEBNAME=$(PACKAGE_TARNAME)_$(PACKAGE_VERSION)-1
+DEBREV=1
+DEBVERSION=$(PACKAGE_VERSION)-$(DEBREV)
+DEBNAME=$(PACKAGE_TARNAME)_$(DEBVERSION)
 DEBFILE=$(abs_top_builddir)/$(DEBNAME).deb
 DPKGDIR=$(abs_top_builddir)/$(DEBNAME)
 DEBDIR=$(DPKGDIR)/DEBIAN
@@ -72,7 +74,7 @@ $(DEBDEPS): $(DEBDIR)
 
 $(DEBCTRL): $(DEBCTRL_DEPS)
 	cat $(srcdir)/debian/control | sed \
-	    -e 's|__version__|$(PACKAGE_VERSION)|' \
+	    -e 's|__version__|$(DEBVERSION)|' \
 	    -e "s|__size__|$$(cat $(DEBDIR)/.size)|" \
             -e "s|__arch__|$$(cat $(DEBDIR)/.arch)|" \
             -e "s|__deplibs__|$$(cat $(DEBDIR)/.deps)|" \
