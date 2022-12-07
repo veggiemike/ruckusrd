@@ -95,6 +95,15 @@ eudev/FOO: util-linux.tar
 #       tweaking .config, but this seems easier (and more flexible)
 #       for now.
 #
+# NOTE: For building on jammy (or anything with newer versions of
+#       glibc that no longer include rpc/rpc.h), you have to specify
+#       additional CFLAGS to get things building.  For jammy, the
+#       libtripc-dev package seems to be the one installed by default,
+#       so setting CFLAGS=-I/usr/include/tirpc and
+#       CONFIG_EXTRA_LDLIBS=tirpc will make it compile with
+#       CONFIG_FEATURE_INETD_RPC enabled.  For now, we'll just leave
+#       RPC disabled in our .config file.
+#
 busybox/FOO:
 	pushd busybox && \
 	rm -rf FOO && \
