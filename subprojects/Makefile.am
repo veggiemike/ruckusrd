@@ -259,9 +259,19 @@ zfs/FOO: util-linux.tar eudev.tar
 syslinux-6.03.tar.xz:
 	wget https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/$@
 
-# FIXME: the sed statement was added to fix compilation problems on
-#        Ubuntu 20.04...  hopefully this isn't needed when we upgrade
-#        from upstream.
+# FIXME: The sysmacros.h sed statement was added to fix compilation
+#        problems on Ubuntu 20.04...  hopefully this isn't needed when
+#        we upgrade from upstream.  Oh, there hasn't been an upstream
+#        syslinux release in years... :-/
+#
+# FIXME: The -fcommon sed statement was added to prevent gcc-10 linker
+#        errors about multiple definitions of externs.  See
+#        https://wiki.syslinux.org/wiki/index.php?title=Building for
+#        more discussion.  Hopefully fixed in 6.04 if it ever gets
+#        released... :-/
+#
+# FIXME: Perhaps we should build 6.04-pre3 from git?  I noticed Ubuntu
+#        22.04 is using 6.04~git20190206.bf6db5b4+dfsg1-3ubuntu1
 #
 syslinux/FOO: syslinux-6.03.tar.xz
 	tar xf $< && \
@@ -270,6 +280,9 @@ syslinux/FOO: syslinux-6.03.tar.xz
 	sed -i \
 	    -e 's|^#include <sys/types.h>|#include <sys/types.h>\n#include <sys/sysmacros.h>|' \
 	    extlinux/main.c && \
+	sed -i \
+	    -e 's|\(^GCCWARN.*\)|\1 -fcommon|' \
+	    mk/syslinux.mk && \
 	make install INSTALLROOT=$$PWD/FOO && \
 	popd || exit 1
 
