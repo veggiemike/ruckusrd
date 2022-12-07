@@ -3,14 +3,14 @@
 # in here for each subproject.
 
 
-all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar
+all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar
 all-local: fw.sqsh ucode.img
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
 
 distclean-local:
-	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,less}.tar
+	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,zstd,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,less}.tar
 	rm -fv fw.sqsh ucode.img
 	rm -rf .build*
 	cd util-linux && git clean -dfx && git stash
@@ -19,6 +19,7 @@ distclean-local:
 	cd mdadm && git clean -dfx && git stash
 	cd lvm2 && git clean -dfx && git stash
 	cd e2fsprogs && git clean -dfx && git stash
+	cd zstd && git clean -dfx && git stash
 	cd squashfs-tools && git clean -dfx && git stash
 	cd zfs && git clean -dfx && git stash
 	rm -rf syslinux-6.03
