@@ -335,6 +335,9 @@ rsync/FOO: zstd.tar
 	popd || exit 1
 
 
+# NOTE: Leaving this at v16 because bionic problems.  Either fix or
+#       wait until we've disowned 18.04 to upgrade to v18.
+#
 efibootmgr/FOO:
 	pushd efibootmgr && \
 	rm -rf FOO && \
@@ -380,7 +383,7 @@ less/FOO:
 
 
 # NOTE: We use the mksquashfs we've built against our libztd to ensure
-#       that old systems (e.g., Ubuntu 18.04) have a workig mksquashfs
+#       that old systems (e.g., Ubuntu 18.04) have a working mksquashfs
 #       that can use zstd.  The resulting .sqsh file is slightly
 #       larger, but unpacks faster during boot.
 #
@@ -404,7 +407,7 @@ fw.sqsh: squashfs-tools.tar
 #       and AMD.  Sticking to our "universal initramfs" principles, we
 #       include ALL microcode for both vendors in this image.
 #
-# FIXME: Intel: cating together into bin works, but iucode_tool definately
+# FIXME: Intel: cating together into bin works, but iucode_tool definitely
 #        produces something slightly different... and i don't know why.
 #
 #        iucode_tool -wGenuineIntel.bin /lib/firmware/intel-ucode{,-with-caveats}/
