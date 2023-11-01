@@ -75,6 +75,29 @@
    something like that to differentiate our initramfs messages from kernel
    spew?
 
+ - Update docs with clearer instructions for ucode.img, fw.img, and fw.sqsh
+   handling... it's kinda sparse and I have to read through the code every time
+   I haven't touched this in a while.  /boot/ucode.img gets wrapped up into
+   built initramfs images... but only if you install it.  /fw.sqsh gets loaded
+   during boot if you specify FWDEV=.  Wasn't there another way to specify fw?
+   Yes: fw.img can be concattenated w/ the initramfs, but that means you have
+   to regenerate initramfs in order to update fw.
+
+   Also, holy crap.  fw.sqsh from 0.18 was 287M and now in 0.19-dev it's 416M!
+   That's starting to get pretty unwieldy... and firmwarenator currently
+   depends on /lib/firmware being populated already (and i was doing this by
+   booting once w/ full-blown fw.sqsh, which injects into /lib/firmware).  I
+   suppose I could manually install new fw instead of piggy backing like that.
+   So maybe stick instructions on updating /lib/firmware from our build
+   fw.sqsh? unsquashfs fw.sqsh; rsync -vau squashfs-root/ /lib/firmware.  Then
+   create new small /boot/fw.sqsh via firmwarenator.
+
+   Should we just go ahead an install /boot/ucode.img?  Or install it in
+   /usr/share/ruckusrd or something?
+
+ - --no-ucode flag?  That way you can disable the auto-adding of
+   /boot/ucode.img w/out having to remove it (for testing?).
+
 
 * Could happen in a stable release
 
@@ -88,3 +111,9 @@
    Hmm... somewhere along the line I stopped needing to specify -i, but it's
    still complaining. odd.  Hm, it's if I login.  Adding /etc/nsswitch.conf
    doesn't help....
+
+ - maint: less: WARNING: terminal is not fully funcitonal
+
+   Strange, because everything else including vi seems to work fine.  Less
+   source code makes makes me think there is indeed some sort of line clearing
+   capability that's not working correctly...
