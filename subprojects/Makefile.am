@@ -236,6 +236,7 @@ zfs/FOO: util-linux.tar eudev.tar
 	pushd zfs && \
 	rm -rf FOO && \
 	echo "AC_DEFUN([ZFS_AC_KERNEL_TEST_RESULT], [])" >> config/kernel.m4 && \
+	echo "AC_DEFUN([ZFS_AC_CONFIG_KERNEL], [])" >> config/kernel.m4 && \
 	./autogen.sh && \
 	  ./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
