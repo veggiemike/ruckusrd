@@ -372,13 +372,12 @@ groff/FOO:
 less/FOO:
 	pushd less && \
 	rm -rf FOO && \
-	autoreconf -f -i -s && \
-	make -f Makefile.aut && \
+	sed -i '/lesstest\/Makefile echo_distfiles/d' Makefile.aut && \
+	make -f Makefile.aut distfiles && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
           --disable-static && \
         make -j$(JOBCOUNT) && \
-	make -f Makefile.aut less.nro lesskey.nro lessecho.nro && \
 	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
 
