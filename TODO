@@ -69,7 +69,7 @@
 
 * For 0.19
 
- - re-update microcode, firmware, and zfs
+ - add fsarchiver to initramfs?
 
 
 * For 0.20
