@@ -50,3 +50,6 @@
 [submodule "subprojects/less"]
 	path = subprojects/less
 	url = https://github.com/gwsw/less.git
+[submodule "subprojects/fsarchiver"]
+	path = subprojects/fsarchiver
+	url = https://github.com/fdupoux/fsarchiver.git
