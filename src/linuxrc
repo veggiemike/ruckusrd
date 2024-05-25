@@ -257,7 +257,7 @@ root="/dev/something"
 root_rw=""
 root_true_rw="ro"
 rootflags=""
-rootfstype="auto"
+rootfstype=""
 overlayflags=""
 to_ram=""
 # breakpoints!
@@ -281,6 +281,7 @@ sqsh_layers=""
 sqsh_layerdev=""
 sqsh_layerdir="/tmproot"
 sqsh_layerdir_rel=""
+sqshfstype=""
 ram_layer=""
 modinject=
 fwdevspec=
