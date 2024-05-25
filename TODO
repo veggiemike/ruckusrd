@@ -69,6 +69,11 @@
 
 * For 0.19
 
+ - re-update microcode, firmware, and zfs
+
+
+* For 0.20
+
  - Add dialog to initramfs.  Then we can start playing with installer options.
 
  - Tidy up linuxrc output.  Perhaps prefix each output w/ "ruckusrd: " or

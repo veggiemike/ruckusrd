@@ -367,6 +367,9 @@ for o in `cat /proc/cmdline` ; do
     sqsh_layerdir=*)
         sqsh_layerdir_rel=${o#sqsh_layerdir=}
         ;;
+    sqshfstype=*)
+        sqshfstype=${o#sqshfstype=}
+        ;;
     ram_layer=*)
         ram_layer=${o#ram_layer=}
         ;;
@@ -432,6 +435,7 @@ decho2 "sqsh_layers=$sqsh_layers"
 decho2 "sqsh_layerdev=$sqsh_layerdev"
 decho2 "sqsh_layerdir=$sqsh_layerdir"
 decho2 "sqsh_layerdir_rel=$sqsh_layerdir_rel"
+decho2 "sqshfstype=$sqshfstype"
 decho2 "ram_layer=$ram_layer"
 decho2 "modinject=$modinject"
 decho2 "fwdevspec=$fwdev"
@@ -618,11 +622,19 @@ else
     ln -s $root_true /dev/root-true
 
     # autoload filesystem modules if needed
-    autoload_fs_module /dev/root
-    rootfstype=$TYPE
+    if [ -z "$rootfstype" ]; then
+        autoload_fs_module /dev/root
+        rootfstype=$TYPE
+    else
+        modprobe $rootfstype
+    fi
     if [ -n "$sqsh_layerdev" ]; then
-        autoload_fs_module /dev/sqsh_layerdev
-        sqshfstype=$TYPE
+        if [ -z "$sqshfstype" ]; then
+            autoload_fs_module /dev/sqsh_layerdev
+            sqshfstype=$TYPE
+        else
+            modprobe $sqshfstype
+        fi
     fi
 fi
 

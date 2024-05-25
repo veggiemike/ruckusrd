@@ -55,6 +55,9 @@ Use DIR as the relative path to the images provided via =sqsh_layers=.  This is
 so that the layers can be located somewhere other than at the root of the
 specified device.
 
+** sqshfstype=TYPE
+If specified, assume fstype of sqsh_layerdev is TYPE instead of autodetecting.
+
 * Kernel command line examples
 ** read-write upper on rootdev
 root=/dev/sda1 sqsh_layers=extra:server:base
