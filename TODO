@@ -76,10 +76,6 @@
 
  - Add dialog to initramfs.  Then we can start playing with installer options.
 
- - Tidy up linuxrc output.  Perhaps prefix each output w/ "ruckusrd: " or
-   something like that to differentiate our initramfs messages from kernel
-   spew?
-
 
 * Could happen in a stable release
 

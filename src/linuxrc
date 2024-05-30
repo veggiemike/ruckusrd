@@ -25,17 +25,49 @@
 # - bash var+= (NOPE)
 
 
+__preppend_and_reorder()
+{
+    flags=
+    msg=
+    preppend="ruckusrd: "
+    while [ -n "$1" ]; do
+        if [ "$1" = "-n" ]; then
+            # don't preppend in this case, as we're doing some sort of
+            # updating line thingy (e.g., . . . . accross the screen until
+            # finished).
+            #
+            # NOTE: In this case, it's up to the caller to do the preppending!
+            #
+            preppend=
+        fi
+        case "$1" in
+            -*)
+                [ -n "$flags" ] && flags+=" "
+                flags+=$1
+                shift
+                ;;
+            *)
+                [ -n "$msg" ] && msg+=" "
+                msg+=$1
+                shift
+                ;;
+        esac
+    done
+    echo "$flags $preppend$msg"
+}
+
+
 decho()
 {
     if [ -z "$quiet" ]; then
-        echo $*
+        echo $(__preppend_and_reorder $*)
     fi
 }
 
 decho2()
 {
     if [ -n "$verbose" ]; then
-        echo $*
+        echo $(__preppend_and_reorder $*)
     fi
 }
 
@@ -53,7 +85,7 @@ wait_for_udev_symlink()
     msg="waiting up to $x seconds for $dev symlink..."
     while [ ! -e $dev -a "$x" != "0" ]; do
         if [ -n "$msg" ]; then
-            decho -n $msg
+            decho -n ruckusrd: $msg
             msg=""
         else
             decho -n "."
@@ -70,7 +102,7 @@ wait_for_udev_symlink()
     #       missing.
     #
     if [ -b $dev ] ; then
-        [ -z "$msg" ] && decho " done"
+        [ -z "$msg" ] && decho -n " done\n"
         decho2 "$dev symlink exists"
     else
         echo
@@ -520,7 +552,7 @@ if [ -n "$fwdevspec" ]; then
     done
 fi
 
-decho -n "determining what to mount... "
+decho -n "ruckusrd: determining what to mount... "
 
 cat <<EOF > etc/udev/rules.d/99-ruckusrd.rules
 ACTION!="add|change", GOTO="ruckusrd_end"
@@ -537,7 +569,7 @@ cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
 LABEL="ruckusrd_end"
 EOF
 
-decho "$thingtomount"
+decho -n "$thingtomount\n"
 
 # prep udev hwdb
 go="/sbin/udevadm"
@@ -573,7 +605,7 @@ x=10
 msg="waiting up to $x seconds for at least one hdd to appear..."
 while [ ! -e /dev/sda -a ! -e /dev/nvme0n1 -a ! -e /dev/xvda -a "$x" != "0" ]; do
     if [ -n "$msg" ]; then
-        decho -n $msg
+        decho -n ruckusrd: $msg
         msg=""
     else
         decho -n "."
@@ -585,7 +617,7 @@ if [ -z "$msg" ]; then
     decho -n "."
     # and one more second just to be safe
     sleep 1
-    decho " done"
+    decho -n " done\n"
 fi
 
 # activate LVM
@@ -751,9 +783,9 @@ if [ -n "$sqsh_layers" ]; then
         #       for future usage (e.g., creating virtual machines, installing).
         #
         if [ -n "$to_ram" ]; then
-            decho -n "Copying squashfs layer(s) to RAM... "
+            decho -n "ruckusrd: Copying squashfs layer(s) to RAM... "
             mkdir -p /sqsh_layerdev
-            decho2 ""
+            decho2 -n "\n"
             go="cp -a"
             [ "$quiet" != "1" ] && go="$go -v"
             for x in $sqsh_layers_ws; do
@@ -762,7 +794,7 @@ if [ -n "$sqsh_layers" ]; then
             go="$go /sqsh_layerdev"
             decho2 $go
             eval $go
-	    decho "done"
+	    decho -n "done\n"
             sqsh_layerdir=/sqsh_layerdev
         fi
 
@@ -1176,8 +1208,8 @@ fi
 #       it is, then do an rsync.  Same drill for linux-headers and firmware.
 #
 if [ -n "$modinject" ]; then
-    decho -n "Injecting kernel modules, headers, and firmware into /sysroot... "
-    decho2 ""
+    decho -n "ruckusrd: Injecting kernel modules, headers, and firmware into /sysroot... "
+    decho2 -n "\n"
     
     # mount rw
     mount -o remount,rw /sysroot
@@ -1319,7 +1351,7 @@ if [ -n "$modinject" ]; then
     # mount ro
     mount -o remount,ro /sysroot
 
-    decho "done"
+    decho -n "done\n"
 fi
 
 
