@@ -3,7 +3,7 @@
 # in here for each subproject.
 
 
-all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar
+all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar fsarchiver.tar
 all-local: fw.sqsh ucode.img
 
 %.tar: %/FOO
@@ -28,6 +28,7 @@ distclean-local:
 	cd efibootmgr && git clean -dfx && git stash
 	cd groff && git clean -dfx && git stash
 	cd less && git clean -dfx && git stash
+	cd fsarchiver && git clean -dfx && git stash
 	rm -rf syslinux*
 
 
@@ -378,6 +379,34 @@ less/FOO:
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
           --disable-static && \
         make -j$(JOBCOUNT) && \
+	make DESTDIR=$$PWD/FOO install && \
+	popd || exit 1
+
+
+# NOTE: This compiles and links against our freshly built libblkid and
+#       libuuid (util-linux), libext2fs, libcom_err, and libe2p
+#       (e2fsprogs), and libzstd (zstd).
+#
+fsarchiver/FOO: util-linux.tar e2fsprogs.tar zstd.tar
+	pushd fsarchiver && \
+	rm -rf FOO && \
+	./autogen.sh && \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static \
+	  CFLAGS="-I$$PWD/../zstd/FOO/usr/include" \
+	  LDFLAGS="-L$$PWD/../zstd/FOO/usr/lib/" \
+	  BLKID_CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid" \
+	  BLKID_LIBS="-L$$PWD/../util-linux/FOO/usr/lib/ -lblkid" \
+	  UUID_CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/uuid" \
+	  UUID_LIBS="-L$$PWD/../util-linux/FOO/usr/lib/ -luuid" \
+	  EXT2FS_CFLAGS="-I$$PWD/../e2fsprogs/FOO/usr/include -I$$PWD/../e2fsprogs/FOO/usr/include/ext2fs" \
+	  EXT2FS_LIBS="-L$$PWD/../e2fsprogs/FOO/usr/lib/ -lext2fs" \
+	  COM_ERR_CFLAGS="-I$$PWD/../e2fsprogs/FOO/usr/include" \
+	  COM_ERR_LIBS="-L$$PWD/../e2fsprogs/FOO/usr/lib/ -lcom_err" \
+	  E2P_CFLAGS="-I$$PWD/../e2fsprogs/FOO/usr/include -I$$PWD/../e2fsprogs/FOO/usr/include/e2p" \
+	  E2P_LIBS="-L$$PWD/../e2fsprogs/FOO/usr/lib/ -le2p" && \
+        make V=1 -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
 

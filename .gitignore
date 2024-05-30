@@ -31,6 +31,7 @@ Makefile.in
 /subprojects/e2fsprogs.tar
 /subprojects/efibootmgr.tar
 /subprojects/eudev.tar
+/subprojects/fsarchiver.tar
 /subprojects/fw.sqsh
 /subprojects/groff.tar
 /subprojects/less.tar

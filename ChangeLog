@@ -9,6 +9,7 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 - Upgraded microcode, firmware, and zfs to latest version as of 05/24/24.
 - Added `sqshfstype` command line arg to linuxrc and fixed bug where
   `rootfstype` was ignored.
+- Added fsarchiver to the initramfs.
 - Fixed silly decho -n output bug
 
 * v0.18.0
