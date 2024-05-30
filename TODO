@@ -30,12 +30,6 @@
    using the same option as something in the kernel or systemd.  A couple
    should probably stay unprefixed (e.g., root=, quiet).
 
- - Consider adding a `ruckusonly` flag to linuxrc to invoke busybox's init
-   instead of switching rootfs and invoking the normal system's init.  This
-   would give us a more complete system (complete with multiple TTYs to login
-   on) and opens the door for using a ruckusrd initramfs on it's own to
-   facilitate installation on blank drives.
-
  - Once we've got our initrd acting as a kernel-installer (via modinject), we
    could also add code to do the new sqsh_layer prep and have it work as a full
    blown system installer.  Assuming the user has already created an upper
@@ -67,38 +61,24 @@
    the squashfs.img locally somewhere, etc.
 
 
-* For 0.19
-
- - add fsarchiver to initramfs?
-
-
 * For 0.20
+
+ - Consider adding a `ruckusonly` flag to linuxrc to invoke busybox's init
+   instead of switching rootfs and invoking the normal system's init.  This
+   would give us a more complete system (complete with multiple TTYs to login
+   on) and opens the door for using a ruckusrd initramfs on it's own to
+   facilitate installation on blank drives.
+
+   Should this still assemble sysroot?  I'm thinking "no" because that's what
+   the maint shell is for...  but having more than one tty for maintenance
+   might be nice.  Perhaps the maint shell should NOT continue on into a normal
+   system boot?  That way it could have multiple ttys as well...?  We'll see.
 
  - Add dialog to initramfs.  Then we can start playing with installer options.
 
  - Tidy up linuxrc output.  Perhaps prefix each output w/ "ruckusrd: " or
    something like that to differentiate our initramfs messages from kernel
    spew?
-
- - Update docs with clearer instructions for ucode.img, fw.img, and fw.sqsh
-   handling... it's kinda sparse and I have to read through the code every time
-   I haven't touched this in a while.  /boot/ucode.img gets wrapped up into
-   built initramfs images... but only if you install it.  /fw.sqsh gets loaded
-   during boot if you specify FWDEV=.  Wasn't there another way to specify fw?
-   Yes: fw.img can be concattenated w/ the initramfs, but that means you have
-   to regenerate initramfs in order to update fw.
-
-   Also, holy crap.  fw.sqsh from 0.18 was 287M and now in 0.19-dev it's 416M!
-   That's starting to get pretty unwieldy... and firmwarenator currently
-   depends on /lib/firmware being populated already (and i was doing this by
-   booting once w/ full-blown fw.sqsh, which injects into /lib/firmware).  I
-   suppose I could manually install new fw instead of piggy backing like that.
-   So maybe stick instructions on updating /lib/firmware from our build
-   fw.sqsh? unsquashfs fw.sqsh; rsync -vau squashfs-root/ /lib/firmware.  Then
-   create new small /boot/fw.sqsh via firmwarenator.
-
-   Should we just go ahead an install /boot/ucode.img?  Or install it in
-   /usr/share/ruckusrd or something?
 
  - --no-ucode flag?  That way you can disable the auto-adding of
    /boot/ucode.img w/out having to remove it (for testing?).

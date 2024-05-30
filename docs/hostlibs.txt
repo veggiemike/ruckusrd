@@ -1,0 +1,91 @@
+-*- mode: org -*-
+
+* Some dependence on host system libs is OK
+
+Ok, so we went through a big "no host utils" push, and now we do not include
+any programs (binary or otherwise) from the host system in the resulting
+initramfs.  We *do* still slurp up needed host system libraries though.  The
+rationale is that, unlike programs/utils, libraries aren't going to break any
+of our initramfs functionality (mostly scripts depending on specific behavior
+and command line usage).
+
+* But what if it's not?
+
+Of course, I could always change my mind about that.  Seems like non-trivial
+effort for next to no gain at the moment... but if I *do* run into a real
+reason to do it, we would just add the required libs to =subprojects= and build
+them.
+
+I suppose the problem I could run into with host system libs would be if our
+host system has old/outdated versions of libraries our utils need newer
+versions of.  Shouldn't really happen though, unless you're trying to use this
+on a discustingly old host system.  And even if your system is that whacked,
+your entire compilation toolchain is gonna be suspect... so not my problem.
+
+* What current libs do we depend on?
+
+In our =subprojects= dir, we build =util-linux= so that we can provide our
+maint shell with a *real* fdisk program (the busybox applet didn't support GPT
+at the time, and might still not), as well as a more featureful blkid program.
+This also provides =libuuid=, =libblkid=, =libfdisk=, and =libsmartcols=.
+
+We also build =eudev=, which provides us with =libudev=.
+
+The =e2fsprogs= build provides us with =libext2fs=, =libe2p=, =libss=, and
+=libcom_err=.
+
+Building =lvm2= provides us with =libdevmapper=.
+
+Building =zstd= gives us =libzstd=.
+
+The =zfs= build gives us =libnvpair=, =libuutil=, =libzfsbootenv=,
+=libzfs_core=, =libzfs=, and =libzpool=.
+
+Anything else we add to the initramfs that needs those libs should make sure to
+compile and link against the copies we built, *not* libraries present on the
+host system.
+
+Other libs just get slurped up from the host system.  At present, that includes
+the following:
+
+ld-linux-x86-64
+libacl
+libaio
+libattr
+libcrypt
+libc
+libdl
+libgcc_s
+libgcrypt
+libgpg-error
+libkmod
+liblzma
+liblzo2
+libm
+libncursesw
+libpthread
+libgcc_s
+libreadline
+libresolv
+librt
+libsystemd
+libtinfo
+libutil
+libz
+libcrypto.so
+libefiboot
+libefivar
+libpopt
+libstdc++
+libxxhash
+liblz4
+
+* Why did I add zstd to =subprojects=?
+
+This is really the only library I've run into so far that was unavailable on
+"old" systems I was still supporting at the time.  I think it may have been
+Ubuntu 18.04?  Either way, I wanted to be able to support zstd compresion in
+squashfs-utils (requiring libzstd) and command line compress/decompress using
+zstd, so it got added to =subprojects=.  It's a prefect example of what type of
+things *will* get added: special cases that we need to.
+

@@ -53,7 +53,7 @@ Strengths:
      kernel commandline.  The maintenence shell provided is a fully functional
      embedded rootfs with BusyBox, eudev, lvm, mdadm, e2fsprogs,
      squashfs-tools, the OpenZFS userland tools, syslinux, efibootmgr, wired
-     networking utilities, rsync, and ssh.
+     networking utilities, rsync, ssh, and fsarchiver.
 
  4.  Easy microcode loading/updating.  Initramfs images created w/ RuckusRD
      automatically include /boot/ucode.img (subprojects/ucode.img gets

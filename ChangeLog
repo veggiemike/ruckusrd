@@ -3,7 +3,7 @@
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
 * v0.19.0
-2024-06-ish: RuckusRD v0.19.0 (in development)
+2024-05-30: RuckusRD v0.19.0
 
 - Upgraded all subprojects to latest available versions as of 9/11/23.
 - Upgraded microcode, firmware, and zfs to latest version as of 05/24/24.
