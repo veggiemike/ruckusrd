@@ -5,6 +5,8 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 * v0.20.0
 2024-mm-dd: RuckusRD v0.20.0 (under development)
 
+- Added --no-ucode flag to prevent addition of microcode (for testing).
+
 * v0.19.0
 2024-05-30: RuckusRD v0.19.0
 

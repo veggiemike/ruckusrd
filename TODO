@@ -80,9 +80,6 @@
    something like that to differentiate our initramfs messages from kernel
    spew?
 
- - --no-ucode flag?  That way you can disable the auto-adding of
-   /boot/ucode.img w/out having to remove it (for testing?).
-
 
 * Could happen in a stable release
 

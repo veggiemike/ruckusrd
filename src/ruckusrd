@@ -70,6 +70,9 @@ usage()
     echo "  -U, --with-ucode UCODE_IMG  Include ucode.img in generated initramfs.  Default"
     echo "                              is /boot/ucode.img"
     echo
+    echo "  -N, --no-ucode              Do NOT append any microcode to the generated"
+    echo "                              initramfs (probably only useful for testing)."
+    echo
     echo "example: $(basename $0) /boot/myinitramfs.img \`uname -r\`"
 }
 
@@ -97,8 +100,8 @@ cleanup()
 #       current positional arguments (e.g, $1, $2).
 #
 __opts=$(getopt -un $0 \
-    -o hVvfb:c:o:U: \
-    --long help,version,verbose,force,basedir,compressor,options,with-ucode -- $@)
+    -o hVvfb:c:o:U:N \
+    --long help,version,verbose,force,basedir,compressor,options,with-ucode,no-ucode -- $@)
 if [ $? != 0 ]; then
     echo
     usage
@@ -147,6 +150,10 @@ while true; do
             UCODE=$2
             shift 2
             ;;
+        -N|--no-ucode)
+            UCODE=/dev/null
+            shift
+            ;;
         --)
             # done parsing
             shift
@@ -187,6 +194,7 @@ decho KERNEL: $KERNEL
 decho BASEDIR: $BASEDIR
 decho COMPMODE: $COMPMODE
 decho LINUXRC_OPTS: $LINUXRC_OPTS
+decho UCODE: $UCODE
 echo "Building an initramfs at $INITRAMFS_TARGET for kernel $KERNEL"
 
 
