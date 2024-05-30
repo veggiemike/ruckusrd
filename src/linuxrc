@@ -28,14 +28,14 @@
 decho()
 {
     if [ -z "$quiet" ]; then
-        echo "$*"
+        echo $*
     fi
 }
 
 decho2()
 {
     if [ -n "$verbose" ]; then
-        echo "$*"
+        echo $*
     fi
 }
 
