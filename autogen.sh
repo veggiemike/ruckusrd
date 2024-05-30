@@ -12,7 +12,7 @@ cd $srcdir
 #       the tracked SHA unless we've committed things in the external dirs.
 #
 if [ -z "$(git diff --submodule --color=never | grep '^  >')" ]; then
-    git submodule update --init --recursive || exit 1
+    git submodule update --init || exit 1
 fi
 
 autoreconf -v --install || exit 1
