@@ -110,7 +110,7 @@ wait_for_udev_symlink()
     #       missing.
     #
     if [ -b $dev ] ; then
-        [ -z "$msg" ] && decho -n " done\n"
+        [ -z "$msg" ] && decho -en " done\n"
         decho2 "$dev symlink exists"
     else
         echo
@@ -577,7 +577,7 @@ cat <<EOF >> etc/udev/rules.d/99-ruckusrd.rules
 LABEL="ruckusrd_end"
 EOF
 
-decho -n "$thingtomount\n"
+decho -en "$thingtomount\n"
 
 # prep udev hwdb
 go="/sbin/udevadm"
@@ -625,7 +625,7 @@ if [ -z "$msg" ]; then
     decho -n "."
     # and one more second just to be safe
     sleep 1
-    decho -n " done\n"
+    decho -en " done\n"
 fi
 
 # activate LVM
@@ -793,7 +793,7 @@ if [ -n "$sqsh_layers" ]; then
         if [ -n "$to_ram" ]; then
             decho -n "ruckusrd: Copying squashfs layer(s) to RAM... "
             mkdir -p /sqsh_layerdev
-            decho2 -n "\n"
+            decho2 -en "\n"
             go="cp -a"
             [ "$quiet" != "1" ] && go="$go -v"
             for x in $sqsh_layers_ws; do
@@ -802,7 +802,7 @@ if [ -n "$sqsh_layers" ]; then
             go="$go /sqsh_layerdev"
             decho2 $go
             eval $go
-	    decho -n "done\n"
+	    decho -en "done\n"
             sqsh_layerdir=/sqsh_layerdev
         fi
 
@@ -1217,7 +1217,7 @@ fi
 #
 if [ -n "$modinject" ]; then
     decho -n "ruckusrd: Injecting kernel modules, headers, and firmware into /sysroot... "
-    decho2 -n "\n"
+    decho2 -en "\n"
     
     # mount rw
     mount -o remount,rw /sysroot
@@ -1359,7 +1359,7 @@ if [ -n "$modinject" ]; then
     # mount ro
     mount -o remount,ro /sysroot
 
-    decho -n "done\n"
+    decho -en "done\n"
 fi
 
 
