@@ -25,35 +25,43 @@
 # - bash var+= (NOPE)
 
 
+# prepend $* with "ruckusrd:" label, while potentially reordering $* so that
+# command line args to echo (e.g., -n) are still at the front (so echo will
+# actually consume them).
+#
+# NOTE: If -n has been specified, the "ruckusrd:" label is NOT preppended
+#       (because -n is used for continually updating the line and we don't want
+#       multiple "ruckusrd:" labels).  In this case, it's up to the user to add
+#       it.
+#
 __preppend_and_reorder()
 {
     flags=
-    msg=
     preppend="ruckusrd: "
+    # iterate through $* until $1 does NOT start with a flag
     while [ -n "$1" ]; do
-        if [ "$1" = "-n" ]; then
-            # don't preppend in this case, as we're doing some sort of
-            # updating line thingy (e.g., . . . . accross the screen until
-            # finished).
-            #
-            # NOTE: In this case, it's up to the caller to do the preppending!
-            #
-            preppend=
-        fi
+        case "$1" in
+            -*n*)
+                # don't preppend in this case, as we're doing some sort of
+                # updating line thingy (e.g., . . . . accross the screen until
+                # finished).
+                preppend=
+                ;;
+        esac
         case "$1" in
             -*)
-                [ -n "$flags" ] && flags+=" "
-                flags+=$1
+                [ -n "$flags" ] && flags="$flags "
+                flags="$flags$1"
                 shift
                 ;;
             *)
-                [ -n "$msg" ] && msg+=" "
-                msg+=$1
-                shift
+                # as soon as we encounter an item that isn't potentially a
+                # command line option to echo, we stop parsing things.
+                break
                 ;;
         esac
     done
-    echo "$flags $preppend$msg"
+    echo "$flags $preppend$*"
 }
 
 
