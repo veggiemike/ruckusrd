@@ -67,7 +67,7 @@ __preppend_and_reorder()
 
 decho()
 {
-    if [ -z "$quiet" ]; then
+    if [ -z "$quiet" ] || [ -n "$verbose" ]; then
         echo $(__preppend_and_reorder $*)
     fi
 }
@@ -581,7 +581,7 @@ decho -en "$thingtomount\n"
 
 # prep udev hwdb
 go="/sbin/udevadm"
-[ "$quiet" != "1" ] && go="$go --debug"
+[ -n "$verbose" ] && go="$go --debug"
 go="$go hwdb --update"
 decho2 $go
 eval $go
