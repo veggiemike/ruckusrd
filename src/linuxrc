@@ -265,6 +265,83 @@ lookup_layer()
 }
 
 
+# FIXME: maybe start_udev, start_md, start_lvm, and start_zfs should be
+#        installed in /sbin so they can be executed easily by hand once logged
+#        in?
+#
+#        well, lvm is just a single call to vgchange...  similarly, zfs is just
+#        zpool import.  and it looks like md is being automatically configured
+#        by the kernel.  So really just start_udev is non-trivial.
+#
+start_udev()
+{
+    # prep udev hwdb
+    go="/sbin/udevadm"
+    [ -n "$verbose" ] && go="$go --debug"
+    go="$go hwdb --update"
+    decho2 $go
+    eval $go
+
+    decho2 "starting udevd"
+    /sbin/udevd --daemon --resolve-names=never
+
+    # tell udevd to start processing its queue
+    #
+    # NOTE: I used to just trigger and settle...  LFS does these 3 triggers and
+    #       then conditionally settles.  Not 100% sure of the rationale, but
+    #       I'll follow LFS on this one.
+    #
+    /sbin/udevadm trigger --action=add --type=subsystems
+    /sbin/udevadm trigger --action=add --type=devices
+    /sbin/udevadm trigger --action=change --type=devices
+}
+
+
+start_ruckusrd_system()
+{
+    decho hello there
+
+    # FIXME: missing /etc/fstab so can't login... not sure i care.
+
+    # FIXME: /etc/fstab doesn't quite match reality.  we don't have /dev/pts or
+    #        /dev/shm mounted, and rootfs is now awkward.  Should we have
+    #        *something* listed in df output?
+
+    # FIXME: maybe add an init script for activating lvm, mdraid, zfs, etc?
+    #        (actually, there *are* zfs init scripts, but I bet they don't work
+    #        given the minimal environment)
+
+    # clean up some stuff we won't be needing
+    #rm /init
+    #rm /linuxrc
+    rm -rf /kernel
+    rmdir /sysroot
+
+    # FIXME: is this ok here?  traditionally this would be done AFTER
+    #        switch_root via an rcS script, but we've already done all the rest
+    #        of the normal stuff that script handles (e.g., initial device
+    #        nodes, virtual filesystem mounts)... and we're really not
+    #        switching to another rootfs.
+    #
+    start_udev
+    sleep 1
+
+    # switch to *this* root instead of sysroot and pass control to busybox's
+    # init process
+    #
+    # FIXME: do we really have to switch_root?  i mean, it's to the same
+    #        rootfs...
+    #
+    # FIXME: not sure we want to switch_root... it's supposed to delete the
+    #        existing fs after switching, which would be bad.
+    #
+    #go="exec switch_root / $init $initargs"
+    go="exec /sbin/init"
+    decho2 $go
+    eval $go
+}
+
+
 trap "emergency_shell" 0 2
 
 # exit immediately if a command fails
@@ -325,6 +402,7 @@ sqshfstype=""
 ram_layer=""
 modinject=
 fwdevspec=
+ruckusonly=
 
 # parse our config file, which could possibly override some of our hardcoded
 # default behavior
@@ -420,6 +498,9 @@ for o in `cat /proc/cmdline` ; do
     fwdev=*)
         fwdevspec=${o#fwdev=}
         ;;
+    ruckusonly)
+        ruckusonly=1
+        ;;
     *)
         # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
         #       max_loop=16" to get written in modprobe.conf...
@@ -480,7 +561,18 @@ decho2 "sqshfstype=$sqshfstype"
 decho2 "ram_layer=$ram_layer"
 decho2 "modinject=$modinject"
 decho2 "fwdevspec=$fwdev"
+decho2 "ruckusonly=$ruckusonly"
 
+
+# FIXME: should `ruckusonly` split off here, before we do all our udev shtuff,
+#        or afterwards?  here might make for a convenient place to boot up with
+#        ALL firmware available to get a list of what's needed?
+#
+#        although, i already drop here for `shell`... and it's juts not that
+#        convenient.  Getting things mounted to get at fw.sqsh by hand is super
+#        painful, and w/out it we can't really do a "full firmware" load prior
+#        to udev.
+#
 
 if [ -n "$shell" ]; then
     echo "Dropping directly into shell, as requested.  Enjoy!"
@@ -560,6 +652,14 @@ if [ -n "$fwdevspec" ]; then
     done
 fi
 
+# FIXME: this might be a better `ruckusonly` spot... fw.sqsh mounted, no
+#        special udev rules.
+#
+if [ -n "$ruckusonly" ]; then
+    decho "starting ruckusrd embedded system"
+    start_ruckusrd_system
+fi
+
 decho -n "ruckusrd: determining what to mount... "
 
 cat <<EOF > etc/udev/rules.d/99-ruckusrd.rules
@@ -579,25 +679,7 @@ EOF
 
 decho -en "$thingtomount\n"
 
-# prep udev hwdb
-go="/sbin/udevadm"
-[ -n "$verbose" ] && go="$go --debug"
-go="$go hwdb --update"
-decho2 $go
-eval $go
-
-decho2 "starting udevd"
-/sbin/udevd --daemon --resolve-names=never
-
-# tell udevd to start processing its queue
-#
-# NOTE: I used to just trigger and settle...  LFS does these 3 triggers and
-#       then conditionally settles.  Not 100% sure of the rationale, but I'll
-#       follow LFS on this one.
-#
-/sbin/udevadm trigger --action=add --type=subsystems
-/sbin/udevadm trigger --action=add --type=devices
-/sbin/udevadm trigger --action=change --type=devices
+start_udev
 
 # wait for at least one harddisk to be handled by udev
 #

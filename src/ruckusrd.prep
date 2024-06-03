@@ -161,6 +161,66 @@ sysfs      /sys      sysfs   defaults          0 0
 EOF
 
 
+# FIXME: create /etc/passwd and /etc/group?  we can't login via getty if we
+#        don't at least define a passwordless root account.
+
+
+# Write inittab
+#
+# NOTE: This is only needed for the `ruckusonly` embedded system
+echo '********** GENERATING INITTAB **************************************************'
+cat > initramfs/etc/inittab <<EOF
+# FIXME: rcS is probably only going to start udev...  should we just do that
+#        inside linuxrc before handing things off to init?
+#
+#::sysinit:/etc/init.d/rcS
+
+# /sbin/getty invocations for selected ttys
+#
+# FIXME: Not sure what the baud rate should be, or if it even matters on a
+#        non-serial tty.
+#
+# NOTE: These are completely pointless if we're booting up as a Xen domU... but
+#       having them here doesn't seem to hurt anything and they are helpful if
+#       you're actually booting up on real hardware.
+#
+# FIXME: i don't specify tty a the beginning, to autodect, but then i do
+#        specify tty at the end because getty needs that argument...?
+#
+#::respawn:/sbin/getty 38400 tty1
+#tty2::respawn:/sbin/getty 38400 tty2
+#tty3::respawn:/sbin/getty 38400 tty3
+#tty4::respawn:/sbin/getty 38400 tty4
+#tty5::respawn:/sbin/getty 38400 tty5
+#tty6::respawn:/sbin/getty 38400 tty6
+#
+# Start an "askfirst" shell on the console (whatever that may be)
+::askfirst:-/bin/sh
+# Start an "askfirst" shell on /dev/tty2-4
+tty2::askfirst:-/bin/sh
+tty3::askfirst:-/bin/sh
+tty4::askfirst:-/bin/sh
+# /sbin/getty invocations for selected ttys
+tty5::respawn:/sbin/getty 38400 tty5
+tty6::respawn:/sbin/getty 38400 tty6
+
+# Serial console (example only!)
+#
+# FIXME: This is messing with the Xen hvc0 console for some reason.  Only
+#        enable this if you have a serial line and you're not using Xen.
+#
+#::respawn:/sbin/getty -L ttyS0 115200 vt100
+
+# Stuff to do when restarting the init process
+::restart:/sbin/init
+
+# Stuff to do before rebooting
+::ctrlaltdel:/sbin/reboot
+::shutdown:/bin/umount -a -r
+::shutdown:/sbin/swapoff -a
+EOF
+
+
 # Install our initramfs init script
 echo '********** COPYING LINUXRC TO INITRAMFS ****************************************'
 install -vp linuxrc initramfs/init &&
