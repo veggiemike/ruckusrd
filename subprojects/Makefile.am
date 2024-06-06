@@ -312,6 +312,7 @@ dropbear/FOO:
           MULTI=1 \
           DESTDIR=$$PWD/FOO install && \
 	ln -s dbclient FOO/bin/ssh && \
+	mkdir -p FOO/etc/dropbear && \
 	popd || exit 1
 
 
