@@ -39,12 +39,6 @@ ln -vs ../lib64 initramfs/usr/lib64 &&
 #       (e.g., say mdadm is 32bit on host system, it will put the 32bit
 #       libc.so.6 in /lib which will break all the 64bi binaries...).
 #
-# FIXME: at least add a check for this to warn the user...
-#
-# FIXME: much less of an issue w/out host system binaries... we do still have
-#        to do the symlink, because our built-in binaries are probably linked
-#        against host system libs that might be in either dir...
-#
 ln -vs lib initramfs/lib64 || exit 1
 
 

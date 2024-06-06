@@ -265,7 +265,10 @@ decho '********** INSTALLING MODULES *******************************************
 $cp -a $(realpath $HOSTMODDIR) $DESTMODDIR || cleanup 1
 
 
-# FIXME: skip this whole thing if CONFIG_TRIM_UNUSED_KSYMS=y
+# copy over headers
+#
+# NOTE: This gets skipped if CONFIG_TRIM_UNUSED_KSYMS=y
+#
 config=$BASEDIR/boot/config-$KERNEL
 no_headers=
 if [ ! -f $config ]; then
