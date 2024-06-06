@@ -66,6 +66,8 @@ DEPLIBS=$(LD_LIBRARY_PATH=initramfs/lib find initramfs -type f -exec ldd {} 2>/d
 #       mksquashfs (so it can pthread_cancel) on the initramfs, but nothing
 #       explicitly links against it so it's left out here...
 #
+# NOTE: Same situation for Glibc's NSS runtime shared libs.  Gotta grab them.
+#
 for f in $DEPLIBS; do
     if [ ! -f initramfs/lib/$(basename $f) ]; then
         cp -va --dereference $f initramfs/lib/ || exit 1
@@ -73,9 +75,17 @@ for f in $DEPLIBS; do
     # grab ligbcc_s.so if it exists in the same dir as libpthread.so
     if (echo $f | grep -q libpthread); then
         gcc_s=$(dirname $f)/libgcc_s.so.*
-        #echo GCC_S: $gcc_s
-        if [ -f $gcc_s ]; then
+        echo GCC_S: $gcc_s
+        if [ -n "$gcc_s" ]; then
             cp -va --dereference $gcc_s initramfs/lib/ || exit 1
+        fi
+    fi
+    # grab all the nss libs if they exist in the same dir as libc.so
+    if (echo $f | grep -q libc.so); then
+        nss=$(dirname $f)/libnss*.so.*
+        echo NSS: $nss
+        if [ -n "$nss" ]; then
+            cp -va --dereference $nss initramfs/lib/ || exit 1
         fi
     fi
 done

@@ -13,6 +13,8 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
   complete maintenance system (complete with multiple TTYs to login on) and
   opens the door for using a ruckusrd initramfs on it's own to facilitate
   installation on blank drives.
+- Included Glibc's NSS shared libs on the initramfs, so things like dropbear
+  will be able to authenticate users.
 
 
 * v0.19.0
