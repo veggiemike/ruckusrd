@@ -273,6 +273,13 @@ lookup_layer()
 #        zpool import.  and it looks like md is being automatically configured
 #        by the kernel.  So really just start_udev is non-trivial.
 #
+#        starting to think maybe that's silly...  plus, this func has nice
+#        verbose/quiet support that would be lost (perhaps?) if we made it a
+#        script in /sbin.
+#
+#        we could fix the verbose/quiet stuff and add start_dhcp, start_sshd as
+#        well
+#
 start_udev()
 {
     # prep udev hwdb
@@ -301,41 +308,28 @@ start_ruckusrd_system()
 {
     decho hello there
 
-    # FIXME: missing /etc/fstab so can't login... not sure i care.
+    # FIXME: missing /etc/passwd so can't login... not sure i care.
 
     # FIXME: /etc/fstab doesn't quite match reality.  we don't have /dev/pts or
     #        /dev/shm mounted, and rootfs is now awkward.  Should we have
     #        *something* listed in df output?
 
-    # FIXME: maybe add an init script for activating lvm, mdraid, zfs, etc?
-    #        (actually, there *are* zfs init scripts, but I bet they don't work
-    #        given the minimal environment)
-
     # clean up some stuff we won't be needing
-    #rm /init
-    #rm /linuxrc
     rm -rf /kernel
     rmdir /sysroot
 
-    # FIXME: is this ok here?  traditionally this would be done AFTER
-    #        switch_root via an rcS script, but we've already done all the rest
-    #        of the normal stuff that script handles (e.g., initial device
-    #        nodes, virtual filesystem mounts)... and we're really not
-    #        switching to another rootfs.
+    # NOTE: Traditionally this would be done after switch_root via an rcS
+    #       script, but we've already done all the rest of the stuff that
+    #       script would normally handle (e.g., initial device nodes, virtual
+    #       filesystem mounts)... and we're really not switching to another
+    #       rootfs.  So we do it here.
     #
     start_udev
+    # FIXME: should we sleep here?  I mean, it's completely unnecessary, but it
+    #        would prevent kernel messages from obscuring our login prompt...
     sleep 1
 
-    # switch to *this* root instead of sysroot and pass control to busybox's
-    # init process
-    #
-    # FIXME: do we really have to switch_root?  i mean, it's to the same
-    #        rootfs...
-    #
-    # FIXME: not sure we want to switch_root... it's supposed to delete the
-    #        existing fs after switching, which would be bad.
-    #
-    #go="exec switch_root / $init $initargs"
+    # hand off control to /sbin/init
     go="exec /sbin/init"
     decho2 $go
     eval $go
@@ -564,16 +558,6 @@ decho2 "fwdevspec=$fwdev"
 decho2 "ruckusonly=$ruckusonly"
 
 
-# FIXME: should `ruckusonly` split off here, before we do all our udev shtuff,
-#        or afterwards?  here might make for a convenient place to boot up with
-#        ALL firmware available to get a list of what's needed?
-#
-#        although, i already drop here for `shell`... and it's juts not that
-#        convenient.  Getting things mounted to get at fw.sqsh by hand is super
-#        painful, and w/out it we can't really do a "full firmware" load prior
-#        to udev.
-#
-
 if [ -n "$shell" ]; then
     echo "Dropping directly into shell, as requested.  Enjoy!"
     echo
@@ -652,8 +636,10 @@ if [ -n "$fwdevspec" ]; then
     done
 fi
 
-# FIXME: this might be a better `ruckusonly` spot... fw.sqsh mounted, no
-#        special udev rules.
+# stop normal boot if `ruckusonly` requested
+#
+# NOTE: This seems like the perfect `ruckusonly` spot... fw.sqsh mounted, no
+#       special udev rules.
 #
 if [ -n "$ruckusonly" ]; then
     decho "starting ruckusrd embedded system"

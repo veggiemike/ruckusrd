@@ -160,9 +160,52 @@ proc       /proc     proc    defaults          0 0
 sysfs      /sys      sysfs   defaults          0 0
 EOF
 
-
-# FIXME: create /etc/passwd and /etc/group?  we can't login via getty if we
-#        don't at least define a passwordless root account.
+# Create passwd and group
+#
+# NOTE: We can't login via getty or ssh if we don't at least define a
+#       passwordless root account.
+#
+echo '********** GENERATING PASSWD/GROUP *********************************************'
+cat > initramfs/etc/shells <<EOF
+/bin/ash
+/bin/bash
+EOF
+cat > initramfs/etc/passwd <<EOF
+root::0:0:root:/root:/bin/ash
+bin:x:1:1:bin:/bin:/bin/false
+daemon:x:2:6:daemon:/sbin:/bin/false
+ruckus::1000:1000:RuckusRD User:/home/ruckus:/bin/ash
+nobody:x:65534:65533:Unprivileged User:/dev/null:/bin/false
+EOF
+cat > initramfs/etc/group <<EOF
+root:x:0:
+bin:x:1:
+sys:x:2:
+kmem:x:3:
+tape:x:4:
+tty:x:5:
+daemon:x:6:
+floppy:x:7:
+disk:x:8:
+lp:x:9:
+dialout:x:10:
+audio:x:11:
+video:x:12:
+utmp:x:13:
+usb:x:14:
+cdrom:x:15:
+adm:x:16:
+console:x:17:
+cdrw:x:18:
+mail:x:30:
+news:x:31:
+wheel:x:39:
+users:x:1000:
+nogroup:x:65533:
+EOF
+chmod -v 644 initramfs/etc/{passwd,group}
+mkdir -p initramfs/home/ruckus
+chown 1000:1000 initramfs/home/ruckus
 
 
 # Write inittab
@@ -170,8 +213,9 @@ EOF
 # NOTE: This is only needed for the `ruckusonly` embedded system
 echo '********** GENERATING INITTAB **************************************************'
 cat > initramfs/etc/inittab <<EOF
-# FIXME: rcS is probably only going to start udev...  should we just do that
-#        inside linuxrc before handing things off to init?
+# NOTE: Normally, rcS would mount virtual filesystems, prepopulate /dev, start
+#       udev, etc.  This is all done elsewhere inside linuxrc, so we don't even
+#       call an rcS script.
 #
 #::sysinit:/etc/init.d/rcS
 
@@ -193,6 +237,10 @@ cat > initramfs/etc/inittab <<EOF
 #tty4::respawn:/sbin/getty 38400 tty4
 #tty5::respawn:/sbin/getty 38400 tty5
 #tty6::respawn:/sbin/getty 38400 tty6
+#
+# FIXME: askfirst vs getty... which do i want?  askfirst is certainly simpler,
+#        doesn't take a baud or tty argument, and i really only have a root
+#        user... so is there any reason to do getty?
 #
 # Start an "askfirst" shell on the console (whatever that may be)
 ::askfirst:-/bin/sh
