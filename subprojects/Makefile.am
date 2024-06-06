@@ -117,6 +117,11 @@ busybox/FOO:
 	rm -f FOO/bin/{lsattr,chattr,less} && \
 	rm -f FOO/sbin/{fdisk,sfdisk,cfdisk,blkid} && \
 	rm -f FOO/sbin/{fsck,tune2fs,mke2fs,mkfs.ext2} && \
+	mkdir -p FOO/usr/share/udhcpc && \
+	cp -va examples/udhcp/{sample,simple}.* FOO/usr/share/udhcpc/ && \
+	chmod +x FOO/usr/share/udhcpc/* && \
+	sed -i 's|^RESOLV_CONF=.*|RESOLV_CONF="/etc/resolv.conf"|' FOO/usr/share/udhcpc/* && \
+	ln -vs sample.script FOO/usr/share/udhcpc/default.script && \
 	popd || exit 1
 
 
