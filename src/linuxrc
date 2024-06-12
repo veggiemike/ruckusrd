@@ -306,15 +306,20 @@ start_udev()
 
 start_ruckusrd_system()
 {
-    decho hello there
-
-    # FIXME: missing /etc/passwd so can't login... not sure i care.
-
-    # FIXME: /etc/fstab doesn't quite match reality.  we don't have /dev/pts or
-    #        /dev/shm mounted, and rootfs is now awkward.  Should we have
-    #        *something* listed in df output?
+    # set hostname to something unique
+    hostname ruckusrd-`date +%Y%m%d%H%M%S`
 
     # clean up some stuff we won't be needing
+    #
+    # FIXME: should we consider removing more?  We've only got 25% of total RAM
+    #        for rootfs, and no easy way to monitor that...  we could remove
+    #        /usr/src to free up 115M...  is anyone really going to be trying
+    #        to compile kernel modules from in here?
+    #
+    #        sadly, that might actually be a use case for this shell...  fixing
+    #        borked 3rd party but important kernel modules that are non-trivial
+    #        to fix (e.g., NVIDIA, ZFS, DRBD)
+    #
     rm -rf /kernel
     rmdir /sysroot
 
@@ -345,13 +350,26 @@ PATH=/sbin:/bin
 
 exec < /dev/console > /dev/console 2>&1
 
+# before we start mounting anything, let's fix file ownership/perms on the
+# entire initramfs.
+#
+# NOTE: This is needed because in order to be able to create initramfs as
+#       non-root users, we cannot change ownership of the files it contains
+#       while running ruckusrd.
+#
+chown -R root:root /
+chgrp utmp /var/log/lastlog
+chown -R ruckus:users /home/ruckus
+chmod u+s /bin/busybox
+
 # mount devtmpfs for /dev
 mount -n -t devtmpfs -o mode=0755 devtmpfs /dev || \
     ( echo "is CONFIG_DEVTMPFS enabled in your kernel?"; emergency_shell )
 
-# mount virtual filesystems
-mount -n -t proc proc /proc
-mount -n -t sysfs sysfs /sys
+# mount remaining virtual filesystems
+mkdir -p /dev/pts
+mkdir -p /dev/shm
+mount -a
 
 # create /etc/mtab symlink
 ln -fs /proc/mounts /etc/mtab

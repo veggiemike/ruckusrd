@@ -61,20 +61,43 @@
    the squashfs.img locally somewhere, etc.
 
 
+* For 0.21
+
+ - Consider adding `ruckusmaint` to create a maint shell using initramfs init
+   (like `ruckusonly`) but with the the sysroot assembled and mounted read-only
+   at /sysroot.  This gives us more functionality in our maint shell (e.g.,
+   multiple ttys to work from), but would no longer continue to boot the
+   sysroot on exit.
+
+   Could alternatively add a mount_sysimage script to /bin and tell the user
+   about it via /etc/motd.  (in which case, we'll want the sysroot udev rules
+   after all).
+
+
 * For 0.20
 
- - Consider adding a `ruckusonly` flag to linuxrc to invoke busybox's init
-   instead of switching rootfs and invoking the normal system's init.  This
-   would give us a more complete system (complete with multiple TTYs to login
-   on) and opens the door for using a ruckusrd initramfs on it's own to
-   facilitate installation on blank drives.
-
-   Should this still assemble sysroot?  I'm thinking "no" because that's what
-   the maint shell is for...  but having more than one tty for maintenance
-   might be nice.  Perhaps the maint shell should NOT continue on into a normal
-   system boot?  That way it could have multiple ttys as well...?  We'll see.
+ - Make sure sqsh_layers=es-base.img works with root=ZFS=zroot/dude and maybe
+   make sqshlayerdev=ZFS=zroot/sqsh work too?  Or at least document what
+   doesn't work and clean up associated FIXMEs.
 
  - Add dialog to initramfs.  Then we can start playing with installer options.
+   Look into dialog implementations, too, to find one that looks less terrible
+   on xen console?
+
+ - Make sure regular maint and normal bootup still work now that i've fleshed
+   out `ruckusonly`
+
+ - Test booting ruckusonly on my laptop, to make sure things work as well as
+   they did when i started.
+
+ - Test booting ruckusonly w/ fw.sqsh on flash drive... I recall the giant
+   fw.sqsh not working the last time I tried to boot using it on aldarion.  Is
+   it just too big?
+
+ - Can we add microcodenator and firmwarenator to the initramfs?  Assuming we
+   can get the full fw.sqsh to boot, that would be a good place to generate a
+   small system-specific fw.sqsh file.  The irony... they used to be a part of
+   this source tree.  ;-)
 
 
 * Could happen in a stable release
@@ -95,3 +118,7 @@
    Strange, because everything else including vi seems to work fine.  Less
    source code makes makes me think there is indeed some sort of line clearing
    capability that's not working correctly...
+
+   super annoying, especially now that we have `ruckusonly`, manpages, etc.
+   It's definately just less.  Even busybox's less is working.  Need to either
+   fix this or jetison less.

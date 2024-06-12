@@ -16,6 +16,7 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 - Included Glibc's NSS shared libs on the initramfs, so things like dropbear
   will be able to authenticate users.
 - Include scripts for udhcpcd in the initramfs, so using dhcp actually works.
+  Ha, woops.
 
 
 * v0.19.0

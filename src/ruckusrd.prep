@@ -22,6 +22,28 @@ rm -rf initramfs initramfs.cpio.xz
 #
 echo '********** MAKING DIRECTORIES **************************************************'
 mkdir -vp initramfs/{bin,dev,sys,proc,usr,run,sysroot,etc,lib} || exit 1
+#
+# NOTE: These other dirs aren't really needed for a normal initramfs, but we
+#       add them to be more in-line with the Filesystem Hierarchy Standard,
+#       mostly so that things will "just work" in `ruckusonly` and `maint`
+#       shells.
+#
+mkdir -vp initramfs/{boot,home,mnt,opt,srv} || exit 1
+mkdir -vp initramfs/etc/{opt,sysconfig} || exit 1
+mkdir -vp initramfs/lib/firmware || exit 1
+mkdir -vp initramfs/media/{floppy,cdrom} || exit 1
+mkdir -vp initramfs/usr/{,local/}{include,src} || exit 1
+mkdir -vp initramfs/usr/local/{bin,lib,sbin} || exit 1
+mkdir -vp initramfs/usr/{,local/}share/{color,dict,doc,info,locale,man} || exit 1
+mkdir -vp initramfs/usr/{,local/}share/{misc,terminfo,zoneinfo} || exit 1
+mkdir -vp initramfs/usr/{,local/}share/man/man{1..8} || exit 1
+mkdir -vp initramfs/var/{cache,local,log,mail,opt,spool} || exit 1
+mkdir -vp initramfs/var/lib/{color,misc,locate} || exit 1
+mkdir -vp initramfs/run/lock || exit 1
+ln -sfv /run initramfs/var/run || exit 1
+ln -sfv /run/lock initramfs/var/lock || exit 1
+install -dv -m 0750 initramfs/root || exit 1
+install -dv -m 1777 initramfs/tmp initramfs/var/tmp || exit 1
 
 
 # Make a couple symlinks
@@ -155,14 +177,26 @@ if [ -d /etc/modprobe.d ]; then
 fi
 
 # Write fstab
+#
+# NOTE: This is done so the initramfs can just do a mount -a to get all the
+#       virtual filesystems mounted.  There is no / entry, because initramfs.
+#
 echo '********** GENERATING FSTAB ****************************************************'
 cat > initramfs/etc/fstab <<EOF
-/dev/root  /         auto    defaults,noatime  0 0
 devpts     /dev/pts  devpts  gid=5,mode=620    0 0
 tmpfs      /dev/shm  tmpfs   defaults          0 0
 proc       /proc     proc    defaults          0 0
 sysfs      /sys      sysfs   defaults          0 0
 EOF
+
+
+# Create hosts file
+echo '********** GENERATING HOSTS ****************************************************'
+cat > initramfs/etc/hosts << EOF
+127.0.0.1  localhost
+::1        localhost
+EOF
+
 
 # Create passwd and group
 #
@@ -207,9 +241,72 @@ wheel:x:39:
 users:x:1000:
 nogroup:x:65533:
 EOF
-chmod -v 644 initramfs/etc/{passwd,group}
-mkdir -p initramfs/home/ruckus
-chown 1000:1000 initramfs/home/ruckus
+chmod -v 644 initramfs/etc/{passwd,group} || exit 1
+mkdir -p initramfs/home/ruckus || exit 1
+
+
+echo '********** GENERATING ISSUE and MOTD *******************************************'
+echo -e "\e[1;37mRuckusRD Maintenance System\e[00m" > initramfs/etc/issue
+cat >> initramfs/etc/issue <<EOF
+\n (\s \m \r)
+tty: \l
+
+login as `root` or `ruckus` (unprivileged)
+
+EOF
+cat > initramfs/etc/motd <<"EOF"
+
+Welcome!  Might I suggest setting up networking and SSH access?  For example,
+to create a VLAN20 interface on eth0 using DHCP and start ssh:
+
+% vconfig add eth0 20
+% ip link set eth0 up
+% udhcpc -i eth0.20 -qf -F `hostname -s`
+% dropbear -RB
+
+EOF
+
+
+echo '********** GENERATING .PROFILE FILES *******************************************'
+cat > initramfs/root/.profile <<"EOF"
+# -*- mode: sh -*-
+
+PS1='\u:\w\$ '
+
+# FIXME: Might want to consider en_US.UTF-8
+#
+LC_ALL=POSIX
+
+# technically, we've got all the bins and sbins symlinked to /bin in the
+# initramfs... but here's a normal looking PATH variable just to be hopefully
+# less confusing
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+PATH=/usr/local/bin:/usr/local/sbin:$PATH
+
+export LC_ALL PATH PS1
+
+alias ls='ls -FC --color'
+alias ll='ls -l'
+alias lla='ls -la'
+
+alias h='history'
+alias less='less -MR'
+
+export PAGER='less -MR'
+EOF
+cp initramfs/root/.profile initramfs/home/ruckus/ || exit 1
+
+
+# Populate /var/log lastlog files
+#
+# NOTE: Some files, like /var/log/lastlog, need to have ownership
+#       modified... but we can't do that here (unless we're running as root),
+#       so we do that later on inside linuxrc.
+#
+echo '********** GENERATING LASTLOG FILES ********************************************'
+touch initramfs/var/log/{btmp,lastlog,faillog,wtmp} || exit 1
+chmod -v 664  initramfs/var/log/lastlog || exit 1
+chmod -v 600  initramfs/var/log/btmp || exit 1
 
 
 # Write inittab
@@ -225,43 +322,24 @@ cat > initramfs/etc/inittab <<EOF
 
 # /sbin/getty invocations for selected ttys
 #
-# FIXME: Not sure what the baud rate should be, or if it even matters on a
-#        non-serial tty.
+# NOTE: The baud rate specified for "regular" ttys has no effect.
 #
-# NOTE: These are completely pointless if we're booting up as a Xen domU... but
-#       having them here doesn't seem to hurt anything and they are helpful if
-#       you're actually booting up on real hardware.
+# NOTE: We specify vt220 for the serial consoles because that's what Ubuntu was
+#       doing that last time I checked, and it seems to work just fine.
+#       Likewise, we don't specify a terminal type for "regular" ttys because I
+#       never have and I've never had problems.
 #
-# FIXME: i don't specify tty a the beginning, to autodect, but then i do
-#        specify tty at the end because getty needs that argument...?
-#
-#::respawn:/sbin/getty 38400 tty1
-#tty2::respawn:/sbin/getty 38400 tty2
-#tty3::respawn:/sbin/getty 38400 tty3
-#tty4::respawn:/sbin/getty 38400 tty4
-#tty5::respawn:/sbin/getty 38400 tty5
-#tty6::respawn:/sbin/getty 38400 tty6
-#
-# FIXME: askfirst vs getty... which do i want?  askfirst is certainly simpler,
-#        doesn't take a baud or tty argument, and i really only have a root
-#        user... so is there any reason to do getty?
-#
-# Start an "askfirst" shell on the console (whatever that may be)
-::askfirst:-/bin/sh
-# Start an "askfirst" shell on /dev/tty2-4
-tty2::askfirst:-/bin/sh
-tty3::askfirst:-/bin/sh
-tty4::askfirst:-/bin/sh
-# /sbin/getty invocations for selected ttys
-tty5::respawn:/sbin/getty 38400 tty5
-tty6::respawn:/sbin/getty 38400 tty6
-
-# Serial console (example only!)
-#
-# FIXME: This is messing with the Xen hvc0 console for some reason.  Only
-#        enable this if you have a serial line and you're not using Xen.
-#
-#::respawn:/sbin/getty -L ttyS0 115200 vt100
+# 1st serial port
+ttyS0::respawn:/sbin/getty 115200 ttyS0 vt220
+# Xen console
+hvc0::respawn:/sbin/getty 115200 hvc0 vt220
+# regular ttys
+tty1::respawn:/sbin/getty 115200 tty1
+tty2::respawn:/sbin/getty 115200 tty2
+tty3::respawn:/sbin/getty 115200 tty3
+tty4::respawn:/sbin/getty 115200 tty4
+tty5::respawn:/sbin/getty 115200 tty5
+tty6::respawn:/sbin/getty 115200 tty6
 
 # Stuff to do when restarting the init process
 ::restart:/sbin/init
