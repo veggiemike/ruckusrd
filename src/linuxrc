@@ -330,9 +330,20 @@ start_ruckusrd_system()
     #       rootfs.  So we do it here.
     #
     start_udev
-    # FIXME: should we sleep here?  I mean, it's completely unnecessary, but it
-    #        would prevent kernel messages from obscuring our login prompt...
     sleep 1
+
+    # attempt to mount efivars
+    if [ -d /sys/firmware/efi ]; then
+        decho "mounting efivars"
+        mount efivarfs -t efivarfs /sys/firmware/efi/efivars || echo "WARNING: Failed to mount efivars. Cannot manage UEFI settings."
+    else
+        decho "system doesn't support EFI, not mounting efivars"
+    fi
+
+    # check for existence of serial devices and uncomment getty entries in
+    # /etc/inittab accordingly
+    [ -c /dev/ttyS0 ] && sed -i 's|^#ttyS0::|ttyS0::|' /etc/inittab
+    [ -c /dev/hvc0 ] && sed -i 's|^#hvc0::|hvc0::|' /etc/inittab
 
     # hand off control to /sbin/init
     go="exec /sbin/init"

@@ -329,10 +329,15 @@ cat > initramfs/etc/inittab <<EOF
 #       Likewise, we don't specify a terminal type for "regular" ttys because I
 #       never have and I've never had problems.
 #
+# NOTE: The serial and Xen console ttys get uncommented if the devices are
+#       present just prior to handing things off to init.
+#
 # 1st serial port
-ttyS0::respawn:/sbin/getty 115200 ttyS0 vt220
+#ttyS0::respawn:/sbin/getty 115200 ttyS0 vt220
+#
 # Xen console
-hvc0::respawn:/sbin/getty 115200 hvc0 vt220
+#hvc0::respawn:/sbin/getty 115200 hvc0 vt220
+#
 # regular ttys
 tty1::respawn:/sbin/getty 115200 tty1
 tty2::respawn:/sbin/getty 115200 tty2
