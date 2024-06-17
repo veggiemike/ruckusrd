@@ -17,6 +17,7 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
   will be able to authenticate users.
 - Include scripts for udhcpcd in the initramfs, so using dhcp actually works.
   Ha, woops.
+- Fixed less "terminal is not fully functional" errors in initramfs.
 
 
 * v0.19.0

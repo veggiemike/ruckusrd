@@ -22,6 +22,25 @@ versions of.  Shouldn't really happen though, unless you're trying to use this
 on a discustingly old host system.  And even if your system is that whacked,
 your entire compilation toolchain is gonna be suspect... so not my problem.
 
+* What about cross-compiling?
+
+Well, this would definately require not using any system libs.  At one point,
+years ago, being able to cross-compile for other architectures was a goal for
+RuckusRD... but I haven't felt the need to fully commit to it.  My desire at
+the time was for cross-compiling Source Ruckus Linux (based on CLFS) for other
+architectures, but that ship has sailed I think.  The CLFS project seems pretty
+dead, and I've been just basing Source Ruckus off of Debian/Ubuntu because it
+suits my needs professionally and personally.
+
+That being said, if we ever do want to push RuckusRD into non-intel
+architectures (e.g., arm for raspberry pi), the ground-work is laid already.
+We would just have to add all the required libs to subprojects.  It would be
+quite a few, though, because I've added so much functionality to the initramfs.
+
+And *if* we cared enough to use RuckusRD on a raspberry pi, we could *build* it
+on a raspberry pi and just pull in host libs...  compiling on a pi would be slow,
+but also near-zero effort.
+
 * What current libs do we depend on?
 
 In our =subprojects= dir, we build =util-linux= so that we can provide our
@@ -86,6 +105,6 @@ This is really the only library I've run into so far that was unavailable on
 "old" systems I was still supporting at the time.  I think it may have been
 Ubuntu 18.04?  Either way, I wanted to be able to support zstd compresion in
 squashfs-utils (requiring libzstd) and command line compress/decompress using
-zstd, so it got added to =subprojects=.  It's a prefect example of what type of
-things *will* get added: special cases that we need to.
+zstd, so it got added to =subprojects=.  It's a perfect example of what type of
+things *will* get added: special cases that we need.
 

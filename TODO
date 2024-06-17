@@ -82,7 +82,8 @@
 
  - Add dialog to initramfs.  Then we can start playing with installer options.
    Look into dialog implementations, too, to find one that looks less terrible
-   on xen console?
+   on xen console?  Maybe whiptail?  (seems like whiptail is more Debian-ish
+   and dialog is more RH-ish?)
 
  - Make sure regular maint and normal bootup still work now that i've fleshed
    out `ruckusonly`
@@ -99,26 +100,3 @@
    small system-specific fw.sqsh file.  The irony... they used to be a part of
    this source tree.  ;-)
 
-
-* Could happen in a stable release
-
- - I've added rsync and dropbear, and they both work.  However, something is
-   wonky regarding uid detection in my maint shell.  Even after adding
-   /etc/passwd and /etc/group (so id shows valid stuff), dropbear's call to
-   either getuid() or getpwuid() in cli-runopts.c is failing.  I think this is
-   forcing me to specify -i /.ssh/id_dropbear on the ssh command line to get
-   key-based auth working (as well as specifying root@).
-
-   Hmm... somewhere along the line I stopped needing to specify -i, but it's
-   still complaining. odd.  Hm, it's if I login.  Adding /etc/nsswitch.conf
-   doesn't help....
-
- - maint: less: WARNING: terminal is not fully funcitonal
-
-   Strange, because everything else including vi seems to work fine.  Less
-   source code makes makes me think there is indeed some sort of line clearing
-   capability that's not working correctly...
-
-   super annoying, especially now that we have `ruckusonly`, manpages, etc.
-   It's definately just less.  Even busybox's less is working.  Need to either
-   fix this or jetison less.

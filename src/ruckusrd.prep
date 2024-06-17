@@ -113,6 +113,17 @@ for f in $DEPLIBS; do
 done
 
 
+# Pull in any needed support files for required libs
+#
+# NOTE: We need /lib/terminfo for functional libtinfo and libncurses usage at
+#       the very least.
+#
+echo '********** COPYING NEEDED SUPPORT FILES ****************************************'
+go="cp -va /lib/terminfo initramfs/lib/"
+echo $go
+eval $go || exit 1
+
+
 # Remove static libs
 echo '********** REMOVING UNNEEDED FILES *********************************************'
 go="find initramfs \( -type f -a -name \*.h \) -exec rm -v --interactive=never {} \;"
