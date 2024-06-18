@@ -258,7 +258,7 @@ mkdir -p initramfs/home/ruckus || exit 1
 
 echo '********** GENERATING ISSUE and MOTD *******************************************'
 echo -e "\e[1;37mRuckusRD Maintenance System\e[00m" > initramfs/etc/issue
-cat >> initramfs/etc/issue <<EOF
+cat >> initramfs/etc/issue <<"EOF"
 \n (\s \m \r)
 tty: \l
 
