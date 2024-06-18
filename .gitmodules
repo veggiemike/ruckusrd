@@ -53,3 +53,6 @@
 [submodule "subprojects/fsarchiver"]
 	path = subprojects/fsarchiver
 	url = https://github.com/fdupoux/fsarchiver.git
+[submodule "subprojects/newt"]
+	path = subprojects/newt
+	url = https://github.com/mlichvar/newt.git

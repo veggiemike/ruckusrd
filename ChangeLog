@@ -18,6 +18,8 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 - Include scripts for udhcpcd in the initramfs, so using dhcp actually works.
   Ha, woops.
 - Fixed less "terminal is not fully functional" errors in initramfs.
+- Added newt (whiptail) to initramfs for creating dialog-based prompts, perhaps
+  for an installer or rescue interface.
 
 
 * v0.19.0
