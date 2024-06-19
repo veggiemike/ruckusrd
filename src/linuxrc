@@ -424,7 +424,7 @@ sqsh_layerdir_rel=""
 sqshfstype=""
 ram_layer=""
 modinject=
-fwdevspec=
+fwdev=
 ruckusonly=
 
 # parse our config file, which could possibly override some of our hardcoded
@@ -519,7 +519,7 @@ for o in `cat /proc/cmdline` ; do
         modinject=1
         ;;
     fwdev=*)
-        fwdevspec=${o#fwdev=}
+        fwdev=${o#fwdev=}
         ;;
     ruckusonly)
         ruckusonly=1
@@ -583,7 +583,7 @@ decho2 "sqsh_layerdir_rel=$sqsh_layerdir_rel"
 decho2 "sqshfstype=$sqshfstype"
 decho2 "ram_layer=$ram_layer"
 decho2 "modinject=$modinject"
-decho2 "fwdevspec=$fwdev"
+decho2 "fwdev=$fwdev"
 decho2 "ruckusonly=$ruckusonly"
 
 
@@ -613,7 +613,7 @@ modprobe loop max_loop=32
 
 # extra special device with fw.sqsh on it!
 mkdir -p /lib/firmware
-if [ -n "$fwdevspec" ]; then
+if [ -n "$fwdev" ]; then
     # load some modules needed for block device access
     #
     # NOTE: Some is the keyword here.  We need to provide access specifically
@@ -638,31 +638,59 @@ if [ -n "$fwdevspec" ]; then
     modprobe nvme
     # usb disks - added USB Attached Storage (just in case) and the XHCI PCI
     # driver
+    #
+    # NOTE: This triggers a couple second long iteration of all the usb devices
+    #       detected... so we have to wait for fwdev to show up!
+    #
     modprobe usb_storage
     modprobe uas
     modprobe xhci_pci
     # raid - software raid, at least
     modprobe raid1
 
-    # split fwdevspec on ',' and iterate over the results until we actually
-    # successfully mount one
-    for fwdev in ${fwdevspec/,/ }; do
-        # load modules needed for whatever fs is on fwdev
-        autoload_fs_module $fwdev
-        # now get it mounted
-        fwdir=/fwdev
-        fwsqsh=$fwdir/fw.sqsh
-        mkdir -p $fwdir
-        mount -o ro $fwdev $fwdir || continue
-        if [ -e $fwsqsh ]; then
-            mount -o ro $fwsqsh /lib/firmware
+    # wait-loop attempting to mount fwdev, giving kernel time to finish
+    # iterating through devices (e.g., slow USB disks).
+    #
+    # FIXME: this works, but is super noisy.  every single failed mount results
+    #        in 5ish kernel device lookup errors and an error on stderr.
+    #        probably better to make autoload_fs_module do some sort of silent
+    #        failure and loop on that.
+    #
+    fwdir=/fwdev
+    fwsqsh=$fwdir/fw.sqsh
+    mkdir -p $fwdir
+    x=10
+    msg="waiting up to $x seconds for fwdev to appear..."
+    res="timed out"
+    while [ "$x" != "0" ]; do
+        if [ -n "$msg" ]; then
+            decho -n ruckusrd: $msg
+            msg=""
         else
-            fwsqsh=
+            decho -n "."
         fi
-        umount -l $fwdir
-        # got to the end - we found an appropriate device, stop looping
-        break
+        # load modules needed for whatever fs is on fwdev
+        #
+        # NOTE: This will quietly fail if fwdev doesn't exist yet (e.g., USB)
+        #
+        autoload_fs_module $fwdev
+        # now try to mount it (but don't let it really fail!)
+        mount -o ro $fwdev $fwdir || echo -n
+        if $(grep -q $fwdir /etc/mtab); then
+            if [ -e $fwsqsh ]; then
+                mount -o ro $fwsqsh /lib/firmware
+            else
+                fwsqsh=
+            fi
+            umount -l $fwdir
+            # got to the end - we found an appropriate device, stop looping
+            res="done"
+            break
+        fi
+        x=$((x-1))
+        sleep 1
     done
+    decho -en " $res\n"
 fi
 
 # stop normal boot if `ruckusonly` requested
