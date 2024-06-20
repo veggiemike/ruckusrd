@@ -34,6 +34,9 @@
 #       multiple "ruckusrd:" labels).  In this case, it's up to the user to add
 #       it.
 #
+# FIXME: This does eat leading space off of the output message, even if
+#        quoted... not sure I like that... but I don't think I can fix it...
+#
 __preppend_and_reorder()
 {
     flags=
@@ -80,52 +83,86 @@ decho2()
 }
 
 
-# waits up to $1 seconds for $2 symlink to get created by udev.  if it takes
-# longer than that, something is wrong, but maybe the user can fix it.
+# Wait up to $1 seconds for any of the specified device nodes to exist.  If
+# timeout occurs, something is wrong, but maybe the user can fix it, so we drop
+# to an emergency shell.
 #
-# NOTE: Adds device-mapper device name responsible for the required evice to
-#       $dmneeded prior to returning.
+# Example: wait_for_dev 10 fwdev LABEL=FIRMWARE
 #
-wait_for_udev_symlink()
+# Example: wait_for_dev 10 "at least ond hdd" /dev/sda /dev/nvme0n1 /dev/xvda
+#
+# Example: wait_for_dev 30 "/dev/root symlink" /dev/root
+#
+# NOTE: Adds device-mapper device name responsible for the required device to
+#       global $dmneeded prior to returning.
+#
+wait_for_dev()
 {
-    x=$1
-    dev=$2
-    msg="waiting up to $x seconds for $dev symlink..."
-    while [ ! -e $dev -a "$x" != "0" ]; do
+    seconds=$1
+    txt=$2
+    shift 2
+    devices=$*
+
+    msg="waiting up to $seconds seconds for $txt to appear..."
+    found=
+    while [ $seconds -gt 0 ]; do
         if [ -n "$msg" ]; then
             decho -n ruckusrd: $msg
             msg=""
         else
             decho -n "."
         fi
-        x=$(($x-1))
         # just in case we need to activate LVM on a freshly plugged device
-        # (e.g., USB that was a bit slow to register
+        # (e.g., USB that was a bit slow to register)
         vgchange -a y --quiet --quiet
+        # check for each device
+        for dev in $devices; do
+            decho2 "checking dev=$dev..."
+            # try to resolve LABEL= and the like
+            #
+            # NOTE: This looks wonky because finds prints either a resolved
+            #       block device name or nothing if not found... but if passed
+            #       a /dev/whatever it doesn't look it just prints it back
+            #       out... so findfs /dev/blargynotreal will print
+            #       /dev/blargynotreal and we have to verify it exists still.
+            #
+            dev=$(findfs $dev || echo -n)
+            [ -n "$dev" ] || continue
+            if [ -e $dev ]; then
+                found=$dev
+                # break out of both loops, we're done done
+                break 2
+            fi
+        done
+        seconds=$(($seconds-1))
+        decho2 "waiting for $seconds more seconds"
         sleep 1
     done
 
-    # NOTE: At this point, either the symlink exists OR our waitloop timed out.
-    #       We'll give the user a chance to manually create the symlink if it's
-    #       missing.
+    # NOTE: At this point, either a device we were waiting for exists OR our
+    #       waitloop timed out.  If we timed out, qe'll give the user a chance
+    #       to manually fix things.
     #
-    if [ -b $dev ] ; then
-        [ -z "$msg" ] && decho -en " done\n"
-        decho2 "$dev symlink exists"
+    # FIXME: original fwdev wait code didn't treat failure as fatal... this is
+    #        probably better, but think it over.
+    #
+    if [ -n "$found" ]; then
+        [ -z "$msg" ] && decho -en ". $found found\n"
+        decho2 "$found exists (waited on: $devices)"
     else
         echo
         echo
         echo "--------------------------------------"
-        echo "WARNING: Cannot find device for $dev!"
+        echo "WARNING: Timed out waiting for $devices!"
         echo "--------------------------------------"
         echo
-        echo "Create symlink $dev and then exit this shell to continue"
+        echo "Create devices (or symlinks) manually and then exit this shell to continue"
         echo "the boot sequence."
         echo
         control_shell
     fi
 
-    dmneeded="$dmneeded $(dmsetup info -c --noheadings -o name $dev 2>/dev/null || echo)"
+    dmneeded="$dmneeded $(dmsetup info -c --noheadings -o name $found 2>/dev/null || echo)"
 }
 
 
@@ -648,49 +685,25 @@ if [ -n "$fwdev" ]; then
     # raid - software raid, at least
     modprobe raid1
 
-    # wait-loop attempting to mount fwdev, giving kernel time to finish
-    # iterating through devices (e.g., slow USB disks).
-    #
-    # FIXME: this works, but is super noisy.  every single failed mount results
-    #        in 5ish kernel device lookup errors and an error on stderr.
-    #        probably better to make autoload_fs_module do some sort of silent
-    #        failure and loop on that.
-    #
+    # wait for kernel to finish iterating through devices if needed (e.g., USB
+    # disks)
+    wait_for_dev 10 fwdev $fwdev
+
     fwdir=/fwdev
     fwsqsh=$fwdir/fw.sqsh
     mkdir -p $fwdir
-    x=10
-    msg="waiting up to $x seconds for fwdev to appear..."
-    res="timed out"
-    while [ "$x" != "0" ]; do
-        if [ -n "$msg" ]; then
-            decho -n ruckusrd: $msg
-            msg=""
-        else
-            decho -n "."
-        fi
-        # load modules needed for whatever fs is on fwdev
-        #
-        # NOTE: This will quietly fail if fwdev doesn't exist yet (e.g., USB)
-        #
-        autoload_fs_module $fwdev
-        # now try to mount it (but don't let it really fail!)
-        mount -o ro $fwdev $fwdir || echo -n
-        if $(grep -q $fwdir /etc/mtab); then
-            if [ -e $fwsqsh ]; then
-                mount -o ro $fwsqsh /lib/firmware
-            else
-                fwsqsh=
-            fi
-            umount -l $fwdir
-            # got to the end - we found an appropriate device, stop looping
-            res="done"
-            break
-        fi
-        x=$((x-1))
-        sleep 1
-    done
-    decho -en " $res\n"
+    # load modules needed for whatever fs is on fwdev
+    autoload_fs_module $fwdev
+    # mount it
+    mount -o ro $fwdev $fwdir
+    # mount the fwsqsh file
+    #
+    # NOTE: This is fatal if missing, so no need to check for existence.
+    #
+    mkdir -p /lib/firmware
+    mount -o ro $fwsqsh /lib/firmware
+    # unmount the fwdev since we no longer need to access it
+    umount -l $fwdir
 fi
 
 # stop normal boot if `ruckusonly` requested
@@ -734,24 +747,7 @@ start_udev
 #
 #/sbin/udevadm settle --exit-if-exists=/dev/sda
 #
-x=10
-msg="waiting up to $x seconds for at least one hdd to appear..."
-while [ ! -e /dev/sda -a ! -e /dev/nvme0n1 -a ! -e /dev/xvda -a "$x" != "0" ]; do
-    if [ -n "$msg" ]; then
-        decho -n ruckusrd: $msg
-        msg=""
-    else
-        decho -n "."
-    fi
-    x=$(($x-1))
-    sleep 1
-done
-if [ -z "$msg" ]; then
-    decho -n "."
-    # and one more second just to be safe
-    sleep 1
-    decho -en " done\n"
-fi
+wait_for_dev 10 "at least one hdd" /dev/sda /dev/nvme0n1 /dev/xvda
 
 # activate LVM
 #
@@ -782,9 +778,9 @@ if [ -n "$ZFS" ]; then
 else
     # wait for udev symlinks to get created
     dmneeded=""
-    wait_for_udev_symlink 30 /dev/root
+    wait_for_dev 30 "/dev/root symlink" /dev/root
     root_true=`readlink /dev/root`
-    [ -n "$sqsh_layerdev" ] && wait_for_udev_symlink 30 /dev/sqsh_layerdev
+    [ -n "$sqsh_layerdev" ] && wait_for_dev 30 "/dev/sqsh_layerdev symlink" /dev/sqsh_layerdev
     ln -s $root_true /dev/root-true
 
     # autoload filesystem modules if needed
