@@ -17,10 +17,12 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
   will be able to authenticate users.
 - Include scripts for udhcpcd in the initramfs, so using dhcp actually works.
   Ha, woops.
-- Fixed less "terminal is not fully functional" errors in initramfs.
+- Upgraded less to latest version as of 6/20/24 and fixed "terminal is not
+  fully functional" errors in initramfs.
 - Added newt (whiptail) to initramfs for creating dialog-based prompts, perhaps
-  for an installer or rescue interface.
-
+  for an installer or rescue interface down the road.
+- The fwdev= mount code now waits for device hotplug to finish, so we can now
+  boot with USB flash drive for fwdev.
 
 * v0.19.0
 2024-05-30: RuckusRD v0.19.0

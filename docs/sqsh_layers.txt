@@ -6,10 +6,6 @@ RuckusRD's Squashfs Layering Mechanism (sqsh_layers)
 As always, default behavior of linuxrc script will be to assemble a traditional
 root filesystem and switch over to it.
 
-Until we remove it, the old squashfs behavior (complete w/ autodetecting
-presence of squashfs.img at /) will remain.  Will probably wait a rev or so
-before removal.
-
 If =sqsh_layers=layer2:layer1= is provided on the kernel command line,
 =/layer1.sqsh= will be mounted at =/layer1=, =/layer2.sqsh= at =/layer2=, etc.
 These layers will be used as the "lower layers" for an OverlayFS mount.  Note
