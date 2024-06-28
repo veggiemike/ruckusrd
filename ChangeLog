@@ -23,6 +23,8 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
   for an installer or rescue interface down the road.
 - The fwdev= mount code now waits for device hotplug to finish, so we can now
   boot with USB flash drive for fwdev.
+- Added firmwarenator to the initramfs so our maint shell can be used to create
+  machine-specific fw.sqsh images
 
 * v0.19.0
 2024-05-30: RuckusRD v0.19.0

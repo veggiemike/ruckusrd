@@ -56,3 +56,6 @@
 [submodule "subprojects/newt"]
 	path = subprojects/newt
 	url = https://github.com/mlichvar/newt.git
+[submodule "subprojects/firmwarenator"]
+	path = subprojects/firmwarenator
+	url = https://github.com/sourceruckus/firmwarenator

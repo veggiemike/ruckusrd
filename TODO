@@ -66,6 +66,10 @@
  - Consider adding `rescue` to kick-off a dialog-based rootfs recovery of some
    sort?  Or maybe just add a /bin/rescue script to run via `ruckusonly` shell?
 
+ - If we consider using ruckusonly for maint moving forward, can we kill init
+   and switchroot to /sysroot still?  Or does the fact that we started init
+   really preclude us from continuing to boot into sysroot?
+
  - Consider adding `ruckusmaint` to create a maint shell using initramfs init
    (like `ruckusonly`) but with the the sysroot assembled and mounted read-only
    at /sysroot.  This gives us more functionality in our maint shell (e.g.,
