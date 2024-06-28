@@ -8,7 +8,7 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 - Added --no-ucode flag to prevent addition of microcode (for testing).
 - Preppended "ruckusrd:" to all initramfs messages, to better differentiate
   from kernel messages.
-- Added new `ruckusonly` boot parameter to invoke the initramfs's init instead
+- Added new `initramsys` boot parameter to invoke the initramfs's init instead
   of switching rootfs and invoking the sysroot's init.  This gives us a more
   complete maintenance system (complete with multiple TTYs to login on) and
   opens the door for using a ruckusrd initramfs on it's own to facilitate

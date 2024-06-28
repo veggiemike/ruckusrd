@@ -64,14 +64,14 @@
 * For 0.22
 
  - Consider adding `rescue` to kick-off a dialog-based rootfs recovery of some
-   sort?  Or maybe just add a /bin/rescue script to run via `ruckusonly` shell?
+   sort?  Or maybe just add a /bin/rescue script to run via `initramsys` shell?
 
- - If we consider using ruckusonly for maint moving forward, can we kill init
+ - If we consider using initramsys for maint moving forward, can we kill init
    and switchroot to /sysroot still?  Or does the fact that we started init
    really preclude us from continuing to boot into sysroot?
 
  - Consider adding `ruckusmaint` to create a maint shell using initramfs init
-   (like `ruckusonly`) but with the the sysroot assembled and mounted read-only
+   (like `initramsys`) but with the the sysroot assembled and mounted read-only
    at /sysroot.  This gives us more functionality in our maint shell (e.g.,
    multiple ttys to work from), but would no longer continue to boot the
    sysroot on exit.
@@ -115,12 +115,7 @@
 * For 0.20
 
  - Make sure regular maint and normal bootup still work now that i've fleshed
-   out `ruckusonly`
+   out `initramsys`
 
- - Test booting ruckusonly on my laptop, to make sure things work as well as
+ - Test booting initramsys on my laptop, to make sure things work as well as
    they did when i started.
-
- - Do we like `nosysroot` more than `ruckusonly`?  Well, we still have root=
-   and want to be able to mount and tweak it... maybe `noswitchroot` or
-   `noswitch_root` or `no_switch_root`?  `initramsys`?  I think I like
-   `initramsys` best so far.

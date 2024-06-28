@@ -462,7 +462,7 @@ sqshfstype=""
 ram_layer=""
 modinject=
 fwdev=
-ruckusonly=
+initramsys=
 
 # parse our config file, which could possibly override some of our hardcoded
 # default behavior
@@ -558,8 +558,8 @@ for o in `cat /proc/cmdline` ; do
     fwdev=*)
         fwdev=${o#fwdev=}
         ;;
-    ruckusonly)
-        ruckusonly=1
+    initramsys)
+        initramsys=1
         ;;
     *)
         # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
@@ -621,7 +621,7 @@ decho2 "sqshfstype=$sqshfstype"
 decho2 "ram_layer=$ram_layer"
 decho2 "modinject=$modinject"
 decho2 "fwdev=$fwdev"
-decho2 "ruckusonly=$ruckusonly"
+decho2 "initramsys=$initramsys"
 
 
 if [ -n "$shell" ]; then
@@ -706,12 +706,12 @@ if [ -n "$fwdev" ]; then
     umount -l $fwdir
 fi
 
-# stop normal boot if `ruckusonly` requested
+# stop normal boot if `initramsys` requested
 #
-# NOTE: This seems like the perfect `ruckusonly` spot... fw.sqsh mounted, no
+# NOTE: This seems like the perfect `initramsys` spot... fw.sqsh mounted, no
 #       special udev rules.
 #
-if [ -n "$ruckusonly" ]; then
+if [ -n "$initramsys" ]; then
     decho "starting ruckusrd embedded system"
     start_ruckusrd_system
 fi

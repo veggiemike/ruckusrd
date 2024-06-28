@@ -25,7 +25,7 @@ mkdir -vp initramfs/{bin,dev,sys,proc,usr,run,sysroot,etc,lib} || exit 1
 #
 # NOTE: These other dirs aren't really needed for a normal initramfs, but we
 #       add them to be more in-line with the Filesystem Hierarchy Standard,
-#       mostly so that things will "just work" in `ruckusonly` and `maint`
+#       mostly so that things will "just work" in `initramsys` and `maint`
 #       shells.
 #
 mkdir -vp initramfs/{boot,home,mnt,opt,srv} || exit 1
@@ -322,7 +322,7 @@ chmod -v 600  initramfs/var/log/btmp || exit 1
 
 # Write inittab
 #
-# NOTE: This is only needed for the `ruckusonly` embedded system
+# NOTE: This is only needed for the `initramsys` embedded system
 echo '********** GENERATING INITTAB **************************************************'
 cat > initramfs/etc/inittab <<EOF
 # NOTE: Normally, rcS would mount virtual filesystems, prepopulate /dev, start
