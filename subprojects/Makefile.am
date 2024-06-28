@@ -3,7 +3,7 @@
 # in here for each subproject.
 
 
-all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar fsarchiver.tar newt.tar firmwarenator.tar
+all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar fsarchiver.tar newt.tar firmwarenator.tar microcodenator.tar
 all-local: fw.sqsh ucode.img
 
 %.tar: %/FOO
@@ -31,6 +31,7 @@ distclean-local:
 	cd fsarchiver && git clean -dfx && git stash
 	cd newt && git clean -dfx && git stash
 	cd firmwarenator && git clean -dfx && git stash
+	cd microcodenator && git clean -dfx && git stash
 	rm -rf syslinux*
 
 
@@ -434,6 +435,18 @@ newt/FOO:
 
 firmwarenator/FOO:
 	pushd firmwarenator && \
+	rm -rf FOO && \
+	./autogen.sh && \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static && \
+	make -j$(JOBCOUNT) && \
+	make DESTDIR=$$PWD/FOO install && \
+	popd || exit 1
+
+
+microcodenator/FOO:
+	pushd microcodenator && \
 	rm -rf FOO && \
 	./autogen.sh && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \

@@ -38,6 +38,7 @@ Makefile.in
 /subprojects/less.tar
 /subprojects/lvm2.tar
 /subprojects/mdadm.tar
+/subprojects/microcodenator.tar
 /subprojects/newt.tar
 /subprojects/rsync.tar
 /subprojects/squashfs-tools.tar

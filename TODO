@@ -114,11 +114,6 @@
 
 * For 0.20
 
- - Can we add microcodenator and firmwarenator to the initramfs?  Assuming we
-   can get the full fw.sqsh to boot, that would be a good place to generate a
-   small system-specific fw.sqsh file.  The irony... they used to be a part of
-   this source tree.  ;-)
-
  - Make sure regular maint and normal bootup still work now that i've fleshed
    out `ruckusonly`
 

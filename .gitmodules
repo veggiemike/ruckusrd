@@ -59,3 +59,6 @@
 [submodule "subprojects/firmwarenator"]
 	path = subprojects/firmwarenator
 	url = https://github.com/sourceruckus/firmwarenator
+[submodule "subprojects/microcodenator"]
+	path = subprojects/microcodenator
+	url = https://github.com/sourceruckus/microcodenator.git
