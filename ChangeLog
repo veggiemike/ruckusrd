@@ -3,7 +3,7 @@
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
 * v0.20.0
-2024-mm-dd: RuckusRD v0.20.0 (under development)
+2024-10-01: RuckusRD v0.20.0
 
 - Added --no-ucode flag to prevent addition of microcode (for testing).
 - Preppended "ruckusrd:" to all initramfs messages, to better differentiate

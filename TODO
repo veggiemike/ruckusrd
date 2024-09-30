@@ -81,13 +81,13 @@
    after all).
 
  - Consider trying some of the future sqsh_layer managenment stuff from
-   docs/sqsh_layers.txt from our new ruckussys shell?  All the stuff that's got
+   docs/sqsh_layers.txt from our new initramsys shell?  All the stuff that's got
    a "hmm, really have to reboot" or "archiving a live read-write filesystem is
    bad" caveat...?  Perhaps add all those proposed commands as initramfs boot
    params?  Or just add commands to initramfs to do the work?
 
  - Boot parameter to assemble sqsh_layers but then use the overlay as a source
-   to install from.  This is probably the simlest installation mechanism.  This
+   to install from.  This is probably the simplest installation mechanism.  This
    way we can boot from sqsh_layers for a first boot, but then immediately turn
    the system into a non-sqsh system.  We get the best of both worlds, quick
    cloning of tons of systems but they have zero odd quirks after first boot.
@@ -101,21 +101,15 @@
 
 * For 0.21
 
- - Manpage section detailing all the boot-time parameters.  Should probably
-   have a section describing firmware and microcode handling as well.  Some of
-   this info might be in docs/* already.  Perhaps additional pages, like
-   ruckusrd-squashfs, ruckusrd-firmware, ruckusrd-params to go along with the
-   existing help2man generated manpage (with a See Also section added)?
+ - Manpage section detailing all the boot-time parameters (e.g., initramsys).
+   Should probably have a section describing firmware and microcode handling as
+   well.  Some of this info might be in docs/* already.  Perhaps additional
+   pages, like ruckusrd-squashfs, ruckusrd-firmware, ruckusrd-params to go
+   along with the existing help2man generated manpage (with a See Also section
+   added)?
 
  - Make sure sqsh_layers=es-base.img works with root=ZFS=zroot/dude and maybe
    make sqshlayerdev=ZFS=zroot/sqsh work too?  Or at least document what
    doesn't work and clean up associated FIXMEs.
 
-
-* For 0.20
-
- - Make sure regular maint and normal bootup still work now that i've fleshed
-   out `initramsys`
-
- - Test booting initramsys on my laptop, to make sure things work as well as
-   they did when i started.
+ - Upgrade zfs, busybox, and anything else interesting

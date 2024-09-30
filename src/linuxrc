@@ -265,6 +265,11 @@ EOF
             #        think ZFS is going to be an alternative to
             #        sqsh_layers... not sure why you'd combine the two.
             #
+            #        well, to get zfs snapshots and other cool featues even
+            #        when using a sqsh_layer perhaps?  what exactly will be
+            #        broken... is it just sqsh_layerdev? or sqsh_layer usage in
+            #        general?
+            #
             ZFS=${str#ZFS=}
             ZFS_POOL=${ZFS%%/*}
             if [ "$name" = "root" ]; then
@@ -772,6 +777,9 @@ if [ -n "$ZFS" ]; then
     # NOTE: We're only mounting the specified root dataset here.  The OS will
     #       mount the rest during it's normal bootup processing (assuming it's
     #       configured properly).
+    #
+    # FIXME: why was it ok to not setup overlay support?  what if i want to use
+    #        sqsh_layers but use ZFS for my upper layer?
     #
     zpool import $ZFS_POOL -N
     rootfstype=zfs
