@@ -113,3 +113,5 @@
    doesn't work and clean up associated FIXMEs.
 
  - Upgrade zfs, busybox, and anything else interesting
+
+ - Maybe a `firstboot` target to prompt for hostname, root pw, etc?
