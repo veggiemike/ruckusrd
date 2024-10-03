@@ -1302,10 +1302,8 @@ ExecStart=$ruckusrd_umount
 EOF
 
             # register it for shutdown
-            #
-            # FIXME: where did this target.wants dirs go in noble?  should i just create these dirs if missing?
-            #
             for x in halt poweroff reboot; do
+                mkdir -p /sysroot/$systemdpath/$x.target.wants
                 ln -fs ../ruckusrd_umount.service /sysroot/$systemdpath/$x.target.wants/ruckusrd_umount.service
             done
 

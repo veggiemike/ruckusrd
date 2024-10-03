@@ -114,4 +114,11 @@
 
  - Upgrade zfs, busybox, and anything else interesting
 
- - Maybe a `firstboot` target to prompt for hostname, root pw, etc?
+ - Maybe a `firstboot` target to prompt for hostname, root pw, localadmin pw,
+   dpkg-reconfigure (tzdata, locales), create basic networking, etc?  Might
+   have to run during boot in the sysroot as opposed to running in the initrd
+   stage so that things like nmcli will work...  dpkg-reconfigure does work in
+   initrd, so that much is certainly doable.  Ooh, I can create NM files in
+   /etc/NetworkManager/system-connections using nmcli --offline, so no need to
+   run in sysroot.  Good.
+
