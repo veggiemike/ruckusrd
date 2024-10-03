@@ -1285,7 +1285,7 @@ EOF
             #       this might not be 100% correct, but it's a best guess for
             #       now (and works in Ubuntu).
             #
-            systemdpath=$(dirname $(readlink /sysroot/$init))/system
+            systemdpath=$(dirname $(readlink -f /sysroot/$init) | sed 's|^/sysroot||')/system
 
             # create service file
             cat <<EOF > /sysroot/$systemdpath/ruckusrd_umount.service
@@ -1302,6 +1302,9 @@ ExecStart=$ruckusrd_umount
 EOF
 
             # register it for shutdown
+            #
+            # FIXME: where did this target.wants dirs go in noble?  should i just create these dirs if missing?
+            #
             for x in halt poweroff reboot; do
                 ln -fs ../ruckusrd_umount.service /sysroot/$systemdpath/$x.target.wants/ruckusrd_umount.service
             done
