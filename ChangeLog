@@ -5,6 +5,12 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 * v0.21.0
 2024-mm-dd: Ruckusrd v0.21.0 (under development)
 
+* v0.20.1
+2024-10-04: RuckusRD v0.20.1
+
+- Fixed bootup problems with Ubuntu 24.04, and anywhere else where /sbin/init
+  is a relative symlink instead of an absolute one.
+
 * v0.20.0
 2024-10-01: RuckusRD v0.20.0
 

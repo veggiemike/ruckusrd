@@ -109,6 +109,15 @@ eudev/FOO: util-linux.tar
 #       CONFIG_FEATURE_INETD_RPC enabled.  For now, we'll just leave
 #       RPC disabled in our .config file.
 #
+# FIXME: For building on noble (or anything that's using kernel
+#        headers newer than v6.8), the tc module fails to build
+#        because CBQ support was removed from the kernel.  It looks
+#        like this hasn't been fixed upstream yet, even in the newer
+#        1.37 release, so we'll disable tc for now in our .config
+#        file.
+#
+#        https://bugs.busybox.net/show_bug.cgi?id=15931
+#
 busybox/FOO:
 	pushd busybox && \
 	rm -rf FOO && \
@@ -349,8 +358,14 @@ rsync/FOO: zstd.tar
 # NOTE: Leaving this at v16 because bionic problems.  Either fix or
 #       wait until we've disowned 18.04 to upgrade to v18.
 #
+# NOTE: Oooh, one of my favorite pet peevs... -Werror on by default.
+#       Thanks developers for making packagers lives harder for no
+#       gain.  We sed this out so we can compile on noble (and
+#       anything else with a post 2023 compiler.
+#
 efibootmgr/FOO:
 	pushd efibootmgr && \
+	sed -i 's|-Werror||' Make.defaults && \
 	rm -rf FOO && \
 	make EFIDIR=ruckus && \
 	make EFIDIR=ruckus DESTDIR=$$PWD/FOO install && \

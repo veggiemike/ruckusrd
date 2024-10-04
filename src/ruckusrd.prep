@@ -119,7 +119,14 @@ done
 #       the very least.
 #
 echo '********** COPYING NEEDED SUPPORT FILES ****************************************'
-go="cp -va /lib/terminfo initramfs/lib/"
+if [ -d /lib/terminfo ]; then
+    go="cp -va /lib/terminfo initramfs/lib/"
+elif [ -d /usr/share/terminfo ]; then
+    go="cp -va /usr/share/terminfo initramfs/lib/"
+else
+    echo "No terminfo files in /lib or /usr/share?"
+    exit 1
+fi
 echo $go
 eval $go || exit 1
 
