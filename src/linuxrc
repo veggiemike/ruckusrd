@@ -1285,7 +1285,11 @@ EOF
             #       this might not be 100% correct, but it's a best guess for
             #       now (and works in Ubuntu).
             #
-            systemdpath=$(dirname $(readlink -f /sysroot/$init) | sed 's|^/sysroot||')/system
+            systemdpath=$(dirname $(readlink /sysroot/$init))/system
+            # if it's a relative path, make it absolute
+            if [ -z "$(echo $systemdpath | awk '/^\// {print}')" ]; then
+                systemdpath=$(realpath /sysroot/$(dirname $init)/$systemdpath | sed 's|^/sysroot||')
+            fi
 
             # create service file
             cat <<EOF > /sysroot/$systemdpath/ruckusrd_umount.service
