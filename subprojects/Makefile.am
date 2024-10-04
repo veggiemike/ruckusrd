@@ -109,6 +109,15 @@ eudev/FOO: util-linux.tar
 #       CONFIG_FEATURE_INETD_RPC enabled.  For now, we'll just leave
 #       RPC disabled in our .config file.
 #
+# FIXME: For building on noble (or anything that's using kernel
+#        headers newer than v6.8), the tc module fails to build
+#        because CBQ support was removed from the kernel.  It looks
+#        like this hasn't been fixed upstream yet, even in the newer
+#        1.37 release, so we'll disable tc for now in our .config
+#        file.
+#
+#        https://bugs.busybox.net/show_bug.cgi?id=15931
+#
 busybox/FOO:
 	pushd busybox && \
 	rm -rf FOO && \
