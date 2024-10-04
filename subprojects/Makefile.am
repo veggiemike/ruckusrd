@@ -358,8 +358,14 @@ rsync/FOO: zstd.tar
 # NOTE: Leaving this at v16 because bionic problems.  Either fix or
 #       wait until we've disowned 18.04 to upgrade to v18.
 #
+# NOTE: Oooh, one of my favorite pet peevs... -Werror on by default.
+#       Thanks developers for making packagers lives harder for no
+#       gain.  We sed this out so we can compile on noble (and
+#       anything else with a post 2023 compiler.
+#
 efibootmgr/FOO:
 	pushd efibootmgr && \
+	sed -i 's|-Werror||' Make.defaults && \
 	rm -rf FOO && \
 	make EFIDIR=ruckus && \
 	make EFIDIR=ruckus DESTDIR=$$PWD/FOO install && \
