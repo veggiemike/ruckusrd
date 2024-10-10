@@ -260,20 +260,14 @@ EOF
             #       initialization code down below that uses the ZFS and
             #       ZFS_POOL variables, set here.
             #
-            # FIXME: this is going to break if user passes in a ZFS
-            #        sqsh_layerdev as well... but i don't care right now.  i
-            #        think ZFS is going to be an alternative to
-            #        sqsh_layers... not sure why you'd combine the two.
-            #
-            #        well, to get zfs snapshots and other cool featues even
-            #        when using a sqsh_layer perhaps?  what exactly will be
-            #        broken... is it just sqsh_layerdev? or sqsh_layer usage in
-            #        general?
-            #
             ZFS=${str#ZFS=}
             ZFS_POOL=${ZFS%%/*}
             if [ "$name" = "root" ]; then
                 thingtomount=$ZFS
+                rootfstype=zfs
+            elif [ "$name" = "sqsh_layerdev" ]; then
+                thingtomount_sqsh=$ZFS
+                sqshfstype=zfs
             fi
             ;;
         /dev/*)
@@ -766,29 +760,23 @@ decho2 "activating LVM"
 vgchange -a y --quiet --quiet
 
 # do ZFS initialization
+#
+# NOTE: This ZFS var will be set to the last ZFS= argument to be parsed, so
+#       will be set if we have ANY zfs to mount.
+#
 if [ -n "$ZFS" ]; then
     modprobe zfs
-    # NOTE: we don't set root_true, but that's fine becuase we're not doing an
-    #       overlay.
-    #
-    # NOTE: we don't have a /dev/root symlink, but that's fine because we're
-    #       not doing an overlay.
-    #
     # NOTE: We're only mounting the specified root dataset here.  The OS will
     #       mount the rest during it's normal bootup processing (assuming it's
     #       configured properly).
-    #
-    # FIXME: why was it ok to not setup overlay support?  what if i want to use
-    #        sqsh_layers but use ZFS for my upper layer?
-    #
     zpool import $ZFS_POOL -N
-    rootfstype=zfs
-else
+fi
+
+if [ -z "$thingtomount" ]; then
     # wait for udev symlinks to get created
     dmneeded=""
     wait_for_dev 30 "/dev/root symlink" /dev/root
     root_true=`readlink /dev/root`
-    [ -n "$sqsh_layerdev" ] && wait_for_dev 30 "/dev/sqsh_layerdev symlink" /dev/sqsh_layerdev
     ln -s $root_true /dev/root-true
 
     # autoload filesystem modules if needed
@@ -798,13 +786,15 @@ else
     else
         modprobe $rootfstype
     fi
-    if [ -n "$sqsh_layerdev" ]; then
-        if [ -z "$sqshfstype" ]; then
-            autoload_fs_module /dev/sqsh_layerdev
-            sqshfstype=$TYPE
-        else
-            modprobe $sqshfstype
-        fi
+fi
+if [ -n "$sqsh_layerdev" ] && [ -z "$thingtomount_sqsh" ]; then
+    wait_for_dev 30 "/dev/sqsh_layerdev symlink" /dev/sqsh_layerdev
+
+    if [ -z "$sqshfstype" ]; then
+        autoload_fs_module /dev/sqsh_layerdev
+        sqshfstype=$TYPE
+    else
+        modprobe $sqshfstype
     fi
 fi
 
@@ -849,7 +839,8 @@ fi
 
 # create mountpoints for root and sqsh_layerdev
 mkdir -p /sysroot
-[ -h /dev/sqsh_layerdev ] && mkdir -p /sqsh_layerdev
+[ -h /dev/sqsh_layerdev ] && thingtomount_sqsh="/dev/sqsh_layerdev"
+[ -n "$thingtomount_sqsh" ] && mkdir -p /sqsh_layerdev
 
 # mountdevs breakpoint
 if [ -n "$shell_mountdevs" ]; then
@@ -884,9 +875,9 @@ else
     fi
 
     # look for sqsh_layerdev
-    if [ -h /dev/sqsh_layerdev ]; then
+    if [ -n "$thingtomount_sqsh" ]; then
         # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
-        go="mount -t $sqshfstype -o ro /dev/sqsh_layerdev /sqsh_layerdev"
+        go="mount -t $sqshfstype -o ro $thingtomount_sqsh /sqsh_layerdev"
         decho2 $go
         eval $go
     fi
