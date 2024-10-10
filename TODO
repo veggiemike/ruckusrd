@@ -98,6 +98,12 @@
    around and overlaying eventually turns into a bit of a resource (cpu and
    space) waste.
 
+ - Udev rules to rename network interfaces like systemd, so pre-boot network
+   config can actuall have the right device names?
+
+   https://systemd.io/PREDICTABLE_INTERFACE_NAMES/
+   https://wiki.archlinux.org/title/Network_configuration#Change_interface_name
+
 
 * For 0.21
 
@@ -108,12 +114,6 @@
    along with the existing help2man generated manpage (with a See Also section
    added)?
 
- - Make sure sqsh_layers=es-base.img works with root=ZFS=zroot/dude and maybe
-   make sqshlayerdev=ZFS=zroot/sqsh work too?  Or at least document what
-   doesn't work and clean up associated FIXMEs.
-
- - Upgrade zfs, busybox, and anything else interesting
-
  - Maybe a `firstboot` target to prompt for hostname, root pw, localadmin pw,
    dpkg-reconfigure (tzdata, locales), create basic networking, etc?  Might
    have to run during boot in the sysroot as opposed to running in the initrd
@@ -121,4 +121,19 @@
    initrd, so that much is certainly doable.  Ooh, I can create NM files in
    /etc/NetworkManager/system-connections using nmcli --offline, so no need to
    run in sysroot.  Good.
+
+   Given that the boot scripts on `sysroot` might (probably) rename eth0 to
+   something supposedly more meaningful, perhaps we shouldn't attempt network
+   configuration during initramfs.  In Ubuntu 24.04, eth0 gets renamed enX0 for
+   xen domUs...
+
+   We could give a warning about device names probably changing post-boot
+   (thanks systemd) and allow for some generic canned configs to choose from:
+   Xen VM trunk w/ vlan20 interface (enX0), Trunk w/ vlan20 interface (eno1),
+   Bonded Trunk w/ vlan20 interface (ens1f0, ens1f2), Xen Bridge on Bonded
+   Trunk w/ vlan20 interface (eno1, eno2).  These are intended as a starting
+   point, all using DHCP, expecting a little post-boot tweaking.
+
+   If I do this, how do I ensure that we don't run again?  I suppose leave a
+   /.ruckusrd_firstboot file behind?
 
