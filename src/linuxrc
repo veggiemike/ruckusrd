@@ -564,7 +564,7 @@ dlg_done()
     eval $go
 }
 
-firstboot_dryrun=y
+#firstboot_dryrun=y
 firstboot_wizard()
 {
     dlg_welcome || return
@@ -672,6 +672,7 @@ shell_sqshprep=""
 shell_mountoverlay=""
 
 maint="" # just before switch_root and handover to init
+firstboot=""
 hoststamp=""
 quiet=
 verbose=
@@ -730,6 +731,9 @@ for o in `cat /proc/cmdline` ; do
     maint)
 	maint=1
 	;;
+    firstboot)
+        firstboot=1
+        ;;
     rw)
         root_rw=1
         ;;
@@ -833,6 +837,7 @@ decho2 "shell_mountdevs=$shell_mountdevs"
 decho2 "shell_sqshprep=$shell_sqshprep"
 decho2 "shell_mountoverlay=$shell_mountoverlay"
 decho2 "maint=$maint"
+decho3 "firstboot=$firstboot"
 decho2 "hoststamp=$hoststamp"
 decho2 "sqsh_layers=$sqsh_layers"
 decho2 "sqsh_layerdev=$sqsh_layerdev"
@@ -1715,6 +1720,12 @@ fi
 
 # unmount fw.sqsh if we mounted it
 [ -n "$fwsqsh" ] && umount /lib/firmware
+
+if [ -n "$firstboot" ]; then
+    mount -o remount,rw /sysroot
+    firstboot_wizard
+    mount -o remount,ro /sysroot
+fi
 
 if [ -n "$maint" ]; then
     echo "Dropping to a maintenance shell, as requested. Good luck!"
