@@ -377,6 +377,7 @@ EOF
 # Install our initramfs init script
 echo '********** COPYING LINUXRC TO INITRAMFS ****************************************'
 install -vp linuxrc initramfs/init &&
+install -vp firstboot_wizard initramfs/bin/ &&
 cp -va ruckusrd.sh initramfs/ || exit 1
 
 

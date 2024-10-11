@@ -5,6 +5,7 @@ dist_sysconf_DATA =
 dist_sysconf_DATA += ruckusrd.conf
 
 pkgdata_DATA =
+pkgdata_DATA += firstboot_wizard
 pkgdata_DATA += linuxrc
 pkgdata_DATA += ruckusrd.sh
 pkgdata_DATA += initramfs.cpio.xz
