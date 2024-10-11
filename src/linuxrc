@@ -1345,7 +1345,7 @@ EOF
     fi
 
     # move /sqsh_layerdev into /sysroot
-    if [ -h /dev/sqsh_layerdev ]; then
+    if [ -d /sqsh_layerdev ]; then
         decho2 "moving /sqsh_layerdev to /sysroot/mnt/"
 	mkdir -p /sysroot/mnt/sqsh_layerdev
         mount --move /sqsh_layerdev /sysroot/mnt/sqsh_layerdev
