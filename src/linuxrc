@@ -392,32 +392,33 @@ DLG="whiptail --backtitle 'RuckusRD Firstboot'"
 dlg_welcome()
 {
     go=$DLG
-    go+=" --title 'Welcome!'"
-    go+=" --yesno 'Welcome to the RuckusRD Firstboot wizard, which will help you groom your sysroot prior to booting for the first time.\n\nContinue?' 0 0"
+    go="$go --title 'Welcome!'"
+    go="$go --yesno 'Welcome to the RuckusRD Firstboot wizard, which will help you groom your sysroot prior to booting for the first time.\n\nContinue?'"
+    go="$go 0 0"
     eval $go
 }
 
 dlg_hostname()
 {
     go=$DLG
-    go+=" --title 'System Hostname'"
-    go+=" --inputbox \"What is the system's short hostname?\" 0 0"
+    go="$go --title 'System Hostname'"
+    go="$go --inputbox \"What is the system's short hostname?\" 0 0"
     HOSTNAME=$(eval $go 3>&1 1>&2 2>&3)
 }
 
 dlg_pw()
 {
     go=$DLG
-    go+=" --title '$1 Password'"
-    go+=" --passwordbox \"Please enter a $1 password\" 0 0"
+    go="$go --title '$1 Password'"
+    go="$go --passwordbox \"Please enter a $1 password\" 0 0"
     PW=$(eval $go 3>&1 1>&2 2>&3)
 }
 
 dlg_pw2()
 {
     go=$DLG
-    go+=" --title 'Reenter $1 Password'"
-    go+=" --passwordbox \"Please reenter a $1 password\" 0 0"
+    go="$go --title 'Reenter $1 Password'"
+    go="$go --passwordbox \"Please reenter a $1 password\" 0 0"
     PW2=$(eval $go 3>&1 1>&2 2>&3)
 }
 
@@ -431,8 +432,8 @@ dlg_pw_check()
 dlg_pw_mismatch()
 {
     go=$DLG
-    go+=" --title 'Password Mismatch!'"
-    go+=" --msgbox \"The entered passwords didn't match.  Try again.\" 0 0"
+    go="$go --title 'Password Mismatch!'"
+    go="$go --msgbox \"The entered passwords didn't match.  Try again.\" 0 0"
     eval $go
 }
 
@@ -457,20 +458,21 @@ dlg_pw_loop()
 dlg_networking()
 {
     go=$DLG
-    go+=" --title 'Networking'"
-    go+=" --menu \"Select a Networking template (you may have to modify after boot)\" 0 0 5"
-    go+=" \"None\" \"System defaults, configure later\""
-    go+=" \"Trunk\" \"Trunk w/ vlan20 DHCP interface (eno1)\""
-    go+=" \"Xen VM Trunk\" \"Xen VM trunk w/ vlan20 DHCP interface (enX0)\""
-    go+=" \"Xen Bridged Trunk\" \"Xen bridged trunk for domain0 w/ vlan20 DHCP interface (eno1)\""
-    go+=" \"Bonded Trunk\" \"Bonded trunk w/ vlan20 DHCP interface (ens1f0, ens1f1)\""
-    go+=" \"Xen Bridge on Bonded Trunk\" \"Xen bridge on bonded trunk w/ vlan20 DHCP interface (eno1, eno2)\""
+    go="$go --title 'Networking'"
+    go="$go --menu \"Select a Networking template (you may have to modify after boot)\" 0 0 5"
+    go="$go \"None\" \"System defaults, configure later\""
+    go="$go \"Trunk\" \"Trunk w/ vlan20 DHCP interface (eno1)\""
+    go="$go \"Xen VM Trunk\" \"Xen VM trunk w/ vlan20 DHCP interface (enX0)\""
+    go="$go \"Xen Bridged Trunk\" \"Xen bridged trunk for domain0 w/ vlan20 DHCP interface (eno1)\""
+    go="$go \"Bonded Trunk\" \"Bonded trunk w/ vlan20 DHCP interface (ens1f0, ens1f1)\""
+    go="$go \"Xen Bridge on Bonded Trunk\" \"Xen bridge on bonded trunk w/ vlan20 DHCP interface (eno1, eno2)\""
     NETWORKING=$(eval $go 3>&1 1>&2 2>&3)
 }
 
 CHROOT="chroot /sysroot /usr/bin/env -i HOME=/root TERM=$TERM PATH=$PATH"
 configure_networking()
 {
+    echo "Configuring for: $1..."
     case $1 in
         "Trunk")
             # trunk
@@ -543,15 +545,15 @@ configure_networking()
     esac
 
     if [ "$1" != "None" ]; then
-        chmod 600 /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection/*.nmconnection
+        chmod 600 /sysroot/etc/NetworkManager/system-connections/*.nmconnection
     fi
 }
 
 dlg_exit()
 {
     go=$DLG
-    go+=" --title 'Goodbye...'"
-    go+=" --msgbox 'You have opted to exit partway through configuration... things might be a little messy.' 0 0"
+    go="$go --title 'Goodbye...'"
+    go="$go --msgbox 'You have opted to exit partway through configuration... things might be a little messy.' 0 0"
     eval $go
 }
 
@@ -559,19 +561,19 @@ FIRSTBOOT_DONE_FILE=/.ruckusrd_firstboot_done
 dlg_done()
 {
     go=$DLG
-    go+=" --title 'Outstanding!'"
-    go+=" --msgbox \"Finished! You can run this again by removing $FIRSTBOOT_DONE_FILE and adding 'firstboot' to your boot args.\" 0 0"
+    go="$go --title 'Outstanding!'"
+    go="$go --msgbox \"Finished! You can run this again by removing $FIRSTBOOT_DONE_FILE and adding 'firstboot' to your boot args.\" 0 0"
     eval $go
 }
 
-#firstboot_dryrun=y
+firstboot_dryrun=y
 firstboot_wizard()
 {
     dlg_welcome || return
     # get hostname
     if ! dlg_hostname; then
         dlg_exit; return
-    elif [ -n "$firstboot_dryrun" ] && [ "$(cat /sysroot/etc/hostname)" != "$HOSTNAME" ]; then
+    elif [ -z "$firstboot_dryrun" ] && [ "$(cat /sysroot/etc/hostname)" != "$HOSTNAME" ]; then
         # update if actually different
         echo $HOSTNAME > /sysroot/etc/hostname
         $CHROOT dbus-uuidgen > /sysroot/etc/machine-id
@@ -579,32 +581,32 @@ firstboot_wizard()
     # get root pw
     if ! dlg_pw_loop root; then
         dlg_exit; return
-    elif [ -n "$firstboot_dryrun" ]; then
+    elif [ -z "$firstboot_dryrun" ]; then
         echo -e "$PW\n$PW2" | $CHROOT passwd root
     fi
     # get localadmin pw, then create that user
     if ! dlg_pw_loop localadmin; then
         dlg_exit; return
-    elif [ -n "$firstboot_dryrun" ]; then
+    elif [ -z "$firstboot_dryrun" ]; then
         $CHROOT useradd -c "Local Administrator" -G adm,sudo,cdrom,dip,plugdev -m -s /bin/zsh localadmin
         echo -e "$PW\n$PW2" | $CHROOT passwd localadmin
     fi
     # timezone
-    if [ -n "$firstboot_dryrun" ]; then
-        $CHROOT dpkg-reconfigure tzselect
+    if [ -z "$firstboot_dryrun" ]; then
+        $CHROOT dpkg-reconfigure tzdata
     fi
     # locale
-    if [ -n "$firstboot_dryrun" ]; then
-        dpkg-reconfigure locales
+    if [ -z "$firstboot_dryrun" ]; then
+        $CHROOT dpkg-reconfigure locales
     fi
     # networking
     if ! dlg_networking; then
         dlg_exit; return
-    elif [ -n "$firstboot_dryrun" ]; then
+    elif [ -z "$firstboot_dryrun" ]; then
         configure_networking $NETWORKING
     fi
     dlg_done
-    if [ -n "$firstboot_dryrun" ]; then
+    if [ -z "$firstboot_dryrun" ]; then
         touch /sysroot/$FIRSTBOOT_DONE_FILE
     fi
 }
@@ -837,7 +839,7 @@ decho2 "shell_mountdevs=$shell_mountdevs"
 decho2 "shell_sqshprep=$shell_sqshprep"
 decho2 "shell_mountoverlay=$shell_mountoverlay"
 decho2 "maint=$maint"
-decho3 "firstboot=$firstboot"
+decho2 "firstboot=$firstboot"
 decho2 "hoststamp=$hoststamp"
 decho2 "sqsh_layers=$sqsh_layers"
 decho2 "sqsh_layerdev=$sqsh_layerdev"
