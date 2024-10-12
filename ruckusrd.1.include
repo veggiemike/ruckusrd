@@ -1,3 +1,242 @@
+[Squashfs Layers]
+
+As always, the default behavior of the \fIlinuxrc\fP script will be to assemble
+a traditional root filesystem and switch over to it.  However, it also supports
+a special squashfs layering mechanism for quickly creating new systems.
+
+If \fBsqsh_layers=layer2:layer1\fP is provided on the kernel command line,
+\fBlayer1.sqsh\fP will be mounted at \fI/layer1\fP, \fBlayer2.sqsh\fP at
+\fI/layer2\fP, etc.  These layers will then be used as the "lower layers" for an
+OverlayFS mount.  Note that OverlayFS stacks lower layers from right to left
+(i.e., \fBlayer2\fP is stacked on top of \fBlayer1\fP).
+
+The "upper layer" is for read-write functionality.  Unless overriden via other
+parameters, a speical \fBupper\fP directory on the provided root device will be
+used.
+
+After switching root, this will result in the rootdev being at
+\fB/mnt/root-true\fP with each read-only squashfs layer being mounted at
+\fB/mnt/sqsh_layer-NAME\fP.  Since the upper layer needs to be writable, the
+rootdev will be mounted read-write (unless \fBram_layer\fP, see \fBBOOT
+PARAMETERS\fP).
+
+All the squashfs image files are expected to be on the root of the specified
+root device (unless \fBsqsh_layerdev\fP, see \fBBOOT PARAMETERS\fP).
+
+[firmware]
+Yah, do it
+
+[microcode]
+And this, too
+
+[boot parameters]
+Initramfs created with \fIruckusrd\fP will handle the following kernel command
+line parameters, provided in groupings based on use-case.
+
+.SS Regular/Common
+
+.TP "\w'\fBsqsh_layerdev\fR=\fBDEV\fR'u+1n"
+\fBblacklist\fR=\fBMODULE\fR
+Add the specified \fBMODULE\fR to the system's kernel module blacklist file, to
+prevent it from being autoloaded by udev.
+
+.TP
+\fBinit\fR=\fBINIT\fR
+Provide path to alternate init binary, \fBINIT\fP.
+
+.TP
+\fBquiet\fR
+Don't make any terminal output if you can help it.  Most distros use this as a
+default boot parameter as to not interupt graphical boot screens.
+
+.TP
+\fBroot\fR=\fBDEVSPEC\fR
+The single most important boot parameter!  Specify where the root filesystem is
+located, so we can use it!  \fBDEVSPEC\fB can be a plain device name, or you
+can specify a filesystem label (\fILABEL\fR=), filesystem UUID (\fIUUID\fR=),
+CD/DVD-ROM label (\fICDLABEL\fR=), or ZFS dataset (\fIZFS\fR=).
+
+.TP
+\fBrootflags\fR=\fBFLAGS\fR
+Specify extra \fBFLAGS\fP for mounting the root device.
+
+.TP
+\fBrootfstype\fR=\fBFSTYPE\fR
+Explicitly state the \fBFSTYPE\fP of the root device, instead of auto-detecting.
+
+.TP
+\fBrw\fR
+Leave the sysroot mounted read-write before handing off to sysroot's init
+system.  Most init systems expect sysroot to be read-only when they start (and
+that's the default behavior of \fIruckusrd\fP initramfs), but sometimes you
+need this.
+
+.TP
+\fBverbose\fR
+Make the \fIlinuxrc\fP script be extra verbose, the exact opposite of
+\fBquiet\fP.  This is \fIvery\fP noisy, so be warned.
+
+
+.SS Squashfs Layers
+
+.TP "\w'\fBsqsh_layerdev\fR=\fBDEV\fR'u+1n"
+\fBoverlayflags\fR=\fBFLAGS\fR
+Specify extra \fBFLAGS\fP for mounting the Overlay File System.
+
+.TP
+\fBram_layer\fR=\fBSIZE\fR
+Use RAM for the upper layer.  This will result in tmpfs of the requested \fBSIZE\fP
+mounted at \fB/upper\fP.  Any valid value for the tmpfs \fBsize\fP option can be
+specified (e.g., 2G, 50%).  Since rootdev will no longer need to be writable,
+it will be mounted read-only.
+
+.TP
+\fBroot_true_rw\fR
+Similar to \fBrw\fP, leave the root-true device mounted read-write before
+handing off to sysroot's init system.
+
+.TP
+\fBsqsh_layerdev\fR=\fBDEV\fR
+Use \fBDEV\fP as an alternate device for locating the sqsh layers.  \fBDEV\fP
+will be mounted read-only.  This is primarily for supporting sharing of a
+read-only device between multiple virtual machines which all have their own
+dedicated rootdev for the upper layer.
+
+\fINOTE:\fP This causes us to look at rootdev AND THEN sqsh_layerdev for named
+layers.  This way, we'll be able to have shared base images w/ host-specific
+extra layers.  Otherwise, if a host with lots of changes decides to create a
+new layer, it would have to have write access to sqsh_layerdev (which it almost
+definately does not have).
+
+\fINOTE:\fP This option cannot be used along with \fBto_ram\fP because... why
+would you do that?  The point of \fBto_ram\fP is allowing for removal of the
+root device after boot.  To use \fBto_ram\fP with a separate sqshdev would work
+in theory, as long as we copy layers from the correct path, but how many
+different pieces of removable media are really going to require at bootup?
+More than 1?  I see no use-case for that.
+
+.TP
+\fBsqsh_layerdir\fR=\fBDIR\fR
+Use \fBDIR\fP as the relative path to the images provided via
+\fBsqsh_layers\fP.  This is so that the layers can be located somewhere other
+than at the root of the specified device.
+
+.TP
+\fBsqsh_layers\fR=\fBSQSH_LAYERS\fR
+Specifiy tiered list of lower layers to be used along with a read-write upper
+layer (on the \fBroot\fP device) in an OverlayFS mount to be userd as the
+sysroot.  See \fBSQUASHFS LAYERS\fP for more details.
+
+.TP
+\fBsqshfstype\fR=\fBFSTYPE\fR
+Explicitly state the \fBFSTYPE\fP of the \fBsqsh_layerdev\fP device, instead of
+auto-detecting.
+
+.TP
+\fBto_ram\fR
+Used in conjunction with \fBram_layer\fP, causes the entire contents of the
+rootdev to be loaded into RAM, so you can safely unmount the root device (i.e.,
+if it's a USB stick or DVD-ROM).  Obviously, this requires a small root dev or
+a large ammount of RAM... or both.
+
+
+.SS Initramfs Debugging
+
+.TP "\w'\fBsqsh_layerdev\fR=\fBDEV\fR'u+1n"
+\fBshell\fR
+Drop to a shell as soon as \fIlinuxrc\fP script starts, before doing anything,
+not even udev rule creation.  As a regular user, you never want this.  It's
+convenient for testing and development of the \fIlinuxrc\fP script, though.  In
+fact, there are more \fBshell_*\fP breakpoints scattered through \fIlinuxrc\fP... go
+grep for them.
+
+.SS Maintenance
+
+.TP "\w'\fBsqsh_layerdev\fR=\fBDEV\fR'u+1n"
+\fBmaint\fR
+Drop to a maintenance shell AFTER assembling \fI/sysroot\fP, just prior handing
+off control to \fI/sysroot\fP's init system.  When this shell exits, sysroot
+boot continues.  This gives you a convenient way to interrupt boot to fix
+something silly, then continue booting w/out even having to fully reboot.
+
+.SS Other Super Cool Options
+
+.TP "\w'\fBsqsh_layerdev\fR=\fBDEV\fR'u+1n"
+\fBfirstboot\fR
+Prior to handing control over to sysroot, run our embedded
+\fIfirstboot_wizard\fP to pre-configure a bunch of things for the first boot of
+a new system.  Even if \fBfirstboot\fP is specified, if
+\fI.ruckusrd_firstboot_done\fP exists at the root of the sysroot filesystem,
+\fIfirstboot_wizard\fP will be skipped.
+
+.TP
+\fBfwdev\fR=\fBFWDEV\fR
+Specify a device containing \fIfw.sqsh\fP.  If found, this squashfs image is
+mounted on \fI/lib/firmware\fP to provide firmware to modules loaded during the
+initramrd stage (e.g., video cards, ethernet cards).  Not only does this ensure
+that all the firmware needed for any potentially loaded modules (i.e., if you
+want networking during a \fBmaint\fP session) is present, it also makes
+updating firmware independent of the initrd or kernel upgrade process.  A giant
+\fIfw.sqsh\fP is built in \fIruckusrd/subprojects/fw.sqsh\fP out of ALL the
+latest firmware, but isn't installed (it is quite large).  Alternatively, you
+can create a machine-specific set of firmware with \fBfirmwarenator\fP(1).
+
+.TP
+\fBhoststamp\fR
+Append a timestamp to system hostname.  Probably only desired when using
+\fBram_layer\fP and/or \fBto_ram\fP to boot a bunch of systems from a common
+image (i.e., an installer or live-disk).
+
+.TP
+\fBinitramsys\fR
+Completely ignore sysroot. Invoke the initramfs's init instead, and you've got
+a fully functional embedded system (complete with networking and multiple TTYs
+to login on) w/out any root device.
+
+.TP
+\fBmodinject\fR
+Inject kernel modules (and kernel header files) from the initramfs into the
+sysroot.  This ensures that the same modules exist post bootup that exist
+during initrd, and removes the requirement of installing kernel modules prior
+to booting a new kernel.
+
+[Kernel command line examples]
+Regular system
+.ft B
+
+	root=/dev/sda1 quiet
+.ft R
+
+Regular system w/ extra cool fun features
+.ft B
+
+	root=LABEL=rootishness quiet firstboot modinject fwdev=LABEL=firmware
+.ft R
+
+Squashfs layers, read-write upper on rootdev
+.ft B
+
+	root=/dev/sda1 sqsh_layers=extra:server:base
+.ft R
+
+Squashfs layers, read-write upper on rootdev but sqsh_layers on alternate read-only device
+.ft B
+
+	root=/dev/xvda1 sqsh_layerdev=/dev/xvdb1 sqsh_layers=extra:server:base
+.ft R
+
+Squashfs layers, read-only rootdev, RAM upper layer
+.ft B
+
+	root=/dev/sda1 sqsh_layers=extra:server:base ram_layer=50%
+.ft R
+
+Squashfs layers, unmounted/removable rootdev, RAM upper layer
+.ft B
+
+	root=/dev/sda1 sqsh_layers=extra:server:base ram_layer=50% to_ram
+.ft R
+
 [files]
 .TP
 .I /etc/ruckusrd.conf
@@ -8,3 +247,12 @@ User config file, which is read last.
 .TP
 .I /boot/ucode.img
 Default path to microcode image to be prepended to generated initrd file.
+.TP
+.I /.ruckusrd_firstboot_done
+Prevents \fIfirstboot_wizard\fP from running even if \fBfirstboot\fP boot
+parameter was specified.
+
+[see also]
+\fBfirmwarenator\fP(1),
+\fBmicrocodenator\fP(1),
+\fBkernel-builder\fP(1)

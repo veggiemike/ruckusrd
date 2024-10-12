@@ -62,7 +62,7 @@ Strengths:
 
  5.  Firmware loading made easy.  RuckusRD initramfs images can have an
      appropriate `fw.img` (e.g., created with `firmwarenator`) appended to them, or
-     even better you can use `FWDEV=disk` on the kernel commandline to specify a
+     even better you can use `fwdev=DISK` on the kernel commandline to specify a
      device containing `fw.sqsh`.  This makes updating firmware independent of
      the initrd or kernel upgrade process.  A giant `fw.sqsh` is built in
      `subprojects/fw.sqsh` out of ALL the latest firmware, but isn't installed.
