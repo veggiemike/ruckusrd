@@ -30,110 +30,71 @@
    using the same option as something in the kernel or systemd.  A couple
    should probably stay unprefixed (e.g., root=, quiet).
 
- - Once we've got our initrd acting as a kernel-installer (via modinject), we
-   could also add code to do the new sqsh_layer prep and have it work as a full
-   blown system installer.  Assuming the user has already created an upper
-   layer device and specified it as root=whatever, we could automatically do
-   the following:
-
-   1. create new /etc/hostname
-   2. create new /etc/mailname
-   3. sed hostname and domain into /etc/postfix/main.cf
-   4. create new /etc/machine-id
-   5. remove /var/log/journal/*
-   6. create new /etc/fstab
-   7. clean out NetworkManager connections (maybe?)
-   8. dpkg-reconfigure locale, tzdata, postfix, ...?
-
-   Of course, if we do that... it will really be distro specific.  So far, the
-   things that would get tweaked are pretty generic... it might actually work
-   in most distros.
-
-   We could even go as far as creating logvol and EXT4 fs to match
-   root=whatever if needed.  That would make installation via pre-existing
-   squashfs image super duper trivial: 1) boot up off USB stick, pick "Install
-   system" option in syslinux menu, either edit the kernel commandline to
-   provide root=whatever, hostname, domainname, or add a couple prompts during
-   boot.  Done.
-
-   When installing on a blank system, we would also have to setup boot.
-   Install syslinux (either for EFI or BIOS), install the kernel files, install
-   the squashfs.img locally somewhere, etc.
-
-
-* For 0.22
-
  - Consider adding `rescue` to kick-off a dialog-based rootfs recovery of some
    sort?  Or maybe just add a /bin/rescue script to run via `initramsys` shell?
 
- - If we consider using initramsys for maint moving forward, can we kill init
-   and switchroot to /sysroot still?  Or does the fact that we started init
-   really preclude us from continuing to boot into sysroot?
-
- - Consider adding `ruckusmaint` to create a maint shell using initramfs init
-   (like `initramsys`) but with the the sysroot assembled and mounted read-only
-   at /sysroot.  This gives us more functionality in our maint shell (e.g.,
-   multiple ttys to work from), but would no longer continue to boot the
-   sysroot on exit.
-
-   Could alternatively add a mount_sysimage script to /bin and tell the user
-   about it via /etc/motd.  (in which case, we'll want the sysroot udev rules
-   after all).
-
- - Consider trying some of the future sqsh_layer managenment stuff from
-   docs/sqsh_layers.txt from our new initramsys shell?  All the stuff that's got
-   a "hmm, really have to reboot" or "archiving a live read-write filesystem is
-   bad" caveat...?  Perhaps add all those proposed commands as initramfs boot
-   params?  Or just add commands to initramfs to do the work?
-
- - Boot parameter to assemble sqsh_layers but then use the overlay as a source
-   to install from.  This is probably the simplest installation mechanism.  This
-   way we can boot from sqsh_layers for a first boot, but then immediately turn
-   the system into a non-sqsh system.  We get the best of both worlds, quick
-   cloning of tons of systems but they have zero odd quirks after first boot.
-
-   For long-lasting systems, constantly installing updates, doing regular work,
-   etc, eventually results in essentially the entire collection of sqsh_layers
-   being replaced in upper with new files.  So keeping the original sqsh_layers
-   around and overlaying eventually turns into a bit of a resource (cpu and
-   space) waste.
-
  - Udev rules to rename network interfaces like systemd, so pre-boot network
-   config can actuall have the right device names?
+   config can actually have the right device names?
 
    https://systemd.io/PREDICTABLE_INTERFACE_NAMES/
    https://wiki.archlinux.org/title/Network_configuration#Change_interface_name
 
 
-* For 0.21
+* proposed for 0.23
 
- - Manpage section detailing all the boot-time parameters (e.g., initramsys).
-   Should probably have a section describing firmware and microcode handling as
-   well.  Some of this info might be in docs/* already.  Perhaps additional
-   pages, like ruckusrd-squashfs, ruckusrd-firmware, ruckusrd-params to go
-   along with the existing help2man generated manpage (with a See Also section
-   added)?
+ - For long-lasting systems, constantly installing updates, doing regular work,
+   etc, eventually results in essentially the entire collection of sqsh_layers
+   being replaced in upper with new files.  So keeping the original sqsh_layers
+   around and overlaying eventually turns into a bit of a resource (cpu and
+   space) waste.
 
- - Maybe a `firstboot` target to prompt for hostname, root pw, localadmin pw,
-   dpkg-reconfigure (tzdata, locales), create basic networking, etc?  Might
-   have to run during boot in the sysroot as opposed to running in the initrd
-   stage so that things like nmcli will work...  dpkg-reconfigure does work in
-   initrd, so that much is certainly doable.  Ooh, I can create NM files in
-   /etc/NetworkManager/system-connections using nmcli --offline, so no need to
-   run in sysroot.  Good.
+   Instead of doing sqsh-commit and sqsh-merge, the user may choose to
+   "un-sqsh_layer" back into a "regular" root filesystem.  Perhaps provide
+   sqsh_layers2regular and regular2sqsh_layers?
 
-   Given that the boot scripts on `sysroot` might (probably) rename eth0 to
-   something supposedly more meaningful, perhaps we shouldn't attempt network
-   configuration during initramfs.  In Ubuntu 24.04, eth0 gets renamed enX0 for
-   xen domUs...
+ - Sqsh_layer maintenance scripts for all the things that require rebooting.
 
-   We could give a warning about device names probably changing post-boot
-   (thanks systemd) and allow for some generic canned configs to choose from:
-   Xen VM trunk w/ vlan20 interface (enX0), Trunk w/ vlan20 interface (eno1),
-   Bonded Trunk w/ vlan20 interface (ens1f0, ens1f2), Xen Bridge on Bonded
-   Trunk w/ vlan20 interface (eno1, eno2).  These are intended as a starting
-   point, all using DHCP, expecting a little post-boot tweaking.
+   In particular, sqsh-commit (to create new sqsh from upper) and sqsh-merge (to
+   merge all lower layers into a single sqsh).  And actually, maint might make
+   more sense... since it will have all the layers mounted.  Although, if we
+   want to do a full reboot after re-layering (to ensure the bootloader cfg
+   changes happens before continuing), that won't work via maint, so initramsys
+   would be better suited.
 
-   If I do this, how do I ensure that we don't run again?  I suppose leave a
-   /.ruckusrd_firstboot file behind?
+   Would still have to tackle the "now go update your bootloader config"
+   dilemma.  Should we sed changes into extlinux.conf, syslinux.conf, or
+   reconfigure grub?  Sounds dicey.  I suppose printing out a message telling
+   the user EXACTLY what to go put in their bootloader config is the best
+   compromise.  Or we could *attempt* to find syslinux.conf and sed changes in
+   there if found, otherwise tell the user what to change?  Worst case, they
+   don't do it, and their system doesn't boot?
 
+
+* for 0.22
+
+ - Command line configuration for initramsys network interfaces and autostart
+   sshd.  We won't have to wory about eth0 name, because systemd won't be
+   messing with it.  Although, we have the traditional "which NIC is eth0"
+   problems... but 99% of the time it will be eth0.  All of these modes will use
+   DHCP, and will imply initramsys to keep your cmd line from getting too
+   cluttered: initramsys-net[=VLAN=ID|...]
+
+ - Add a mount_sysimage script to /bin and tell the user about it via /etc/motd.
+   (in which case, we'll want the sysroot udev rules after all).
+ 
+ - Add an install_on_zpool script to configure zfs datasets for a sqsh_layer
+   system.  Dialog to pick topmost layer.  Crete zpool/root, zpool/sqsh,
+   zpool/home, and maybe zpool/scrap.  Install layers into zpool/sqsh.
+   
+   Configure syslinux.  Configure EFI bootloader.  Hmm... how do we detect the
+   need (i.e., because there's no need inside a Xen PVH domain)?  I suppose
+   efibootmgr failing would do it...
+
+   Could include a corresponding boot param to automate the bootup into
+   installer process.  This should run w/out root disk setup, a la initramsys.
+   Could call it initramsys-installer.  Probably actually run as an init script
+   inside the initramsys embedded system.
+
+   If we start automatically, there's no time for user to create a zpool... so
+   we'll have to ask them to and drop to a shell.  Also, we may have to
+   partition a disk to create ESP (and swap?)

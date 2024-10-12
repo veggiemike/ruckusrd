@@ -7,6 +7,13 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
 - Upgraded all subprojects to latest available versions as of 10/10/24.
 - Support sqsh_layer= and sqsh_layerdev= when using ZFS
+- Added firstboot_wizard, which runs if `firstboot` boot parameter is present
+  (and if /sysroot/.ruckusrd_firstboot_done hasn't been created yet).  So far,
+  it sets hostname, generates a new system uuid, sets root password, adds
+  localadmin user, sets localadmin password, sets timezone, sets locale, and
+  helps install some close-to-correct NetworkManager connection files.
+- Added a ton of info to the ruckusrd.1 manpage (e.g., boot parameters,
+  sqsh_layer explanation, usage examples, see also).
 
 * v0.20.1
 2024-10-04: RuckusRD v0.20.1
