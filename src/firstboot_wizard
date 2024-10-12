@@ -45,8 +45,8 @@ dlg_pw2()
 
 dlg_pw_check()
 {
-    dlg_pw $1 || return $?
-    dlg_pw2 $1 || return $?
+    dlg_pw $1 || return 42
+    dlg_pw2 $1 || return 42
     [ "$PW" = "$PW2" ] && [ -n "$PW" ]
 }
 
@@ -65,13 +65,13 @@ dlg_pw_loop()
     while [ -z "$PW" ]; do
         dlg_pw_check $1
         res=$?
-        if [ $res -eq 1 ]; then
-            PW=
-            dlg_pw_mismatch || return $?
-        elif [ $res -ne 0 ]; then
+        if [ $res -eq 42 ]; then
             echo "cancelled"
             PW=
             return $res
+        elif [ $res -ne 0 ]; then
+            PW=
+            dlg_pw_mismatch || return $?
         fi
     done
 }
@@ -142,7 +142,7 @@ configure_networking()
             $CHROOT nmcli --offline connection add type bond-slave ifname eno1 master bond0 \
                     > /sysroot/etc/NetworkManager/system-connections/eno1.nmconnection
             $CHROOT nmcli --offline connection add type bond-slave ifname eno2 master bond0 \
-                    > /sysroot/etc/NetworkManager/system-connections/eno1.nmconnection
+                    > /sysroot/etc/NetworkManager/system-connections/eno2.nmconnection
             # bond0
             $CHROOT nmcli --offline connection add type bond con-name bond0 mode active-backup \
                     connection.master xenbr0 connection.slave-type bridge \
@@ -190,23 +190,17 @@ firstboot_wizard()
 {
     dlg_welcome || return
     # get hostname
-    if ! dlg_hostname; then
-        dlg_exit; return
-    elif [ -z "$firstboot_dryrun" ] && [ "$(cat /sysroot/etc/hostname)" != "$HOSTNAME" ]; then
+    if dlg_hostname && [ -z "$firstboot_dryrun" ] && [ "$(cat /sysroot/etc/hostname)" != "$HOSTNAME" ]; then
         # update if actually different
         echo $HOSTNAME > /sysroot/etc/hostname
         $CHROOT dbus-uuidgen > /sysroot/etc/machine-id
     fi
 1    # get root pw
-    if ! dlg_pw_loop root; then
-        dlg_exit; return
-    elif [ -z "$firstboot_dryrun" ]; then
+    if dlg_pw_loop root && [ -z "$firstboot_dryrun" ]; then
         echo -e "$PW\n$PW2" | $CHROOT passwd root
     fi
     # get localadmin pw, then create that user
-    if ! dlg_pw_loop localadmin; then
-        dlg_exit; return
-    elif [ -z "$firstboot_dryrun" ]; then
+    if dlg_pw_loop localadmin && [ -z "$firstboot_dryrun" ]; then
         $CHROOT useradd -c "Local Administrator" -G adm,sudo,cdrom,dip,plugdev -m -s /bin/zsh localadmin
         echo -e "$PW\n$PW2" | $CHROOT passwd localadmin
     fi
@@ -219,10 +213,8 @@ firstboot_wizard()
         $CHROOT dpkg-reconfigure locales
     fi
     # networking
-    if ! dlg_networking; then
-        dlg_exit; return
-    elif [ -z "$firstboot_dryrun" ]; then
-        configure_networking $NETWORKING
+    if dlg_networking && [ -z "$firstboot_dryrun" ]; then
+        configure_networking "$NETWORKING"
     fi
     dlg_done
     if [ -z "$firstboot_dryrun" ]; then
@@ -231,4 +223,4 @@ firstboot_wizard()
 }
 
 
-firstboot_wizard
+[ -f /sysroot/$FIRSTBOOT_DONE_FILE ] || firstboot_wizard

@@ -20,7 +20,7 @@ install-exec-hook:
 uninstall-local:
 	rm -f $(DESTDIR)$(bindir)/mkinitrd
 
-initramfs.cpio.xz: ../Makefile ruckusrd.prep linuxrc ../subprojects/busybox.tar ../subprojects/util-linux.tar ../subprojects/eudev.tar ../subprojects/mdadm.tar ../subprojects/lvm2.tar ../subprojects/e2fsprogs.tar ../subprojects/squashfs-tools.tar ../subprojects/zfs.tar ../subprojects/syslinux.tar ../subprojects/dropbear.tar ../subprojects/rsync.tar ../subprojects/efibootmgr.tar ../subprojects/groff.tar ../subprojects/zstd.tar ../subprojects/less.tar
+initramfs.cpio.xz: ../Makefile ruckusrd.prep linuxrc firstboot_wizard ../subprojects/busybox.tar ../subprojects/util-linux.tar ../subprojects/eudev.tar ../subprojects/mdadm.tar ../subprojects/lvm2.tar ../subprojects/e2fsprogs.tar ../subprojects/squashfs-tools.tar ../subprojects/zfs.tar ../subprojects/syslinux.tar ../subprojects/dropbear.tar ../subprojects/rsync.tar ../subprojects/efibootmgr.tar ../subprojects/groff.tar ../subprojects/zstd.tar ../subprojects/less.tar
 	./ruckusrd.prep
 
 

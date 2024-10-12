@@ -1499,9 +1499,17 @@ fi
 # unmount fw.sqsh if we mounted it
 [ -n "$fwsqsh" ] && umount /lib/firmware
 
+# FIXME: This works well enough now, I'm considering making it on by
+#        default... perhaps with a 'nofirstboot' to disable it, although that
+#        seems like overkill...
+#
 if [ -n "$firstboot" ]; then
     mount -o remount,rw /sysroot
-    firstboot_wizard
+    # NOTE: When run directly by init, any keypress (including arrow keys)
+    #       causes an error exit... but if you run it by hand immediately
+    #       afterwards, it works fine.  Running via the setsid cttyhack like we
+    #       do for our bash sessions seems to fix it.
+    setsid cttyhack env LESS=-cMR firstboot_wizard || echo -n # so exit doesn't trip emergency_shell
     mount -o remount,ro /sysroot
 fi
 
