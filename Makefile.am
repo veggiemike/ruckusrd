@@ -28,6 +28,8 @@ distclean-local:
 ruckusrd.1: $(srcdir)/src/ruckusrd config.log $(srcdir)/ruckusrd.1.include
 	help2man -o $@ --no-info --include $(srcdir)/ruckusrd.1.include $<
 
+ruckusrd.1.md: $(srcdir)/ruckusrd.1
+	pandoc --from man --to gfm < $< > $@
 
 # i know this isn't the right way to do this... but it's how i've been
 # occasionally making .pkg files to install, now documented/automated

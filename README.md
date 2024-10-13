@@ -69,34 +69,10 @@ Strengths:
      Alternatively, you can create a machine-specific set of firmware with
      `firmwarenator`.
 
-See [docs](docs/) for more ramblings.  ;-)
+See the [manpage](ruckusrd.1.md) for more details, or [docs](docs/)
+for more developmental ramblings.  ;-)
 
 Get the latest and greatest from https://github.com/sourceruckus/ruckusrd and
-take a gander at the sister utilities firmwarenator and microcodenator at
+take a gander at the sister utilities `firmwarenator` and `microcodenator` at
 https://github.com/sourceruckus/firmwarenator and
 https://github.com/sourceruckus/microcodenator.
-
-<pre>
-usage: ruckusrd OPTIONS <out-initrd-image> <kernel-version>
-
-  -h, --help                  Show this help message and exit.
-
-  -V, --version               Show version string and exit.
-
-  -v, --verbose               Show verbose output.
-
-  -f, --force                 Force overwrite existing file.
-
-  -b, --basedir BASEDIR       Use BASEDIR as prefix to all paths.
-
-  -c, --compressor COMPMODE   Pick compressor mode.  Valid options are 'best'
-                              and 'fast'.  Default is 'fast'.
-
-  -o, --options LINUXRCOPTS   Specifiy runtime options to pass to the linuxrc
-                              init script in the generated initramfs.
-
-  -U, --with-ucode UCODE_IMG  Include ucode.img in generated initramfs.  Default
-                              is /boot/ucode.img
-
-example: ruckusrd /boot/myinitramfs.img `uname -r`
-</pre>
