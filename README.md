@@ -56,9 +56,10 @@ Strengths:
      networking utilities, rsync, ssh, and fsarchiver.
 
  4.  Easy microcode loading/updating.  Initramfs images created w/ RuckusRD
-     automatically include /boot/ucode.img (subprojects/ucode.img gets
-     generated out of ALL the latest Intel and AMD microcode but not installed,
-     or you can generate a machine-specific version with microcodenator).
+     automatically include `/boot/ucode.img` (`subprojects/ucode.img` gets
+     generated out of ALL the latest Intel and AMD microcode as a convenience
+     but not installed, or you can generate a machine-specific version with
+     `microcodenator`).
 
  5.  Firmware loading made easy.  RuckusRD initramfs images can have an
      appropriate `fw.img` (e.g., created with `firmwarenator`) appended to them, or
