@@ -23,11 +23,21 @@ PARAMETERS\fP).
 All the squashfs image files are expected to be on the root of the specified
 root device (unless \fBsqsh_layerdev\fP, see \fBBOOT PARAMETERS\fP).
 
-[firmware]
-Yah, do it
+[firmware handling]
+RuckusRD initramfs images can have an appropriate \fIw.img\fP (e.g., created
+with \fBfirmwarenator\fP(1)) appended to them, or even better you can use
+\fBfwdev\fP on the kernel commandline to specify a device containing
+\fIfw.sqsh\fP.  This method of firmware management makes updating system
+firmware independent of the initrd or kernel upgrade process.  A giant
+\fIfw.sqsh\fP is built in \fIruckusrd/subprojects/fw.sqsh\fP out of ALL the
+latest firmware, but isn't installed (it is quite large).
 
-[microcode]
-And this, too
+[microcode handling]
+Initramfs images created w/ RuckusRD automatically include
+\fI/boot/ucode.img\fP (\fIsubprojects/ucode.img\fP gets generated out of ALL
+the latest Intel and AMD microcode as a convenience but not installed, or you
+can generate a machine-specific version with \fBmicrocodenator\fP(1)).
+
 
 [boot parameters]
 Initramfs created with \fIruckusrd\fP will handle the following kernel command
@@ -173,13 +183,7 @@ a new system.  Even if \fBfirstboot\fP is specified, if
 \fBfwdev\fR=\fBFWDEV\fR
 Specify a device containing \fIfw.sqsh\fP.  If found, this squashfs image is
 mounted on \fI/lib/firmware\fP to provide firmware to modules loaded during the
-initramrd stage (e.g., video cards, ethernet cards).  Not only does this ensure
-that all the firmware needed for any potentially loaded modules (i.e., if you
-want networking during a \fBmaint\fP session) is present, it also makes
-updating firmware independent of the initrd or kernel upgrade process.  A giant
-\fIfw.sqsh\fP is built in \fIruckusrd/subprojects/fw.sqsh\fP out of ALL the
-latest firmware, but isn't installed (it is quite large).  Alternatively, you
-can create a machine-specific set of firmware with \fBfirmwarenator\fP(1).
+initramrd stage (e.g., video cards, ethernet cards).
 
 .TP
 \fBhoststamp\fR
