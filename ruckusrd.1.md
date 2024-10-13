@@ -1,6 +1,6 @@
 # NAME
 
-Ruckusrd - manual page for Ruckusrd 0.21.0
+Ruckusrd - manual page for Ruckusrd 0.22.0-dev
 
 # DESCRIPTION
 
@@ -68,13 +68,22 @@ All the squashfs image files are expected to be on the root of the
 specified root device (unless **sqsh_layerdev**, see **BOOT
 PARAMETERS**).
 
-# FIRMWARE
+# FIRMWARE HANDLING
 
-Yah, do it
+RuckusRD initramfs images can have an appropriate *w.img* (e.g., created
+with **firmwarenator**(1)) appended to them, or even better you can use
+**fwdev** on the kernel commandline to specify a device containing
+*fw.sqsh*. This method of firmware management makes updating system
+firmware independent of the initrd or kernel upgrade process. A giant
+*fw.sqsh* is built in *ruckusrd/subprojects/fw.sqsh* out of ALL the
+latest firmware, but isn't installed (it is quite large).
 
-# MICROCODE
+# MICROCODE HANDLING
 
-And this, too
+Initramfs images created w/ RuckusRD automatically include
+*/boot/ucode.img* (*subprojects/ucode.img* gets generated out of ALL the
+latest Intel and AMD microcode as a convenience but not installed, or
+you can generate a machine-specific version with **microcodenator**(1)).
 
 # BOOT PARAMETERS
 
@@ -201,14 +210,7 @@ of a new system. Even if **firstboot** is specified, if
 **fwdev**=**FWDEV**  
 Specify a device containing *fw.sqsh*. If found, this squashfs image is
 mounted on */lib/firmware* to provide firmware to modules loaded during
-the initramrd stage (e.g., video cards, ethernet cards). Not only does
-this ensure that all the firmware needed for any potentially loaded
-modules (i.e., if you want networking during a **maint** session) is
-present, it also makes updating firmware independent of the initrd or
-kernel upgrade process. A giant *fw.sqsh* is built in
-*ruckusrd/subprojects/fw.sqsh* out of ALL the latest firmware, but isn't
-installed (it is quite large). Alternatively, you can create a
-machine-specific set of firmware with **firmwarenator**(1).
+the initramrd stage (e.g., video cards, ethernet cards).
 
 **hoststamp**  
 Append a timestamp to system hostname. Probably only desired when using

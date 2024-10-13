@@ -10,8 +10,11 @@ EXTRA_DIST =
 EXTRA_DIST += $(top_docs)
 EXTRA_DIST += $(deb_examples)
 EXTRA_DIST += ruckusrd.1.include
+EXTRA_DIST += ruckusrd.1.md
 
 man1_MANS = ruckusrd.1
+
+all-local: ruckusrd.1.md
 
 install-data-local:
 	$(MKDIR_P) $(DESTDIR)$(docdir)/debian
@@ -23,12 +26,12 @@ uninstall-local:
 	rm -f $(deb_examples:%=$(DESTDIR)$(docdir)/%)
 
 distclean-local:
-	rm -f $(builddir)/ruckusrd.1
+	rm -f $(builddir)/ruckusrd.1 $(builddir)/ruckusrd.1.md
 
-ruckusrd.1: $(srcdir)/src/ruckusrd config.log $(srcdir)/ruckusrd.1.include
+ruckusrd.1: $(srcdir)/src/ruckusrd $(builddir)/config.log $(srcdir)/ruckusrd.1.include
 	help2man -o $@ --no-info --include $(srcdir)/ruckusrd.1.include $<
 
-ruckusrd.1.md: $(srcdir)/ruckusrd.1
+ruckusrd.1.md: $(builddir)/ruckusrd.1
 	pandoc --from man --to gfm < $< > $@
 
 # i know this isn't the right way to do this... but it's how i've been
