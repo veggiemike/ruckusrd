@@ -83,6 +83,13 @@ m4_foreach_w([P], NEEDED_PROGS,
 AC_PATH_PROG(BASH_SHELL, bash)
 AS_IF([test "$BASH_SHELL" = ""], [AC_MSG_ERROR([Could not find bash])])
 
+# check for pandoc and disable building of markdown version of manpage
+# (only needed so we can see it on the gitweb page)
+AC_PATH_PROG(PANDOC, pandoc)
+AS_IF([test "$PANDOC" != ""], BUILD_MARKDOWN=yes, BUILD_MARKDOWN=no)
+AC_SUBST(BUILD_MARKDOWN)
+AM_CONDITIONAL([BUILD_MARKDOWN], [test x$BUILD_MARKDOWN = xyes])
+
 
 CPUCOUNT=$(grep ^vendor_id /proc/cpuinfo | wc -l)
 JOBCOUNT=$((CPUCOUNT+1))

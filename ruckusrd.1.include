@@ -24,13 +24,15 @@ All the squashfs image files are expected to be on the root of the specified
 root device (unless \fBsqsh_layerdev\fP, see \fBBOOT PARAMETERS\fP).
 
 [firmware handling]
-RuckusRD initramfs images can have an appropriate \fIw.img\fP (e.g., created
+RuckusRD initramfs images can have a traditional \fIfw.img\fP (e.g., created
 with \fBfirmwarenator\fP(1)) appended to them, or even better you can use
-\fBfwdev\fP on the kernel commandline to specify a device containing
+\fBfwdev\fP on the kernel commandline to specify a device (which can be the same
+as the root device) containing a SquashFS image of system firmware named
 \fIfw.sqsh\fP.  This method of firmware management makes updating system
 firmware independent of the initrd or kernel upgrade process.  A giant
 \fIfw.sqsh\fP is built in \fIruckusrd/subprojects/fw.sqsh\fP out of ALL the
-latest firmware, but isn't installed (it is quite large).
+latest firmware, but isn't installed (it is quite large), or you can make a
+machine-specific one (again, with \fBfirmwarenator\fP(1)).
 
 [microcode handling]
 Initramfs images created w/ RuckusRD automatically include

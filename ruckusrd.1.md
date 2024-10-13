@@ -70,13 +70,16 @@ PARAMETERS**).
 
 # FIRMWARE HANDLING
 
-RuckusRD initramfs images can have an appropriate *w.img* (e.g., created
+RuckusRD initramfs images can have a traditional *fw.img* (e.g., created
 with **firmwarenator**(1)) appended to them, or even better you can use
-**fwdev** on the kernel commandline to specify a device containing
-*fw.sqsh*. This method of firmware management makes updating system
-firmware independent of the initrd or kernel upgrade process. A giant
-*fw.sqsh* is built in *ruckusrd/subprojects/fw.sqsh* out of ALL the
-latest firmware, but isn't installed (it is quite large).
+**fwdev** on the kernel commandline to specify a device (which can be
+the same as the root device) containing a SquashFS image of system
+firmware named *fw.sqsh*. This method of firmware management makes
+updating system firmware independent of the initrd or kernel upgrade
+process. A giant *fw.sqsh* is built in *ruckusrd/subprojects/fw.sqsh*
+out of ALL the latest firmware, but isn't installed (it is quite large),
+or you can make a machine-specific one (again, with
+**firmwarenator**(1)).
 
 # MICROCODE HANDLING
 

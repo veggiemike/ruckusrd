@@ -10,11 +10,12 @@ EXTRA_DIST =
 EXTRA_DIST += $(top_docs)
 EXTRA_DIST += $(deb_examples)
 EXTRA_DIST += ruckusrd.1.include
-EXTRA_DIST += ruckusrd.1.md
 
 man1_MANS = ruckusrd.1
 
+if BUILD_MARKDOWN
 all-local: ruckusrd.1.md
+endif
 
 install-data-local:
 	$(MKDIR_P) $(DESTDIR)$(docdir)/debian
