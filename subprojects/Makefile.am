@@ -194,6 +194,11 @@ lvm2/FOO: eudev.tar
 #       at all... the pkg-config checks must be for determining paths
 #       for udev helpers.
 #
+# NOTE: Starting with jammy (and still needed in noble),
+#       fuse/fuse_common.h throws an error telling you to add
+#       -D_FILE_OFFSET_BITS=64 to your compiler flags... so we do.
+#       Seems strange, but seems to work just fine.
+#
 e2fsprogs/FOO: util-linux.tar eudev.tar
 	pushd e2fsprogs && \
 	rm -rf FOO && \
@@ -205,7 +210,8 @@ e2fsprogs/FOO: util-linux.tar eudev.tar
 	  CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid -I$$PWD/../eudev/FOO/usr/include" \
 	  LDFLAGS="-L$$PWD/../util-linux/FOO/usr/lib/ -L$$PWD/../eudev/FOO/usr/lib/" \
 	  udev_CFLAGS="-I$$PWD/../eudev/FOO/usr/include" \
-	  udev_LIBS="-L$$PWD/../eudev/FOO/usr/lib/ -ludev" && \
+	  udev_LIBS="-L$$PWD/../eudev/FOO/usr/lib/ -ludev" \
+	  CPPFLAGS="-D_FILE_OFFSET_BITS=64" && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	rm -rf FOO/usr/lib/*.a && \
