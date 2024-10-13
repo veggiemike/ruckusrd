@@ -3,7 +3,7 @@
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
 * v0.21.0
-2024-mm-dd: Ruckusrd v0.21.0 (under development)
+2024-10-13: Ruckusrd v0.21.0
 
 - Upgraded all subprojects to latest available versions as of 10/10/24.
 - Support sqsh_layer= and sqsh_layerdev= when using ZFS
