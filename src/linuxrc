@@ -777,7 +777,9 @@ if [ -n "$ZFS" ]; then
     zpool import $ZFS_POOL -N
 fi
 
-if [ -z "$thingtomount" ]; then
+# if /dev/root is a symlink, we need to wait for device hotplug to result in it
+# really pointing at a valid device
+if [ -h /dev/root ]; then
     # wait for udev symlinks to get created
     dmneeded=""
     wait_for_dev 30 "/dev/root symlink" /dev/root
@@ -792,7 +794,9 @@ if [ -z "$thingtomount" ]; then
         modprobe $rootfstype
     fi
 fi
-if [ -n "$sqsh_layerdev" ] && [ -z "$thingtomount_sqsh" ]; then
+# similarly, if we have a /dev/sqsh_layerdev symlink, we need to wait for
+# hotplug
+if [ -n "$sqsh_layerdev" ] && [ -h /dev/sqsh_layerdev ]; then
     wait_for_dev 30 "/dev/sqsh_layerdev symlink" /dev/sqsh_layerdev
 
     if [ -z "$sqshfstype" ]; then
