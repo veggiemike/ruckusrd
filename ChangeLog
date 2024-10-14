@@ -2,6 +2,11 @@
 
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
+* v0.21.1
+2024-10-14: Ruckusrd v0.21.1
+
+- Fixed silly bug causing boot failures for non-ZFS hosts
+
 * v0.21.0
 2024-10-13: Ruckusrd v0.21.0
 
