@@ -381,6 +381,57 @@ start_ruckusrd_system()
     [ -c /dev/ttyS0 ] && sed -i 's|^#ttyS0::|ttyS0::|' /etc/inittab
     [ -c /dev/hvc0 ] && sed -i 's|^#hvc0::|hvc0::|' /etc/inittab
 
+    # configure networking
+    if [ -n "initramsys_net" ]; then
+        decho "starting networking"
+        dev=eth0
+        opts=$(echo $initramsys_net_conf | sed 's|,| |g')
+        for o in $opts; do
+            case "$o" in
+                DEV=*)
+                    dev=${o#DEV=}
+                    ;;
+                IP=*)
+                    ip=${o#IP=}
+                    ;;
+                VLAN=*)
+                    vlan=${o#VLAN=}
+                    ;;
+                HOSTNAME=*)
+                    hostname ${o#HOSTNAME=}
+                    ;;
+                *)
+                    decho "ignoring invalid initramsys_net config option $o"
+                    ;;
+            esac
+        done
+        if [ -z "$ip" ] || [ "$ip" = "auto" ]; then
+            decho "will use DHCP on $dev as `hostname -s`"
+        fi
+        ip link set $dev up
+        if [ -n "$vlan" ]; then
+            vconfig add $dev $vlan
+            dev=$dev.$vlan
+        fi
+        if [ -n "$ip" ] && [ "$ip" != "auto" ]; then
+            ip addr add $ip dev $dev
+        else
+            udhcpc -i $dev -qf -F `hostname -s` >/dev/null 2>&1
+        fi
+        dropbear -RB
+    else
+        cat > /etc/motd <<"EOF"
+Welcome!  Might I suggest setting up networking and SSH access?  For example,
+to create a VLAN20 interface on eth0 using DHCP and start ssh:
+
+% vconfig add eth0 20
+% ip link set eth0 up
+% udhcpc -i eth0.20 -qf -F `hostname -s`
+% dropbear -RB
+
+EOF
+    fi
+
     # hand off control to /sbin/init
     go="exec /sbin/init"
     decho2 $go
@@ -463,6 +514,8 @@ ram_layer=""
 modinject=
 fwdev=
 initramsys=
+initramsys_net=
+initramsys_net_conf=
 
 # parse our config file, which could possibly override some of our hardcoded
 # default behavior
@@ -564,6 +617,15 @@ for o in `cat /proc/cmdline` ; do
     initramsys)
         initramsys=1
         ;;
+    initramsys-net)
+        initramsys=1
+        initramsys_networking=1
+        ;;
+    initramsys-net=*)
+        initramsys=1
+        initramsys_net=1
+        initramsys_net_conf=${o#initramsys-net=}
+        ;;
     *)
         # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
         #       max_loop=16" to get written in modprobe.conf...
@@ -626,6 +688,8 @@ decho2 "ram_layer=$ram_layer"
 decho2 "modinject=$modinject"
 decho2 "fwdev=$fwdev"
 decho2 "initramsys=$initramsys"
+decho2 "initramsys_net=$initramsys_net"
+decho2 "initramsys_net_conf=$initramsys_net_conf"
 
 
 if [ -n "$shell" ]; then

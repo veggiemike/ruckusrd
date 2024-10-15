@@ -69,15 +69,13 @@
    there if found, otherwise tell the user what to change?  Worst case, they
    don't do it, and their system doesn't boot?
 
+   Should we add kernel params to do this, too?  Like sqsh_layer-commit and
+   sqsh_layer-merge?  Have them auto-run and leave the user with a prompt to
+   update bootloader config and reboot (if non syslinux), or just go right
+   ahead and autoreboot after updating syslinux.conf (ha, don't forget to make
+   sure to remove sqsh_layer-commit and sqsh_layer-merge before rebooting)?
 
 * for 0.22
-
- - Command line configuration for initramsys network interfaces and autostart
-   sshd.  We won't have to wory about eth0 name, because systemd won't be
-   messing with it.  Although, we have the traditional "which NIC is eth0"
-   problems... but 99% of the time it will be eth0.  All of these modes will use
-   DHCP, and will imply initramsys to keep your cmd line from getting too
-   cluttered: initramsys-net[=VLAN=ID|...]
 
  - Add a mount_sysimage script to /bin and tell the user about it via /etc/motd.
    (in which case, we'll want the sysroot udev rules after all).

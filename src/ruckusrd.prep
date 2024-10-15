@@ -274,14 +274,6 @@ login as `root` or `ruckus` (unprivileged)
 EOF
 cat > initramfs/etc/motd <<"EOF"
 
-Welcome!  Might I suggest setting up networking and SSH access?  For example,
-to create a VLAN20 interface on eth0 using DHCP and start ssh:
-
-% vconfig add eth0 20
-% ip link set eth0 up
-% udhcpc -i eth0.20 -qf -F `hostname -s`
-% dropbear -RB
-
 EOF
 
 

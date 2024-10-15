@@ -196,8 +196,17 @@ image (i.e., an installer or live-disk).
 .TP
 \fBinitramsys\fR
 Completely ignore sysroot. Invoke the initramfs's init instead, and you've got
-a fully functional embedded system (complete with networking and multiple TTYs
+a fully functional embedded system (complete with wired networking and multiple TTYs
 to login on) w/out any root device.
+
+.TP
+\fBinitramsys-net[=CONFIG]\fR
+Implies \fBinitramsys\fP, but also starts networking automatically.  Valid
+config options are \fBDEV\fP=\fIdevname\fP, \fBIP\fP=\fIip/cidr\fP|\fIauto\fP],
+\fBVLAN\fP=\fIvid\fP, \fBHOSTNAME\fP=\fIname\fP and can be provided as one big
+comma-delimited argument (e.g., \fIinitramsys-net=DEV=eth0,VLAN=20\fP).  Default
+configuration is eth0, DHCP, no VLAN, w/ hostname of ruckusrd-TIMESTAMP.  The
+dropbear SSH server is started automatically as well.
 
 .TP
 \fBmodinject\fR
