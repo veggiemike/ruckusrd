@@ -9,6 +9,8 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
   enables networking and starts sshd.  Configuration can be specified as an
   arugment (e.g., `initramsys-net=DEV=eth0,VLAN=20`).  See manpage for more
   details.
+- Split most functions out of `linuxrc` into `ruckusrd-common.sh` to share with
+  other new scripts and to help facilitate development/debugging.
 
 * v0.21.1
 2024-10-14: Ruckusrd v0.21.1
