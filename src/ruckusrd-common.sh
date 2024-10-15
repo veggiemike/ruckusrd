@@ -564,8 +564,8 @@ parse_boot_params()
     fi
 
     # verbose config summary
-    decho2 "opts: $opts"
-    decho2 "opts_from_proc: $opts_from_proc"
+    decho2 "opts=$opts"
+    decho2 "opts_from_proc=$opts_from_proc"
     decho2 "init=$init"
     decho2 "initargs=$initargs"
     decho2 "root=$root"

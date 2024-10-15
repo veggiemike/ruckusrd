@@ -1,0 +1,184 @@
+#!/bin/ash
+#
+# Copyright 2012-2024 Michael D Labriola <veggiemike@sourceruckus.org>
+#
+# Licensed under the GPLv3. See the file COPYING for details. 
+#
+# This script is for mounting a sysroot from within the initramsys environment,
+# for maintenance.
+#
+# FIXME: not sure it matters, but sysroot is always mounted read-write
+#
+# FIXME: to_ram and ram_layer boot params are not honored, you just end up with
+#        an OverlayFS w/out upper (which is read-only).  i don't think that's a
+#        problem, because what kind of maintenance are you going to do to a
+#        non-retentive ram_layer?
+#
+# FIXME: this script doesn't bindmount the boot dir or move any mountpoints
+#        into /sysroot/mnt because i don't think that's needed.
+#
+
+. /ruckusrd-common.sh
+
+
+# FIXME: basing this off code from linuxrc has pointed out some inconsistencies
+#        that i don't like...
+#
+#        1. thingtomount and thingtomount_sqsh are named real_rootdev and
+#           real_sqsh_layerdev here
+#
+#        2. rootfstype is the same here, but sqshfstype is sqsh_layerdevfstype
+#
+#        3. ZFS and ZFS_POOL are overwritten... so both root and sqsh_layerdev
+#           have to be in the same zpool.  i don't think i've ever put them in
+#           different pools... but it wouldn't work if i did.
+#
+special_device_lookup()
+{
+    name=$1
+    str=$2
+
+    realdev=
+    fstype=
+    case $str in
+        CDLABEL=*)
+            # FIXME: does findfs work for CD/DVD drives?  maybe?  it doesn't
+            #        really matter for the type of maintenance i'm envisioning
+            #        using this script for... and i don't actually have a
+            #        CD/DVD drive to test with at the moment... maybe someday
+            #        i'll find out.  ha.
+            #
+            realdev=$(findfs LABEL=${str#CDLABEL=})
+            ;;
+        LABEL=*|UUID=*)
+            realdev=$(findfs $str)
+            ;;
+        ZFS=*)
+            ZFS=${str#ZFS=}
+            ZFS_POOL=${ZFS%%/*}
+            realdev=$ZFS
+            # NOTE We don't normally *need* to know fstype, it can be
+            #      autodetected at mount-time.  But when mounting zfs datasets
+            #      via 'mount' you have to specify -t zfs (if memory serves).
+            #
+            fstype=zfs
+            ;;
+        /dev/*)
+            realdev=$str
+            ;;
+    esac
+
+    # assign results to appropriate variables (so if name=root, we want to set
+    # realrootdev, etc)
+    eval real_${name}=$realdev
+    eval ${name}fstype=$fstype
+}
+
+
+mount_sysimage()
+{
+    parse_boot_params $*
+
+    # further parse root= and sqsh_layerdev= args
+    #
+    # NOTE: During normal boot, we have to wait for hotplug events to ensure
+    #       all devices exist before continuing.  Inside this script, we don't
+    #       have to do that, we can insist that they do exist as a prereq.  Now
+    #       we can just lookup devices using findfs instead of udev rules.
+    #
+    special_device_lookup root $root
+    decho2 "real_root=$real_root"
+    decho2 "rootfstype=$rootfstype"
+
+    special_device_lookup sqsh_layerdev $sqsh_layerdev
+    decho2 "real_sqsh_layerdev=$real_sqsh_layerdev"
+    decho2 "sqsh_layerdevfstype=$sqsh_layerdevfstype"
+
+    decho2 "ZFS=$ZFS"
+    decho2 "ZFS_POOL=$ZFS_POOL"
+
+    # do ZFS initialization
+    #
+    # NOTE: This ZFS var will be set to the last ZFS= argument to be parsed, so
+    #       will be set if we have ANY zfs to mount.
+    #
+    if [ -n "$ZFS" ]; then
+        modprobe zfs
+        zpool import $ZFS_POOL -N
+    fi
+
+    # autoload filesystem modules if needed
+    for x in root sqsh_layerdev; do
+        if [ -z "$(eval echo \$${x}fstype)" ]; then
+            autoload_fs_module $(eval echo \$real_${x})
+            eval ${x}fstype=$TYPE
+        else
+            modprobe $(eval echo \$${x}fstype)
+        fi
+    done
+
+    # mount sysroot
+    mkdir -p /sysroot
+    go="mount -t $rootfstype"
+    [ -n "$rootflags" ] && go="$go -o $rootflags"
+    go="$go $real_root /sysroot"
+    decho $go
+    eval $go
+    if [ "$?" != "0" ]; then
+        echo "ERROR: failed to mount rootdev"
+        return 1
+    fi
+
+    # mount sqsh_layerdev if needed
+    if [ -n "$real_sqsh_layerdev" ]; then
+        mkdir -p /sqsh_layerdev
+        go="mount -t $sqsh_layerdevfstype -o ro $real_sqsh_layerdev /sqsh_layerdev"
+        decho $go
+        eval $go
+        if [ "$?" != "0" ]; then
+            echo "ERROR: failed to mount sqsh_layerdev"
+            return 1
+        fi
+    fi
+
+    # handle sqsh_layers
+    if [ -n "$sqsh_layers" ]; then
+        # move sysroot to tmproot
+        decho "moving /sysroot to /tmproot"
+        mkdir -p /tmproot
+        mount --move /sysroot /tmproot
+
+        # mount each sqsh_layer
+        for x in $sqsh_layers_ws; do
+            mkdir -p /sqsh_layer-$x
+            go="mount -o ro,loop $(lookup_layer $x) /sqsh_layer-$x"
+            decho $go
+            eval $go
+            if [ "$?" != "0" ]; then
+                echo "ERROR: failed to mount layer $x"
+                return 1
+            fi
+        done
+
+        # mount overlay
+        mkdir -p /tmproot/upper/upper /tmproot/upper/work
+        upper=/tmproot/upper
+        lower=/sqsh_layer-${sqsh_layers//:/:/sqsh_layer-}
+        layers=lowerdir=$lower,upperdir=$upper/upper,workdir=$upper/work
+        if [ -n "$overlayflags" ]; then
+            overlayflags=$overlayflags,$layers
+        else
+            overlayflags=$layers
+        fi
+        go="mount -t overlay -o $overlayflags rootfs /sysroot"
+        decho $go
+        eval $go
+        if [ "$?" != "0" ]; then
+            echo "ERROR: failed to mount overlayfs"
+            return 1
+        fi
+    fi
+}
+
+
+[ -n "$JUST_SOURCE" ] || mount_sysimage $*
