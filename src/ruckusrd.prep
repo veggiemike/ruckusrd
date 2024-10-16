@@ -379,6 +379,7 @@ install -vp firstboot_wizard initramfs/bin/ &&
 install -vp mount_sysroot initramfs/bin/ &&
 install -vp mount_sysroot_vfs initramfs/bin/ &&
 install -vp umount_sysroot initramfs/bin/ &&
+install -vp system_installer initramfs/bin/ &&
 cp -va ruckusrd-common.sh initramfs/ &&
 cp -va ruckusrd.sh initramfs/ || exit 1
 

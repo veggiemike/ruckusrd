@@ -75,6 +75,15 @@
    ahead and autoreboot after updating syslinux.conf (ha, don't forget to make
    sure to remove sqsh_layer-commit and sqsh_layer-merge before rebooting)?
 
+ - Can ruckusrd detect a secondary ESP and keep it in sync with the primary?
+   This wouldn't be as good as automatically making them match after dorking
+   around with ESP1 (e.g., installing a new kernel, tweaking syslinux.conf),
+   but it's better than doing nothing and leaving it up to the user (in which
+   case, they'll never match)
+
+   New boot param: redundant-esp=LABEL1,LABEL2,...
+
+
 * for 0.22
 
  - Add an install_on_zpool script to configure zfs datasets for a sqsh_layer
@@ -98,3 +107,11 @@
    what?  If there's just one disk, it's obvious... Any more than that, and
    it's really too complicated to make an educated guess.  Shoot, even 1 disk
    we have to make assumptions about partitioning (e.g., ESP, swap).
+
+   I think we can take either an existing zpool, or a list of drives to make a
+   pool out of.  In that case, we're going to do either single-disk or mirrored
+   pairs (because anything else for zroot is silly), we can autodetect EFI by
+   trying to use efibootmgr, partition each disk with ESP, swap, and rest, then
+   add all the last partitions to the zpool.
+
+   initramsys-installer=IMGDEV,...  

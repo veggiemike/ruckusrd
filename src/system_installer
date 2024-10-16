@@ -1,0 +1,82 @@
+#!/bin/ash
+#
+# Copyright 2012-2024 Michael D Labriola <veggiemike@sourceruckus.org>
+#
+# Licensed under the GPLv3. See the file COPYING for details. 
+#
+
+. /ruckusrd-common.sh
+
+DLG="whiptail --backtitle 'Source Ruckus System Installer'"
+TTYSTR=$(tty)
+TTYSTR=${TTYSTR//\//-}
+ALREADY_DONE=/tmp/.system_installer_done-$TTYSTR
+
+
+dlg_welcome()
+{
+    go=$DLG
+    go="$go --title 'Welcome!'"
+    go="$go --yesno 'Welcome to the Source Ruckus System Installer!\n\nContinue?'"
+    go="$go 0 0"
+    eval $go
+}
+
+
+# FIXME: implement this
+#
+#manual_install()
+#{
+#    # check for efi - if available prompt user on wether or not we should
+#    # manage ESP creation and select disk/partition for it
+#
+#    # prompt for swap amount and disk/partition
+#
+#    # use pre-existing zpool if found?  prompt for disks/partitions to use if
+#    # not?
+#}
+
+
+auto_install()
+{
+    echo hello
+
+    # autodetect and install everything, select block devices to install on and
+    # PROMPT for confirmation
+}
+
+
+system_installer()
+{
+    dlg_welcome || return
+
+    # locate images
+
+    # prompt for uppermost layer
+
+    # prompt for auto or manual configuration
+    #
+    # FIXME: implement this.  until then, we just run auto_install
+    auto_install
+}
+
+
+if [ -z "$JUST_SOURCE" ]; then
+    # When invoked via init, we want to run once, and then give way to a normal
+    # tty.  This is accomplished by checking for the arg `once`, then if our
+    # .aleady_done file is present, we just exec the remaining args.  This way
+    # we can put something like this in inittab:
+    #
+    # tty1::respawn:/sbin/system_installer once sbin/getty 115200 tty1
+    #
+    if [ "$1" = "once" ]; then
+        shift
+        if [ -f $ALREADY_DONE ]; then
+            exec $*
+        else
+            touch $ALREADY_DONE
+        fi
+    fi
+
+    system_installer
+fi

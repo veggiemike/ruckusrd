@@ -416,6 +416,13 @@ to create a VLAN20 interface on eth0 using DHCP and start ssh:
 EOF
     fi
 
+    # enable the installer
+    if [ -n "$initramsys_installer" ]; then
+        sed -i 's|^ttyS0::respawn:/sbin/getty|ttyS0::respawn:/sbin/system_installer once /sbin/getty|' /etc/inittab
+        sed -i 's|^hvc0::respawn:/sbin/getty|hvc0::respawn:/sbin/system_installer once /sbin/getty|' /etc/inittab
+        sed -i 's|^tty1::respawn:/sbin/getty|tty1::respawn:/sbin/system_installer once /sbin/getty|' /etc/inittab
+    fi
+
     # hand off control to /sbin/init
     go="exec /sbin/init"
     decho2 $go
@@ -528,6 +535,10 @@ parse_boot_params()
                 initramsys_net=1
                 initramsys_net_conf=${o#initramsys-net=}
                 ;;
+            initramsys-installer=*)
+                initramsys=1
+                initramsys_installer=${o#initramsys-installer=}
+                ;;
             *)
                 # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
                 #       max_loop=16" to get written in modprobe.conf...
@@ -592,4 +603,5 @@ parse_boot_params()
     decho2 "initramsys=$initramsys"
     decho2 "initramsys_net=$initramsys_net"
     decho2 "initramsys_net_conf=$initramsys_net_conf"
+    decho2 "initramsys_installer=$initramsys_installer"
 }
