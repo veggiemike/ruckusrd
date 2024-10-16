@@ -11,8 +11,9 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
   details.
 - Split most functions out of `linuxrc` into `ruckusrd-common.sh` to share with
   other new scripts and to help facilitate development/debugging.
-- Added new `mount_sysroot` script to facilitate easy assembly of sysroot from
-  inside the `initramsys` environment.
+- Added new `mount_sysroot`, `mount_sysroot_vfs`, and `umount_sysroot` scripts
+  to facilitate easy assembly/disassembly of sysroot from inside the
+  `initramsys` environment.
 
 * v0.21.1
 2024-10-14: Ruckusrd v0.21.1

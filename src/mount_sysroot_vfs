@@ -13,7 +13,7 @@
 set -e
 
 if ! (grep -q /sysroot /proc/mounts); then
-    mount_sysimage $*
+    mount_sysroot $*
 fi
 
 mount proc -t proc /sysroot/proc

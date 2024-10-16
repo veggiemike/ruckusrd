@@ -11,8 +11,22 @@
 # exit immediately if a command fails
 set -e
 
+# check to see of anything was using a zpool
+zpools=
+for zp in $(zpool list -H |awk '{print $1}'); do
+    if (grep -q "^$zp" /proc/mounts); then
+        zpools="$zpools $zp"
+    fi
+done
+
+# unmount everything
 for x in /sysroot/dev/pts /sysroot/dev/shm /sysroot/dev /sysroot/proc /sysroot/sys /sysroot /sqsh_layer-* /sqsh_layerdev /tmproot; do
     if (grep -q $x /proc/mounts); then
         umount $x
     fi
+done
+
+# export any used zpools
+for zp in $zpools; do
+    zpool export $zp
 done

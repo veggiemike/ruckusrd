@@ -77,22 +77,6 @@
 
 * for 0.22
 
- - Add a mount_sysroot script to /bin and tell the user about it via /etc/motd.
-   (in which case, we'll want the sysroot udev rules after all).
-
-   Shall we re-parse /proc/cmdline, or maybe take a new command line?  For an
-   installer, which boots potentially before root devices have been configured,
-   we'd want to be able to specify new command line.  Although, I think
-   initramsys deviates from normal bootup soon enough that the kernel comand
-   line could be bogus and it wouldn't hurt.
-
-   mount_sysroot root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=server:es
-
-   but if no args, re-parse /proc/cmdline.
-
-   Should this mount dev, proc, sys on /sysroot too?  Could also add a
-   mount_sysroot_vfs to make prep for chroot easier.
-
  - Add an install_on_zpool script to configure zfs datasets for a sqsh_layer
    system.  Dialog to pick topmost layer.  Crete zpool/root, zpool/sqsh,
    zpool/home, and maybe zpool/scrap.  Install layers into zpool/sqsh.
