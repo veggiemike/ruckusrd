@@ -1,0 +1,18 @@
+#!/bin/ash
+#
+# Copyright 2012-2024 Michael D Labriola <veggiemike@sourceruckus.org>
+#
+# Licensed under the GPLv3. See the file COPYING for details. 
+#
+# This script unmounts /sysroot, all sqsh_layers, sqsh_layerdev, etc
+
+. /ruckusrd-common.sh
+
+# exit immediately if a command fails
+set -e
+
+for x in /sysroot/dev/pts /sysroot/dev/shm /sysroot/dev /sysroot/proc /sysroot/sys /sysroot /sqsh_layer-* /sqsh_layerdev /tmproot; do
+    if (grep -q $x /proc/mounts); then
+        umount $x
+    fi
+done

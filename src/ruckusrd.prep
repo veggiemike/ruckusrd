@@ -274,6 +274,12 @@ login as `root` or `ruckus` (unprivileged)
 EOF
 cat > initramfs/etc/motd <<"EOF"
 
+You can use the following special scripts for sysroot maintenance:
+
+ - mount_sysroot - assemble and mount /sysroot per kernel command line
+ - mount_sysroot_vfs - mount /sysroot and virtual filesystems needed for chroot
+ - umount_sysroot - unmount it all
+
 EOF
 
 
@@ -371,6 +377,8 @@ echo '********** COPYING LINUXRC TO INITRAMFS **********************************
 install -vp linuxrc initramfs/init &&
 install -vp firstboot_wizard initramfs/bin/ &&
 install -vp mount_sysroot initramfs/bin/ &&
+install -vp mount_sysroot_vfs initramfs/bin/ &&
+install -vp umount_sysroot initramfs/bin/ &&
 cp -va ruckusrd-common.sh initramfs/ &&
 cp -va ruckusrd.sh initramfs/ || exit 1
 
