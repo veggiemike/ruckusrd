@@ -181,4 +181,6 @@ mount_sysimage()
 }
 
 
-[ -n "$JUST_SOURCE" ] || mount_sysimage $*
+if [ -z "$JUST_SOURCE" ]; then
+    grep -q /sysroot /proc/mounts || mount_sysimage $*
+fi
