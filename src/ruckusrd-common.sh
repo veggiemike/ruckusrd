@@ -366,11 +366,10 @@ start_ruckusrd_system()
     [ -c /dev/hvc0 ] && sed -i 's|^#hvc0::|hvc0::|' /etc/inittab
 
     # configure networking
-    if [ -n "initramsys_net" ]; then
+    if [ -n "$initramsys_net" ]; then
         decho "starting networking"
         dev=eth0
         opts=${initramsys_net_conf//,/ }
-        #opts=$(echo $initramsys_net_conf | sed 's|,| |g')
         for o in $opts; do
             case "$o" in
                 DEV=*)
@@ -405,7 +404,7 @@ start_ruckusrd_system()
         fi
         dropbear -RB
     else
-        cat > /etc/motd <<"EOF"
+        cat >> /etc/motd <<"EOF"
 Welcome!  Might I suggest setting up networking and SSH access?  For example,
 to create a VLAN20 interface on eth0 using DHCP and start ssh:
 
