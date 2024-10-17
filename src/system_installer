@@ -7,10 +7,35 @@
 
 . /ruckusrd-common.sh
 
-DLG="whiptail --backtitle 'Source Ruckus System Installer'"
+DLG="whiptail --backtitle 'Source Ruckus System Installer (hostname=$(hostname))'"
 TTYSTR=$(tty)
 TTYSTR=${TTYSTR//\//-}
 ALREADY_DONE=/tmp/.system_installer_done-$TTYSTR
+
+# FIXME: shouldn't hard-code this... should we have source-ruckus-deb create a
+#        conf file with this info during build?
+#
+# FIXME: We're also assuming knowledge of the layering in here... it's not
+#        complicated, but still... it's also not defined anywhere outside of
+#        the source-ruckus-deb Makefile build rules
+#
+es_description="Embedded Server"
+es_file_description="Embedded File Server"
+es_auth_description="Embedded Authentication Server"
+es_web_description="Embedded Web Server"
+server_description="Server"
+vmm_description="Virtual Machine Monitor"
+workstation_description="Full Workstation of Doom"
+es_devel_description="Embedded Development Server"
+
+es_layers="es"
+es_file_layers="es-file:es"
+es_auth_layers="es-auth:es"
+es_web_layers="es-web:es"
+server_layers="server:es"
+vmm_layers="vmm:server:es"
+workstation_layers="workstation:vmm:server:es"
+es_devel_layers="es-devel"
 
 
 dlg_welcome()
@@ -18,6 +43,32 @@ dlg_welcome()
     go=$DLG
     go="$go --title 'Welcome!'"
     go="$go --yesno 'Welcome to the Source Ruckus System Installer!\n\nContinue?'"
+    go="$go 0 0"
+    eval $go
+}
+
+
+dlg_pick_top_layer()
+{
+    go=$DLG
+    go="$go --title 'Top layer selection'"
+    go="$go --menu 'Please select the desired installation type'"
+    go="$go 0 0 0"
+    for l in $*; do
+        desc=${l//.sqsh/}_description
+        desc=${desc//-/_}
+        go="$go $l \"$(eval echo \$$desc)\""
+    done
+    decho $go
+    TOP_LAYER=$(eval $go 3>&1 1>&2 2>&3)
+}
+
+
+dlg_summary()
+{
+    go=$DLG
+    go="$go --title 'Configuration Summary'"
+    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nSetup EFI: $can_efi\nSwap (G): $swap\n\nContinue?'"
     go="$go 0 0"
     eval $go
 }
@@ -37,12 +88,124 @@ dlg_welcome()
 #}
 
 
+autopick_disks()
+{
+    disks=
+    size=
+    bsize=
+    for x in /sys/block/*; do
+        this_dev=/dev/$(basename $x)
+        # skip virtual devices (e.g., loop0)
+        (readlink $x | grep -q virtual) && continue
+        # skip our imgdev
+        [ "$this_dev" = "$real_imgdev" ] && continue
+        # lookup disk info
+        this_size=$(cat $x/size)
+        this_bsize=$(cat $x/queue/physical_block_size)
+        if [ -n "$size" ]; then
+            # we've already picked a disk, make sure if we add another it's the
+            # same size
+            [ "$size" != $this_size ] && continue
+            # same but check for matching block size
+            [ "$bsize" != $this_bsize ] && continue
+            # ok, add it
+            disks="$disks $this_dev"
+        else
+            # disks list empty, this one looks good.  :-)
+            disks=$this_dev
+            size=$this_size
+            bsize=$this_bsize
+        fi
+    done
+}
+
+
+calc_ashift()
+{
+    x=$1
+    ashift=0
+    while [ $x -gt 1 ]; do
+        x=$((x>>1))
+        ashift=$((ashift+1))
+    done
+    echo $ashift
+}
+
+
 auto_install()
 {
-    echo hello
+    # find first non-virtual block device (that isn't imgdev) and any other
+    # disks of the same size
+    autopick_disks
+    decho disks: $disks
+    decho size: $size
+    decho bsize: $bsize
 
-    # autodetect and install everything, select block devices to install on and
-    # PROMPT for confirmation
+    # pick ashift for ZFS
+    #
+    # NOTE: We're doing this because of general distrust of "autodetect" block
+    #       size when creating zfs pools.  Using ashift=0 is supposed to
+    #       autodetect, but it doesn't seem to do a great job.  For example, on
+    #       a Xen PVH with a virtual disk which reports logical block size of
+    #       512 and physical of 64k, zfs sets the block device's ashift to 9
+    #       (for 512 bytes) then complains mightily that you've misconfigured
+    #       it and should really be 64k in zpool status output.
+    #
+    #       We are going to use ashift=12 for everything (even 512 byte disks,
+    #       because there's no performance penalty), UNLESS the disk reports an
+    #       even higher value (like the Xen virtual disks do).
+    ashift=$(calc_ashift $bsize)
+    [ $ashift -lt 12 ] && ashift=12
+    decho ashift: $ashift
+
+    # can we do EFI setup?
+    if (efibootmgr >/dev/null 2>&1); then
+        can_efi=y
+    fi
+    decho can_efi: $can_efi
+
+    # how much ram - pick a swap size
+    #
+    # NOTE: I've historically NOT used any swap on Xen virtual machines.
+    #       Initially this was to limit conplexity (uh, or I was lazy), but
+    #       I've seen zero reason to add swap to these systems over the years.
+    #       So I will continue to not do it.
+    #
+    # NOTE: Probably overkill, but I'll setup enough swap to support
+    #       hibernation.  Ubuntu's recommendation is 1.5*RAM.  I'll calculate
+    #       that and round up to the next whole gigabyte.
+    #
+    # FIXME: Maybe not the best test, but for now I'm going to key off of the
+    #        can_efi variable... because these virtual machines can't goof with
+    #        EFI and all my actual hardware at this point CAN use EFI.
+    #
+    #
+    if [ -n "$can_efi" ]; then
+        # mem in kb
+        mem=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+        # 1.5*mem in G
+        swap=$((mem*15/10/1024/1024+1))
+    fi
+    decho swap: $swap
+
+    # summary - layers, disks, pool ashift, swap, EFI
+    dlg_summary
+
+    # put it all together
+    echo putting it all together now
+
+    # we don't really even have to assemble and mount sysroot...  just boot up
+    # `firstboot` and the initial system groom will happen.
+    #
+    # FIXME: well, that's certainly an argument for `firstboot` being on by
+    #        default... perhaps i should do that and ada a `nofirstboot` flag.
+    #
+    # FIXME: although, I *could* assemble it and manually run the firstboot
+    #        wizard here.
+    #
+    # FIXME: what about mac-address generation for vm config files?  i'm still
+    #        handling that manually
+    #
 }
 
 
@@ -50,9 +213,47 @@ system_installer()
 {
     dlg_welcome || return
 
+    parse_boot_params $*
+
+    # further parse initramsys-installer config
+    opts=${initramsys_installer//,/ }
+    for o in $opts; do
+        case "$o" in
+            IMGDEV=*)
+                imgdev=${o#IMGDEV=}
+                ;;
+            IMGDIR=*)
+                imgdir=${o#IMGDIR=}
+                ;;
+            *)
+                decho "ignoring invalid initramsys_installer config option $o"
+                ;;
+        esac
+    done
+
+    # resolve device name - this will give us real_imgdev and imgdevfstype
+    special_device_lookup imgdev $imgdev
+
+    # mount imgdev
+    mkdir -p /img
+    mount $real_imgdev /img
+    if [ -n "$imgdir" ]; then
+        imgdir="/img/$imgdir"
+    else
+        imgdir="/img"
+    fi
+
     # locate images
+    imgs=$(cd $imgdir; ls *.sqsh)
+    decho "found imgs: $imgs"
 
     # prompt for uppermost layer
+    dlg_pick_top_layer $imgs
+    decho "TOP_LAYER: $TOP_LAYER"
+    layers=${TOP_LAYER//.sqsh/}_layers
+    layers=${layers//-/_}
+    layers=$(eval echo \$$layers)
+    decho "layers: $layers"
 
     # prompt for auto or manual configuration
     #
@@ -62,6 +263,13 @@ system_installer()
 
 
 if [ -z "$JUST_SOURCE" ]; then
+    # exit immediately if a command fails
+    #
+    # FIXME: not sure we can do this and have dialogs... will have to be careful
+    #        handling exit codes there
+    #
+    set -e
+
     # When invoked via init, we want to run once, and then give way to a normal
     # tty.  This is accomplished by checking for the arg `once`, then if our
     # .aleady_done file is present, we just exec the remaining args.  This way
@@ -75,8 +283,20 @@ if [ -z "$JUST_SOURCE" ]; then
             exec $*
         else
             touch $ALREADY_DONE
+            # We also want to sleep for a moment, so that kernel messages
+            # finish printing out on the console before we put a dialog up.
+            #
+            # FIXME: hmm... there doesn't seem to be a magic number of seconds
+            #        to sleep to consistently fix this.  3 works sometimes, but
+            #        that's starting to get a little rediculous.  I suppose we
+            #        can just run with `quiet` to avoid console output.
+            #
+            #sleep 3
         fi
+        system_installer
+    else
+        # missing `once` should mean we're running by hand on the command line,
+        # in which case let's pass $* along so we can override /proc/cmdline
+        system_installer $*
     fi
-
-    system_installer
 fi

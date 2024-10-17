@@ -269,6 +269,60 @@ EOF
 }
 
 
+# FIXME: basing this off how generate_udev_rules works has pointed out some
+#        inconsistencies that i don't like...
+#
+#        1. thingtomount and thingtomount_sqsh are named real_rootdev and
+#           real_sqsh_layerdev here
+#
+#        2. rootfstype is the same here, but sqshfstype is sqsh_layerdevfstype
+#
+#        3. ZFS and ZFS_POOL are overwritten... so both root and sqsh_layerdev
+#           have to be in the same zpool.  i don't think i've ever put them in
+#           different pools... but it wouldn't work if i did.
+#
+special_device_lookup()
+{
+    name=$1
+    str=$2
+
+    realdev=
+    fstype=
+    case $str in
+        CDLABEL=*)
+            # FIXME: does findfs work for CD/DVD drives?  maybe?  it doesn't
+            #        really matter for the type of maintenance i'm envisioning
+            #        using this script for... and i don't actually have a
+            #        CD/DVD drive to test with at the moment... maybe someday
+            #        i'll find out.  ha.
+            #
+            realdev=$(findfs LABEL=${str#CDLABEL=})
+            ;;
+        LABEL=*|UUID=*)
+            realdev=$(findfs $str)
+            ;;
+        ZFS=*)
+            ZFS=${str#ZFS=}
+            ZFS_POOL=${ZFS%%/*}
+            realdev=$ZFS
+            # NOTE We don't normally *need* to know fstype, it can be
+            #      autodetected at mount-time.  But when mounting zfs datasets
+            #      via 'mount' you have to specify -t zfs (if memory serves).
+            #
+            fstype=zfs
+            ;;
+        /dev/*)
+            realdev=$str
+            ;;
+    esac
+
+    # assign results to appropriate variables (so if name=root, we want to set
+    # realrootdev, etc)
+    eval real_${name}=$realdev
+    eval ${name}fstype=$fstype
+}
+
+
 lookup_layer()
 {
     name=$1.sqsh
