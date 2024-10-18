@@ -132,6 +132,37 @@ calc_ashift()
 }
 
 
+partition_disks()
+{
+    zfspart=1
+    swappart=1
+    echo "label: gpt" > /tmp/ptable
+    if [ -n "$can_efi" ]; then
+        # FIXME: how much space for ESP?  Most "regular" installations I've
+        #        seen use a really small partition (256M or 512M), but we're
+        #        going to use ESP as the actual /boot partition and I like to
+        #        keep a couple development kernels and large initrds in there.
+        #
+        echo ",1G,U" >> /tmp/ptable
+        zfspart=$((zfspart+1))
+        swappart=$((swappart+1))
+    fi
+    if [ -n "$swap" ]; then
+        echo ",${swap}G,S" >> /tmp/ptable
+        zfspart=$((zfspart+1))
+    fi
+    echo ",,L" >> /tmp/ptable
+
+    zfsdisks=
+    swapdisks=
+    for d in $disks; do
+        sfdisk $d < /tmp/ptable
+        zfsdisks="$zfsdisks $d$zfspart"
+        swapdisks="$swapdisks $d$swappart"
+    done
+}
+
+
 auto_install()
 {
     # find first non-virtual block device (that isn't imgdev) and any other
@@ -181,6 +212,11 @@ auto_install()
     #
     #
     if [ -n "$can_efi" ]; then
+        want_swap=1
+    fi
+    # FIXME: for testing, remove when done
+    want_swap=1
+    if [ -n "$want_swap" ]; then
         # mem in kb
         mem=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
         # 1.5*mem in G
@@ -191,8 +227,60 @@ auto_install()
     # summary - layers, disks, pool ashift, swap, EFI
     dlg_summary
 
-    # put it all together
-    echo putting it all together now
+    # partition if needed
+    if [ -n "$can_efi" ] || [ -n "$swap" ]; then
+        partition_disks
+    else
+        zfsdisks=$disks
+        swapdisks=
+    fi
+    decho zfsdisks: $zfsdisks
+    decho swapdisks: $swapdisks
+
+    # create swap if desired
+    #
+    # FIXME: do i need an fstab entry to get swap to turn on during bootup?
+    #        pretty sure i do...  should stick "UUID=... none swap sw 0 0" in
+    #        /etc/fstab when we're done
+    #
+    for d in $swapdisks; do
+        go="mkswap $d"
+        decho $go
+        eval $go
+    done
+
+    # create pool
+    mkdir -p /sysroot
+    go="zpool create -o ashift=$ashift zroot"
+    if [ "$(echo $disks | wc -w)" != "1" ]; then
+        go="$go mirror"
+    fi
+    go="$go -O compression=zstd -O relatime=on -O atime=on"
+    go="$go -O acltype=posixacl -O xattr=sa"
+    go="$go $zfsdisks"
+    go="$go -R /sysroot"
+    decho $go
+    eval $go
+
+    # create datasets - zroot/root, zroot/home, zroot/sqsh
+    zfs create zroot/root -o canmount=noauto
+    zfs create zroot/sqsh -o canmount=noauto
+    zfs create zroot/home -o mountpoint=/home
+
+    # install sqsh_layers
+    zfs mount zroot/sqsh
+    cp -va $imgdir/${layers//:/.sqsh $imgdir/}.sqsh /sysroot/zroot/sqsh/
+
+    # efibootmgr
+    #
+    # FIXME: finish this and test
+    #
+    if [ -n "$can_efi" ]; then
+        # install syslinux files in ESP
+
+        # add boot entry to EFI
+        go="efibootmgr"
+    fi
 
     # we don't really even have to assemble and mount sysroot...  just boot up
     # `firstboot` and the initial system groom will happen.
@@ -202,6 +290,10 @@ auto_install()
     #
     # FIXME: although, I *could* assemble it and manually run the firstboot
     #        wizard here.
+    #
+    # FIXME: actually, i *might* have to assemble the sysroot overlay.  If we
+    #        configured efi or swap, we have to update /etc/fstab.  So i guess
+    #        we should put it all together and run the firstboot wizard
     #
     # FIXME: what about mac-address generation for vm config files?  i'm still
     #        handling that manually
