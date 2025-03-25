@@ -136,6 +136,7 @@ partition_disks()
 {
     zfspart=1
     swappart=1
+    esppart=1
     echo "label: gpt" > /tmp/ptable
     if [ -n "$can_efi" ]; then
         # FIXME: how much space for ESP?  Most "regular" installations I've
@@ -155,10 +156,12 @@ partition_disks()
 
     zfsdisks=
     swapdisks=
+    espdisks=
     for d in $disks; do
         sfdisk $d < /tmp/ptable
         zfsdisks="$zfsdisks $d$zfspart"
         swapdisks="$swapdisks $d$swappart"
+        espdisks="$espdisks $d$esppart"
     done
 }
 
@@ -273,10 +276,96 @@ auto_install()
 
     # efibootmgr
     #
-    # FIXME: finish this and test
-    #
+    # FIXME: for testing, remove when done
+    can_efi=y
     if [ -n "$can_efi" ]; then
-        # install syslinux files in ESP
+        # mount rootdev (because it has kernel files)
+        mkdir -p /tmproot
+        mount $real_rootdev /tmproot
+        # install boot files in ESP
+        for d in $espdisks; do
+            mkfs.vfat $d
+            mount $d /boot
+            # install kernel files
+            cp -v --preserve=timestamps /tmproot/System.map* /tmproot/vmlinuz* /tmproot/initrd* /tmproot/config* /tmproot/fw.sqsh /boot/
+            kernelversion=$(basename /boot/vmlinuz*)
+            kernelversion=${kernel//vmlinuz-/}
+            # install syslinux files
+            mkdir -p /boot/EFI/syslinux
+            # FIXME: historically, I've just installed chain.c32, ldlinux.e64,
+            #        libcom32.c32, libutil.c32, mboot.c32, menu.c32,
+            #        syslinux.efi, and vesamenu.c32... (and i'm pretty sure
+            #        vesamenu and mboot don't work for EFI, only BIOS) but just
+            #        copying all the files sure is easier.  let's see what
+            #        happens.
+            #
+            # NOTE: We want timestamps to be preserved, so that we can keep
+            #       redundant ESPs sync'd w/ rsync, but vfat is going to
+            #       have heartburn if we use -a.
+            #
+            cp -v --preserve=timestamps /usr/share/syslinux/efi64/* /boot/EFI/syslinux/
+            # FIXME: i know a lot of this doesn't work... the color stuff, in
+            #        paticular.  Should test and remove things that have no
+            #        effect.
+            #
+            # FIXME: i haven't installed kernel or initrd... and i might not
+            #        even have access to them in here... my current test is as
+            #        a domU and they reside on the dom0.  i suppose when i make
+            #        a real installer (e.g., thumb drive), it'll have those
+            #        files and i can pass in root=UUID=uuidofflashdrive on the
+            #        kernel command line.  then mount and install those files
+            #        before we get here...?
+            #
+            # FIXME: what about fwdev?  didn't i make specifying fwdev= but
+            #        failing to find firmware fatal in a previous
+            #        release... should i attempt to create machine-specific
+            #        fw.sqsh w/ firmwarenator in here?
+            #
+            #        how about yes?
+            #
+            #        we could put the giant fw.sqsh file on the installer
+            #        thumbdrive... but i seem to recall that it's become too
+            #        large to use, at least during boot.  it's a bit of a
+            #        chicken-and-the-egg problem then.  perhaps i need to make
+            #        sure firmwarenator notes failed fw load messages as well
+            #        as sucessful ones and then i can scarf all required
+            #        firmware from the giant fw.sqsh on the root of the thumb
+            #        drive (but don't boot the installer with fwdev=)
+            #
+            cat > /boot/EFI/syslinux/syslinux.cfg <<EOF
+default menu.c32
+timeout 50
+
+menu title RuckusRD is your daddy!
+menu rows 5
+menu passwordrow 4
+menu tabmsgrow 11
+menu cmdlinerow 11
+menu timeoutrow 13
+menu endrow 17
+menu color border 0 #ffffffff #00000000
+menu color sel 7 #ffffffff #ffd09000
+menu color title 0 #ffffffff #00000000
+menu color tabmsg 0 #ffffffff #00000000
+menu color unsel 0 #ffffffff #00000000
+menu color hotsel 0 #ff000000 #ffffffff
+menu color hotkey 7 #ffffffff #ff000000
+menu color timeout_msg 0 #ffffffff #00000000
+menu color timeout 0 #ffffffff #00000000
+menu color cmdline 0 #ffffffff #00000000
+menu hidden
+menu hiddenrow 5
+menu autoboot "Booting default in # second{,s}..."
+
+
+label ruckus
+ menu label Source Ruckus Linux
+ linux /vmlinuz-$kernelversion
+ append initrd=/initrd-$kernelversion.img root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers ro consoleblank=300 fwdev=LABEL=$esplabels quiet
+ menu default
+
+EOF
+        done
 
         # add boot entry to EFI
         go="efibootmgr"

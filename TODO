@@ -114,4 +114,10 @@
    trying to use efibootmgr, partition each disk with ESP, swap, and rest, then
    add all the last partitions to the zpool.
 
-   initramsys-installer=IMGDEV,...  
+   initramsys-installer=IMGDEV,...
+
+ - fwdev= should take a list of potential devices to try... if it doesn't
+   already.  we'll need that for redundant ESP support
+
+ - also, what happens to root=ZFS if a disk is bad/missing?  does it start the
+   pool in degraded mode and continue booting?  or is it hosed?  test
