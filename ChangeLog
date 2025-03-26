@@ -3,7 +3,7 @@
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
 * v0.22.0
-2024-mm-dd: Ruckusrd v0.22.0 (under development)
+2025-mm-dd: Ruckusrd v0.22.0 (under development)
 
 - Added new `initramsys-net` boot parameter.  This implies `initramsys` but
   enables networking and starts sshd.  Configuration can be specified as an

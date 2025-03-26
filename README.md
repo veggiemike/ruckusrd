@@ -1,7 +1,7 @@
 RuckusRD - a super awesome, yet simple, mkinitrd replacement
 ============================================================
 
-Copyright 2012-2024 Michael D Labriola <veggiemike@sourceruckus.org>
+Copyright 2012-2025 Michael D Labriola <veggiemike@sourceruckus.org>
 
 Licensed under the GPLv3. See the file COPYING for details. 
 
