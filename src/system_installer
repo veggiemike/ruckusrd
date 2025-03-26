@@ -8,7 +8,7 @@
 . /ruckusrd-common.sh
 
 DLG="whiptail --backtitle 'Source Ruckus System Installer (hostname=$(hostname))'"
-TTYSTR=$(tty)
+TTYSTR=$(tty 2>/dev/null)
 TTYSTR=${TTYSTR//\//-}
 ALREADY_DONE=/tmp/.system_installer_done-$TTYSTR
 
@@ -38,13 +38,40 @@ workstation_layers="workstation:vmm:server:es"
 es_devel_layers="es-devel"
 
 
+# NOTE: The emergency_shell() function from ruckusrd-common does shenanigans to
+#       get a controlling tty for bash... this seems unneeded at this point,
+#       and has been causing terminal input corruption... but not always.
+#       Luckily all the shenanigans are in a seperate function called
+#       control_shell, which we can redefine here to just call `bash`.
+#
+control_shell()
+{
+    bash
+}
+
+
+user_abort()
+{
+    # unset our trap so we can exit normally
+    trap 0 2
+    echo "installation aborted by user"
+    exit 0
+}
+
+
+# NOTE: Employing shenanigans in all these dlg_* functions to prevent bash's
+#       `set -e` from flagging exiting dialogs as errors...  KEEP_GOING will be
+#       unset if the user is trying to exit, so we can handle that in the
+#       calling function.
+#
 dlg_welcome()
 {
     go=$DLG
     go="$go --title 'Welcome!'"
     go="$go --yesno 'Welcome to the Source Ruckus System Installer!\n\nContinue?'"
     go="$go 0 0"
-    eval $go
+    KEEP_GOING=$(eval $go 3>&1 1>&2 2>&3 && echo yes || echo -n)
+    #echo "KEEP_GOING=$KEEP_GOING"
 }
 
 
@@ -59,8 +86,10 @@ dlg_pick_top_layer()
         desc=${desc//-/_}
         go="$go $l \"$(eval echo \$$desc)\""
     done
-    decho $go
-    TOP_LAYER=$(eval $go 3>&1 1>&2 2>&3)
+    TOP_LAYER=$(eval $go 3>&1 1>&2 2>&3 || echo -n)
+    [ -n "$TOP_LAYER" ] && KEEP_GOING=yes || KEEP_GOING=
+    #echo TOP_LAYER=$TOP_LAYER
+    #echo KEEP_GOING=$KEEP_GOING
 }
 
 
@@ -70,7 +99,8 @@ dlg_summary()
     go="$go --title 'Configuration Summary'"
     go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nSetup EFI: $can_efi\nSwap (G): $swap\n\nContinue?'"
     go="$go 0 0"
-    eval $go
+    KEEP_GOING=$(eval $go 3>&1 1>&2 2>&3 && echo yes || echo -n)
+    #echo "KEEP_GOING=$KEEP_GOING"
 }
 
 
@@ -88,6 +118,8 @@ dlg_summary()
 #}
 
 
+# find first non-virtual block device (that isn't rootdev or imgdev) and any
+# other disks of the same size
 autopick_disks()
 {
     disks=
@@ -97,6 +129,8 @@ autopick_disks()
         this_dev=/dev/$(basename $x)
         # skip virtual devices (e.g., loop0)
         (readlink $x | grep -q virtual) && continue
+        # skip our rootdev
+        [ "$this_dev" = "$real_rootdev" ] && continue
         # skip our imgdev
         [ "$this_dev" = "$real_imgdev" ] && continue
         # lookup disk info
@@ -168,8 +202,8 @@ partition_disks()
 
 auto_install()
 {
-    # find first non-virtual block device (that isn't imgdev) and any other
-    # disks of the same size
+    # find first non-virtual block device (that isn't rootdev or imgdev) and
+    # any other disks of the same size
     autopick_disks
     decho disks: $disks
     decho size: $size
@@ -229,6 +263,7 @@ auto_install()
 
     # summary - layers, disks, pool ashift, swap, EFI
     dlg_summary
+    [ -n "$KEEP_GOING" ] || user_abort
 
     # partition if needed
     if [ -n "$can_efi" ] || [ -n "$swap" ]; then
@@ -271,8 +306,21 @@ auto_install()
     zfs create zroot/home -o mountpoint=/home
 
     # install sqsh_layers
+    #
+    # NOTE: We use rsync here instead of cp for a couple reasons:
+    #
+    #       1. Large files can take a looong time here... with no indication
+    #          that anything is even happening.
+    #
+    #       2. The busybox cp applet doesn't support --preserve=timestamps,
+    #          which we want (instead of full blown -a).  We want timestamps to
+    #          be preserved, so that we can keep redundant ESPs sync'd w/
+    #          rsync, but vfat is going to have heartburn if we use -a.
+    #
+    rsync="rsync -rltD -v --progress"
     zfs mount zroot/sqsh
-    cp -va $imgdir/${layers//:/.sqsh $imgdir/}.sqsh /sysroot/zroot/sqsh/
+    echo "installing sqsh_layer image files..."
+    $rsync $imgdir/${layers//:/.sqsh $imgdir/}.sqsh /sysroot/zroot/sqsh/
 
     # efibootmgr
     #
@@ -282,15 +330,23 @@ auto_install()
         # mount rootdev (because it has kernel files)
         mkdir -p /tmproot
         mount $real_rootdev /tmproot
+        kernelversion=$(basename /tmproot/vmlinuz*)
+        echo "kernelversion: $kernelversion"
+        kernelversion=${kernelversion//vmlinuz-/}
+        echo "kernelversion: $kernelversion"
         # install boot files in ESP
         for d in $espdisks; do
+            echo "preparing ESP $d..."
             mkfs.vfat $d
             mount $d /boot
             # install kernel files
-            cp -v --preserve=timestamps /tmproot/System.map* /tmproot/vmlinuz* /tmproot/initrd* /tmproot/config* /tmproot/fw.sqsh /boot/
-            kernelversion=$(basename /boot/vmlinuz*)
-            kernelversion=${kernel//vmlinuz-/}
+            echo "installing kernel files..."
+            $rsync /tmproot/System.map* /tmproot/vmlinuz* /tmproot/initrd* /tmproot/config* /boot/
+            if [ -f /tmproot/fw.sqsh ]; then
+                $rsync /tmproot/fw.sqsh /boot/
+            fi
             # install syslinux files
+            echo "installing syslinux files..."
             mkdir -p /boot/EFI/syslinux
             # FIXME: historically, I've just installed chain.c32, ldlinux.e64,
             #        libcom32.c32, libutil.c32, mboot.c32, menu.c32,
@@ -299,11 +355,7 @@ auto_install()
             #        copying all the files sure is easier.  let's see what
             #        happens.
             #
-            # NOTE: We want timestamps to be preserved, so that we can keep
-            #       redundant ESPs sync'd w/ rsync, but vfat is going to
-            #       have heartburn if we use -a.
-            #
-            cp -v --preserve=timestamps /usr/share/syslinux/efi64/* /boot/EFI/syslinux/
+            $rsync /usr/share/syslinux/efi64/* /boot/EFI/syslinux/
             # FIXME: i know a lot of this doesn't work... the color stuff, in
             #        paticular.  Should test and remove things that have no
             #        effect.
@@ -369,6 +421,8 @@ EOF
 
         # add boot entry to EFI
         go="efibootmgr"
+
+        echo "done with $d"
     fi
 
     # we don't really even have to assemble and mount sysroot...  just boot up
@@ -392,7 +446,8 @@ EOF
 
 system_installer()
 {
-    dlg_welcome || return
+    dlg_welcome
+    [ -n "$KEEP_GOING" ] || user_abort
 
     parse_boot_params $*
 
@@ -412,8 +467,20 @@ system_installer()
         esac
     done
 
-    # resolve device name - this will give us real_imgdev and imgdevfstype
+    # resolve device name(s) - this will give us real_{devstring} and
+    # {devstring}fstype
+    #
+    # FIXME: do we always need imgdev?  probably could have a default value for
+    #        that one...
+    #
+    # FIXME: what if either of these is missing from the kernel commandline?
+    #
+    special_device_lookup rootdev $root
+    decho "real_rootdev: $real_rootdev"
+    decho "rootdevfstype: $rootdevfstype"
     special_device_lookup imgdev $imgdev
+    decho "real_imgdev: $real_imgdev"
+    decho "imgdevfstype: $imgdevfstype"
 
     # mount imgdev
     mkdir -p /img
@@ -430,6 +497,8 @@ system_installer()
 
     # prompt for uppermost layer
     dlg_pick_top_layer $imgs
+    [ -n "$KEEP_GOING" ] || user_abort
+
     decho "TOP_LAYER: $TOP_LAYER"
     layers=${TOP_LAYER//.sqsh/}_layers
     layers=${layers//-/_}
@@ -440,15 +509,17 @@ system_installer()
     #
     # FIXME: implement this.  until then, we just run auto_install
     auto_install
+    echo "installation complete!"
 }
 
 
 if [ -z "$JUST_SOURCE" ]; then
     # exit immediately if a command fails
     #
-    # FIXME: not sure we can do this and have dialogs... will have to be careful
-    #        handling exit codes there
+    # NOTE: We will have to be careful handling exit codes from the dialogs,
+    #       which return non-zero depending on what the user selects.
     #
+    trap "emergency_shell" 0 2
     set -e
 
     # When invoked via init, we want to run once, and then give way to a normal
@@ -462,22 +533,26 @@ if [ -z "$JUST_SOURCE" ]; then
         shift
         if [ -f $ALREADY_DONE ]; then
             exec $*
-        else
-            touch $ALREADY_DONE
-            # We also want to sleep for a moment, so that kernel messages
-            # finish printing out on the console before we put a dialog up.
-            #
-            # FIXME: hmm... there doesn't seem to be a magic number of seconds
-            #        to sleep to consistently fix this.  3 works sometimes, but
-            #        that's starting to get a little rediculous.  I suppose we
-            #        can just run with `quiet` to avoid console output.
-            #
-            #sleep 3
         fi
+        go="touch $ALREADY_DONE"
+        decho $go
+        eval $go
+
+        # We also want to sleep for a moment, so that kernel messages
+        # finish printing out on the console before we put a dialog up.
+        #
+        # FIXME: hmm... there doesn't seem to be a magic number of seconds
+        #        to sleep to consistently fix this.  3 works sometimes, but
+        #        that's starting to get a little rediculous.  I suppose we
+        #        can just run with `quiet` to avoid console output.
+        #
+        #sleep 3
+
         system_installer
     else
         # missing `once` should mean we're running by hand on the command line,
         # in which case let's pass $* along so we can override /proc/cmdline
         system_installer $*
     fi
+    trap 0 2
 fi

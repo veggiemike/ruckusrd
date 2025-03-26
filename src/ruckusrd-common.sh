@@ -158,6 +158,9 @@ emergency_shell()
 # FIXME: do I need the setsid cttyhack after outside of linuxrc?  does it hurt
 #        anything after the handoff to init?
 #
+#        I think it *IS* causing problems when emergency_shell gets called from
+#        inside system_installer...
+#
 control_shell()
 {
     echo "uptime: $(cat /proc/uptime | cut -d' ' -f1)"
