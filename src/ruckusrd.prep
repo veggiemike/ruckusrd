@@ -280,6 +280,10 @@ You can use the following special scripts for sysroot maintenance:
  - mount_sysroot_vfs - mount /sysroot and virtual filesystems needed for chroot
  - umount_sysroot - unmount it all
 
+Or to install on blank drive(s):
+
+ - system_installer - dialog-based installer
+
 EOF
 
 

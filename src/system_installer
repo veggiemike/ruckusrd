@@ -178,6 +178,9 @@ partition_disks()
         #        going to use ESP as the actual /boot partition and I like to
         #        keep a couple development kernels and large initrds in there.
         #
+        #        if i'm going to keep a full fw.sqsh in /boot, 1G is actually
+        #        already almost too small. (66% full w/ only a single kernel)
+        #
         echo ",1G,U" >> /tmp/ptable
         zfspart=$((zfspart+1))
         swappart=$((swappart+1))
@@ -231,6 +234,8 @@ auto_install()
         can_efi=y
     fi
     decho can_efi: $can_efi
+    # FIXME: for testing, remove when done
+    can_efi=y
 
     # how much ram - pick a swap size
     #
@@ -243,6 +248,12 @@ auto_install()
     #       hibernation.  Ubuntu's recommendation is 1.5*RAM.  I'll calculate
     #       that and round up to the next whole gigabyte.
     #
+    # FIXME: If i've got multiple disks in a zpool, they all get a swap
+    #        partition, and I end up with N times the ammount of swap I
+    #        actually wanted.  If the swap calculations Ubuntu recommends need
+    #        to be contiguous, this is ok, if they don't, this is extremely
+    #        overkill.
+    #
     # FIXME: Maybe not the best test, but for now I'm going to key off of the
     #        can_efi variable... because these virtual machines can't goof with
     #        EFI and all my actual hardware at this point CAN use EFI.
@@ -251,8 +262,6 @@ auto_install()
     if [ -n "$can_efi" ]; then
         want_swap=1
     fi
-    # FIXME: for testing, remove when done
-    want_swap=1
     if [ -n "$want_swap" ]; then
         # mem in kb
         mem=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
@@ -277,14 +286,16 @@ auto_install()
 
     # create swap if desired
     #
-    # FIXME: do i need an fstab entry to get swap to turn on during bootup?
-    #        pretty sure i do...  should stick "UUID=... none swap sw 0 0" in
-    #        /etc/fstab when we're done
+    # NOTE: We have to record UUIDs of each swap partition (and later each ESP)
+    #       so we can add appropriate lines to /etc/fstab.
     #
+    rm -f /tmp/fstab
     for d in $swapdisks; do
         go="mkswap $d"
         decho $go
         eval $go
+        eval $(blkid $d -o export)
+        echo "UUID=$UUID none swap sw 0 0" >> /tmp/fstab
     done
 
     # create pool
@@ -323,9 +334,6 @@ auto_install()
     $rsync $imgdir/${layers//:/.sqsh $imgdir/}.sqsh /sysroot/zroot/sqsh/
 
     # efibootmgr
-    #
-    # FIXME: for testing, remove when done
-    can_efi=y
     if [ -n "$can_efi" ]; then
         # mount rootdev (because it has kernel files)
         mkdir -p /tmproot
@@ -334,6 +342,7 @@ auto_install()
         echo "kernelversion: $kernelversion"
         kernelversion=${kernelversion//vmlinuz-/}
         echo "kernelversion: $kernelversion"
+        bootnum=1
         # install boot files in ESP
         for d in $espdisks; do
             echo "preparing ESP $d..."
@@ -384,6 +393,23 @@ auto_install()
             #        firmware from the giant fw.sqsh on the root of the thumb
             #        drive (but don't boot the installer with fwdev=)
             #
+            # FIXME: Also, what about the "default" place for EFI bootloaders?
+            #        So we don't have to poke the system's EFI setup for
+            #        bootable thumb drives and the like?
+            #
+            #        esp/EFI/syslinux/* -> esp/EFI/BOOT/*
+            #        esp/EFI/syslinux/syslinux.efi -> esp/EFI/BOOT/bootx64.efi
+            #
+            #        My laptop refuses to boot from esp/EFI/BOOT unless I
+            #        specifically add via efibootmgr... maybe I did it wrong?
+            #
+            #        Both the latest Ubuntu installer and the latest clonezilla
+            #        ISO have /EFI/boot/bootx64.efi... given that ESP is
+            #        supposed to be vfat, I can't imagine the capitalization
+            #        really matters... but it *IS* different.
+            #
+            # FIXME: get the variables set for this... $esplabels?
+            #
             cat > /boot/EFI/syslinux/syslinux.cfg <<EOF
 default menu.c32
 timeout 50
@@ -417,13 +443,55 @@ label ruckus
  menu default
 
 EOF
+
+            # update fstab
+            eval $(blkid $d -o export)
+            if [ $bootnum -gt 1 ]; then
+                echo "UUID=$UUID /boot$bootnum vfat defaults 1 1" >> /tmp/fstab
+            else
+                echo "UUID=$UUID /boot vfat defaults 1 1" >> /tmp/fstab
+            fi
+            bootnum=$((bootnum+1))
+
+            # add boot entry to EFI
+            #
+            # NOTE: We do this for EACH ESP to make sure the system is bootable
+            #       even if the primary boot disk fails.
+            #
+            # FIXME: do we have to do this if we use default UEFI filenames?
+            #        probably not, but wouldn't hurt.
+            #
+            go="efibootmgr"
+
+            # umount esp
+            umount /boot
+            echo "done with $d"
         done
 
-        # add boot entry to EFI
-        go="efibootmgr"
-
-        echo "done with $d"
+        # umount rootdev
+        umount /tmproot
     fi
+
+    # create fstab
+    #
+    # NOTE: This file gets installed in the upper layer of our eventual
+    #       overlayfs mount.
+    #
+    zfs mount zroot/root
+    mkdir -p /sysroot/zroot/root/upper/upper/etc
+    # start w/ /etc/fstab from base image
+    base=$(echo $layers | awk -F: '{print $NF}').sqsh
+    unsquashfs -cat /sysroot/zroot/sqsh/$base etc/fstab > /sysroot/zroot/root/upper/upper/etc/fstab
+    # add our generated additions (e.g., swap, boot)
+    cat /tmp/fstab >> /sysroot/zroot/root/upper/upper/etc/fstab
+    # add virtual filesystems from our initramfs
+    echo "" >> /sysroot/zroot/root/upper/upper/etc/fstab
+    cat /etc/fstab >> /sysroot/zroot/root/upper/upper/etc/fstab
+
+    # ensure /boot mountpoint(s) exist
+    for x in $(awk '{if ($2 ~ "/boot") {print $2}}' /tmp/fstab); do
+        mkdir -p /sysroot/zroot/root/upper/upper/$x
+    done
 
     # we don't really even have to assemble and mount sysroot...  just boot up
     # `firstboot` and the initial system groom will happen.
@@ -482,9 +550,11 @@ system_installer()
     decho "real_imgdev: $real_imgdev"
     decho "imgdevfstype: $imgdevfstype"
 
-    # mount imgdev
-    mkdir -p /img
-    mount $real_imgdev /img
+    # mount imgdev (if not already mounted)
+    if ! (grep -q "^$real_imgdev /img" /proc/mounts); then
+        mkdir -p /img
+        mount $real_imgdev /img
+    fi
     if [ -n "$imgdir" ]; then
         imgdir="/img/$imgdir"
     else
@@ -509,6 +579,14 @@ system_installer()
     #
     # FIXME: implement this.  until then, we just run auto_install
     auto_install
+
+    # FIXME: should we leave the installed system mounted?  or unmount
+    #        everything nicely?  sometimes it would be nice to have the sysroot
+    #        left mounted... as long as it's safe to reboot blindly at that
+    #        point
+    #
+    #        for now, I'll leave it mounted... revisit if problems.
+    #
     echo "installation complete!"
 }
 
