@@ -179,13 +179,22 @@ partition_disks()
         #        keep a couple development kernels and large initrds in there.
         #
         #        if i'm going to keep a full fw.sqsh in /boot, 1G is actually
-        #        already almost too small. (66% full w/ only a single kernel)
+        #        already almost too small. (66% full w/ only a single kernel) I
+        #        did 4G when I started to set my laptop up with a new SSD eons
+        #        ago.
         #
         echo ",1G,U" >> /tmp/ptable
         zfspart=$((zfspart+1))
         swappart=$((swappart+1))
     fi
     if [ -n "$swap" ]; then
+        # NOTE: I thought about using LVM for swap... but it wouldn't really
+        #       buy us anything but increased complexity, especially since
+        #       we're using the remaining space in a ZFS pool.  About the only
+        #       benefit I can come up with is that the user would be able to
+        #       shrink swap later if desired... so we just use a straight up
+        #       regular partition for swap.
+        #
         echo ",${swap}G,S" >> /tmp/ptable
         zfspart=$((zfspart+1))
     fi
@@ -208,9 +217,9 @@ auto_install()
     # find first non-virtual block device (that isn't rootdev or imgdev) and
     # any other disks of the same size
     autopick_disks
-    decho disks: $disks
-    decho size: $size
-    decho bsize: $bsize
+    #decho disks: $disks
+    #decho size: $size
+    #decho bsize: $bsize
 
     # pick ashift for ZFS
     #
@@ -227,13 +236,20 @@ auto_install()
     #       even higher value (like the Xen virtual disks do).
     ashift=$(calc_ashift $bsize)
     [ $ashift -lt 12 ] && ashift=12
-    decho ashift: $ashift
+    #decho ashift: $ashift
 
     # can we do EFI setup?
+    #
+    # FIXME: should I allow forcing EFI setup?  would need to allow efibootmgr
+    #        to fail later on... or perhaps add
+    #        initramsys-installer=EFI=default to force inclusion of EFI setup
+    #        using default names (e.g., EFI/boot/bootx64.efi) and skip the last
+    #        call to efibootmgr?
+    #
     if (efibootmgr >/dev/null 2>&1); then
         can_efi=y
     fi
-    decho can_efi: $can_efi
+    #decho can_efi: $can_efi
     # FIXME: for testing, remove when done
     can_efi=y
 
@@ -248,11 +264,16 @@ auto_install()
     #       hibernation.  Ubuntu's recommendation is 1.5*RAM.  I'll calculate
     #       that and round up to the next whole gigabyte.
     #
-    # FIXME: If i've got multiple disks in a zpool, they all get a swap
-    #        partition, and I end up with N times the ammount of swap I
-    #        actually wanted.  If the swap calculations Ubuntu recommends need
-    #        to be contiguous, this is ok, if they don't, this is extremely
-    #        overkill.
+    # NOTE: If we've got N disks in a zpool, they all get a swap partition, and
+    #       we end up with N times the ammount of swap we actually wanted.
+    #       Given that swap doesn't need to be contiguous (per google), we'll
+    #       divide our swap size by number of disks to conserve space.  The
+    #       only problem with that is we'll potentially loose the ability to
+    #       suspend to disk w/ a failed disk in the zpool...  but we've got
+    #       bigger fish to fry in that case.
+    #
+    # FIXME: Could add initramsys-installer=SWAP=1 to specify swap size on
+    #        commandline...
     #
     # FIXME: Maybe not the best test, but for now I'm going to key off of the
     #        can_efi variable... because these virtual machines can't goof with
@@ -267,8 +288,17 @@ auto_install()
         mem=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
         # 1.5*mem in G
         swap=$((mem*15/10/1024/1024+1))
+        numdisks=$(echo $disks | wc -w)
+        if [ $numdisks -gt 1 ]; then
+            halfswap=$((swap/numdisks))
+            # round up if needed
+            if [ $((halfswap*numdisks)) -lt $swap ]; then
+                halfswap=$((halfswap+1))
+            fi
+            swap=$halfswap
+        fi
     fi
-    decho swap: $swap
+    #decho swap: $swap
 
     # summary - layers, disks, pool ashift, swap, EFI
     dlg_summary
@@ -328,6 +358,11 @@ auto_install()
     #          be preserved, so that we can keep redundant ESPs sync'd w/
     #          rsync, but vfat is going to have heartburn if we use -a.
     #
+    # FIXME: if we split a huge.sqsh image into huge.sqshXaa, huge.sqshXab,
+    #        etc, and put huge.sqsh in our dialog to select, and the user
+    #        selected it, we need to reassembe it via `cat huge.sqshX*
+    #        huge.sqsh` here (when installing on target filesystem)
+    #
     rsync="rsync -rltD -v --progress"
     zfs mount zroot/sqsh
     echo "installing sqsh_layer image files..."
@@ -335,9 +370,6 @@ auto_install()
 
     # efibootmgr
     if [ -n "$can_efi" ]; then
-        # mount rootdev (because it has kernel files)
-        mkdir -p /tmproot
-        mount $real_rootdev /tmproot
         kernelversion=$(basename /tmproot/vmlinuz*)
         echo "kernelversion: $kernelversion"
         kernelversion=${kernelversion//vmlinuz-/}
@@ -369,18 +401,8 @@ auto_install()
             #        paticular.  Should test and remove things that have no
             #        effect.
             #
-            # FIXME: i haven't installed kernel or initrd... and i might not
-            #        even have access to them in here... my current test is as
-            #        a domU and they reside on the dom0.  i suppose when i make
-            #        a real installer (e.g., thumb drive), it'll have those
-            #        files and i can pass in root=UUID=uuidofflashdrive on the
-            #        kernel command line.  then mount and install those files
-            #        before we get here...?
-            #
-            # FIXME: what about fwdev?  didn't i make specifying fwdev= but
-            #        failing to find firmware fatal in a previous
-            #        release... should i attempt to create machine-specific
-            #        fw.sqsh w/ firmwarenator in here?
+            # FIXME: Should i attempt to create machine-specific fw.sqsh w/
+            #        firmwarenator in here?
             #
             #        how about yes?
             #
@@ -409,6 +431,10 @@ auto_install()
             #        really matters... but it *IS* different.
             #
             # FIXME: get the variables set for this... $esplabels?
+            #
+            # FIXME: this config file's handling of fwdev= is assuming we can
+            #        specify a list of possible devices... not sure i acutally
+            #        ever implemented that.
             #
             cat > /boot/EFI/syslinux/syslinux.cfg <<EOF
 default menu.c32
@@ -458,10 +484,25 @@ EOF
             # NOTE: We do this for EACH ESP to make sure the system is bootable
             #       even if the primary boot disk fails.
             #
-            # FIXME: do we have to do this if we use default UEFI filenames?
-            #        probably not, but wouldn't hurt.
+            # FIXME: don't do this if we're using default UEFI filenames
+            #        (e.g., EFI=default)
             #
-            go="efibootmgr"
+            # NOTE: from my ancient notes:
+            #
+            #       efibootmgr --v -c -d /dev/sda -p 1 -l /EFI/syslinux/syslinux.efi -L syslinux
+            #       efibootmgr --v -c -d /dev/sda -p 1 -l /xen-4.11.1.efi -L xen
+            #
+            # FIXME: can i, do i need to, specify a bootnum?  similarly, i
+            #        should probably reorder the boot list... yes?  what if i
+            #        specify a bootnum that's already in use?  Could try -b a1,
+            #        a2, a3, etc, in the hopes they're not taken
+            #
+            go="efibootmgr -v -c"
+            go="$go -d $(echo $d | sed 's|[0-9]*$||')"
+            go="$go -p $(echo $d | grep -o '[0-9]*$')"
+            go="$go -l /EFI/syslinux/syslinux.efi -L syslinux"
+            decho $go
+            eval $go || echo "WARNING: efibootmgr failed"
 
             # umount esp
             umount /boot
@@ -499,16 +540,6 @@ EOF
     # FIXME: well, that's certainly an argument for `firstboot` being on by
     #        default... perhaps i should do that and ada a `nofirstboot` flag.
     #
-    # FIXME: although, I *could* assemble it and manually run the firstboot
-    #        wizard here.
-    #
-    # FIXME: actually, i *might* have to assemble the sysroot overlay.  If we
-    #        configured efi or swap, we have to update /etc/fstab.  So i guess
-    #        we should put it all together and run the firstboot wizard
-    #
-    # FIXME: what about mac-address generation for vm config files?  i'm still
-    #        handling that manually
-    #
 }
 
 
@@ -520,7 +551,9 @@ system_installer()
     parse_boot_params $*
 
     # further parse initramsys-installer config
-    opts=${initramsys_installer//,/ }
+    imgdev=
+    imgdir=images
+    opts=${initramsys_installer_conf//,/ }
     for o in $opts; do
         case "$o" in
             IMGDEV=*)
@@ -537,31 +570,45 @@ system_installer()
 
     # resolve device name(s) - this will give us real_{devstring} and
     # {devstring}fstype
-    #
-    # FIXME: do we always need imgdev?  probably could have a default value for
-    #        that one...
-    #
-    # FIXME: what if either of these is missing from the kernel commandline?
-    #
     special_device_lookup rootdev $root
     decho "real_rootdev: $real_rootdev"
     decho "rootdevfstype: $rootdevfstype"
-    special_device_lookup imgdev $imgdev
-    decho "real_imgdev: $real_imgdev"
-    decho "imgdevfstype: $imgdevfstype"
+    if [ -n "$imgdev" ]; then
+        special_device_lookup imgdev $imgdev
+        decho "real_imgdev: $real_imgdev"
+        decho "imgdevfstype: $imgdevfstype"
+    fi
+
+    # mount rootdev (if not already mounted)
+    #
+    # NOTE: Contains kernel files, boot files, and images unless imgdev
+    #       specified
+    #
+    if ! (grep -q "^$real_rootdev /tmproot" /proc/mounts); then
+        mkdir -p /tmproot
+        mount $real_rootdev /tmproot
+    fi
 
     # mount imgdev (if not already mounted)
-    if ! (grep -q "^$real_imgdev /img" /proc/mounts); then
+    if [ -n "$real_imgdev" ] && ! (grep -q "^$real_imgdev /img" /proc/mounts); then
         mkdir -p /img
         mount $real_imgdev /img
     fi
-    if [ -n "$imgdir" ]; then
+
+    # set imgdir to absolute path to our images
+    if [ -n "$real_imgdev" ]; then
         imgdir="/img/$imgdir"
     else
-        imgdir="/img"
+        imgdir=/tmproot/$imgdir
     fi
 
     # locate images
+    #
+    # FIXME: look for *.sqshXaa as well, for split up huge images.  can't
+    #        reassemble yet, because we don't have any target filesystems
+    #        mounted yet... but should populated our dialogs with the
+    #        appropriate names in advance
+    #
     imgs=$(cd $imgdir; ls *.sqsh)
     decho "found imgs: $imgs"
 
@@ -580,12 +627,8 @@ system_installer()
     # FIXME: implement this.  until then, we just run auto_install
     auto_install
 
-    # FIXME: should we leave the installed system mounted?  or unmount
-    #        everything nicely?  sometimes it would be nice to have the sysroot
-    #        left mounted... as long as it's safe to reboot blindly at that
-    #        point
-    #
-    #        for now, I'll leave it mounted... revisit if problems.
+    # NOTE: It's convenient to have the sysroot left mounted at this
+    #       point... so we leave it... revisit if that causes problems.
     #
     echo "installation complete!"
 }
@@ -634,3 +677,14 @@ if [ -z "$JUST_SOURCE" ]; then
     fi
     trap 0 2
 fi
+
+
+# FIXME: instead of copying sqsh images over, and setting up a potentially
+#        complicated overlay fs, should we just mount things in an overlay and
+#        create a new custom base.sqsh?  i guess we'd want to run the firstboot
+#        dialog here, then... and probably do an apt update/upgrade if
+#        possible?
+
+# FIXME: if we're setting things up to use zfs, we should probably apt install
+#        zfs and zfs-auto-snapshot if not already included in the selected sqsh
+#        image...

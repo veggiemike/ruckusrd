@@ -592,9 +592,14 @@ parse_boot_params()
                 initramsys_net=1
                 initramsys_net_conf=${o#initramsys-net=}
                 ;;
+            initramsys-installer)
+                initramsys=1
+                initramsys_installer=1
+                ;;
             initramsys-installer=*)
                 initramsys=1
-                initramsys_installer=${o#initramsys-installer=}
+                initramsys_installer=1
+                initramsys_installer_conf=${o#initramsys-installer=}
                 ;;
             *)
                 # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
@@ -661,4 +666,5 @@ parse_boot_params()
     decho2 "initramsys_net=$initramsys_net"
     decho2 "initramsys_net_conf=$initramsys_net_conf"
     decho2 "initramsys_installer=$initramsys_installer"
+    decho2 "initramsys_installer_conf=$initramsys_installer_conf"
 }
