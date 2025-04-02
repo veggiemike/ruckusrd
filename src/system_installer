@@ -97,7 +97,7 @@ dlg_summary()
 {
     go=$DLG
     go="$go --title 'Configuration Summary'"
-    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nSetup EFI: $can_efi\nSwap (G): $swap\n\nContinue?'"
+    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nSetup EFI: $can_efi\nSwap: $swap\n\nContinue?'"
     go="$go 0 0"
     KEEP_GOING=$(eval $go 3>&1 1>&2 2>&3 && echo yes || echo -n)
     #echo "KEEP_GOING=$KEEP_GOING"
@@ -173,21 +173,17 @@ partition_disks()
     esppart=1
     echo "label: gpt" > /tmp/ptable
     if [ -n "$can_efi" ]; then
-        # FIXME: how much space for ESP?  Most "regular" installations I've
-        #        seen use a really small partition (256M or 512M), but we're
-        #        going to use ESP as the actual /boot partition and I like to
-        #        keep a couple development kernels and large initrds in there.
+        # NOTE: Most "regular" installations I've seen use a really small
+        #       partition (256M or 512M), but we're going to use ESP as the
+        #       actual /boot partition and I like to keep a couple development
+        #       kernels and large initrds in there.  So our default size is 1G,
+        #       overridable via the ESP= kernel command line arg.
         #
-        #        if i'm going to keep a full fw.sqsh in /boot, 1G is actually
-        #        already almost too small. (66% full w/ only a single kernel) I
-        #        did 4G when I started to set my laptop up with a new SSD eons
-        #        ago.
-        #
-        echo ",1G,U" >> /tmp/ptable
+        echo ",$espsize,U" >> /tmp/ptable
         zfspart=$((zfspart+1))
         swappart=$((swappart+1))
     fi
-    if [ -n "$swap" ]; then
+    if [ -n "$swap" ] && [ "$swap" != "0" ]; then
         # NOTE: I thought about using LVM for swap... but it wouldn't really
         #       buy us anything but increased complexity, especially since
         #       we're using the remaining space in a ZFS pool.  About the only
@@ -195,7 +191,7 @@ partition_disks()
         #       shrink swap later if desired... so we just use a straight up
         #       regular partition for swap.
         #
-        echo ",${swap}G,S" >> /tmp/ptable
+        echo ",$swap,S" >> /tmp/ptable
         zfspart=$((zfspart+1))
     fi
     echo ",,L" >> /tmp/ptable
@@ -206,8 +202,8 @@ partition_disks()
     for d in $disks; do
         sfdisk $d < /tmp/ptable
         zfsdisks="$zfsdisks $d$zfspart"
-        swapdisks="$swapdisks $d$swappart"
-        espdisks="$espdisks $d$esppart"
+        [ -n "$want_swap" ] && swapdisks="$swapdisks $d$swappart"
+        [ -n "$can_efi" ] && espdisks="$espdisks $d$esppart"
     done
 }
 
@@ -246,12 +242,9 @@ auto_install()
     #        using default names (e.g., EFI/boot/bootx64.efi) and skip the last
     #        call to efibootmgr?
     #
-    if (efibootmgr >/dev/null 2>&1); then
+    if [ -z "$can_efi" ] && (efibootmgr >/dev/null 2>&1); then
         can_efi=y
     fi
-    #decho can_efi: $can_efi
-    # FIXME: for testing, remove when done
-    can_efi=y
 
     # how much ram - pick a swap size
     #
@@ -280,22 +273,25 @@ auto_install()
     #        EFI and all my actual hardware at this point CAN use EFI.
     #
     #
-    if [ -n "$can_efi" ]; then
+    if [ -z "$want_swap" ] && [ "$swap" != "0" ] && [ -n "$can_efi" ] && [ "$can_efi" != "default" ]; then
         want_swap=1
     fi
     if [ -n "$want_swap" ]; then
-        # mem in kb
-        mem=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
-        # 1.5*mem in G
-        swap=$((mem*15/10/1024/1024+1))
-        numdisks=$(echo $disks | wc -w)
-        if [ $numdisks -gt 1 ]; then
-            halfswap=$((swap/numdisks))
-            # round up if needed
-            if [ $((halfswap*numdisks)) -lt $swap ]; then
-                halfswap=$((halfswap+1))
+        if [ -z "$swap" ]; then
+            # mem in kb
+            mem=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+            # 1.5*mem in G
+            swap=$((mem*15/10/1024/1024+1))
+            numdisks=$(echo $disks | wc -w)
+            if [ $numdisks -gt 1 ]; then
+                halfswap=$((swap/numdisks))
+                # round up if needed
+                if [ $((halfswap*numdisks)) -lt $swap ]; then
+                    halfswap=$((halfswap+1))
+                fi
+                swap=$halfswap
             fi
-            swap=$halfswap
+            swap="${swap}G"
         fi
     fi
     #decho swap: $swap
@@ -305,7 +301,7 @@ auto_install()
     [ -n "$KEEP_GOING" ] || user_abort
 
     # partition if needed
-    if [ -n "$can_efi" ] || [ -n "$swap" ]; then
+    if [ -n "$can_efi" ] || [ -n "$want_swap" ]; then
         partition_disks
     else
         zfsdisks=$disks
@@ -319,7 +315,7 @@ auto_install()
     # NOTE: We have to record UUIDs of each swap partition (and later each ESP)
     #       so we can add appropriate lines to /etc/fstab.
     #
-    rm -f /tmp/fstab
+    echo -n > /tmp/fstab
     for d in $swapdisks; do
         go="mkswap $d"
         decho $go
@@ -388,7 +384,7 @@ auto_install()
             fi
             # install syslinux files
             echo "installing syslinux files..."
-            mkdir -p /boot/EFI/syslinux
+            mkdir -p /boot/EFI/$efidir
             # FIXME: historically, I've just installed chain.c32, ldlinux.e64,
             #        libcom32.c32, libutil.c32, mboot.c32, menu.c32,
             #        syslinux.efi, and vesamenu.c32... (and i'm pretty sure
@@ -396,7 +392,10 @@ auto_install()
             #        copying all the files sure is easier.  let's see what
             #        happens.
             #
-            $rsync /usr/share/syslinux/efi64/* /boot/EFI/syslinux/
+            $rsync /usr/share/syslinux/efi64/* /boot/EFI/$efidir/
+            if [ "$can_efi" = "default" ]; then
+                mv -v /boot/EFI/$efidir/syslinux.efi /boot/EFI/$efidir/bootx64.efi
+            fi
             # FIXME: i know a lot of this doesn't work... the color stuff, in
             #        paticular.  Should test and remove things that have no
             #        effect.
@@ -436,7 +435,7 @@ auto_install()
             #        specify a list of possible devices... not sure i acutally
             #        ever implemented that.
             #
-            cat > /boot/EFI/syslinux/syslinux.cfg <<EOF
+            cat > /boot/EFI/$efidir/syslinux.cfg <<EOF
 default menu.c32
 timeout 50
 
@@ -497,12 +496,14 @@ EOF
             #        specify a bootnum that's already in use?  Could try -b a1,
             #        a2, a3, etc, in the hopes they're not taken
             #
-            go="efibootmgr -v -c"
-            go="$go -d $(echo $d | sed 's|[0-9]*$||')"
-            go="$go -p $(echo $d | grep -o '[0-9]*$')"
-            go="$go -l /EFI/syslinux/syslinux.efi -L syslinux"
-            decho $go
-            eval $go || echo "WARNING: efibootmgr failed"
+            if [ "$can_efi" != "default" ]; then
+                go="efibootmgr -v -c"
+                go="$go -d $(echo $d | sed 's|[0-9]*$||')"
+                go="$go -p $(echo $d | grep -o '[0-9]*$')"
+                go="$go -l /EFI/$efidir/syslinux.efi -L syslinux"
+                decho $go
+                eval $go || echo "WARNING: efibootmgr failed"
+            fi
 
             # umount esp
             umount /boot
@@ -553,6 +554,8 @@ system_installer()
     # further parse initramsys-installer config
     imgdev=
     imgdir=images
+    efidir=syslinux
+    espsize=1G
     opts=${initramsys_installer_conf//,/ }
     for o in $opts; do
         case "$o" in
@@ -561,6 +564,23 @@ system_installer()
                 ;;
             IMGDIR=*)
                 imgdir=${o#IMGDIR=}
+                ;;
+            EFI=*)
+                can_efi=${o#EFI=}
+                if [ "$can_efi" = "default" ]; then
+                    efidir="boot"
+                fi
+                ;;
+            SWAP=*)
+                swap=${o#SWAP=}
+                if [ "$swap" != "0" ]; then
+                    want_swap=y
+                else
+                    want_swap=
+                fi
+                ;;
+            ESP=*)
+                espsize=${o#ESP=}
                 ;;
             *)
                 decho "ignoring invalid initramsys_installer config option $o"
