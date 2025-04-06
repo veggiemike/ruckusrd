@@ -5,6 +5,13 @@
 # Licensed under the GPLv3. See the file COPYING for details. 
 #
 
+
+# define pushd/popd aliases because ash doesn't implement them and all our
+# scripts are designed to run from within the initramfs using ash.
+alias pushd='wd="$(pwd) ${wd}" && cd'
+alias popd='cd ${wd%% *} && wd=${wd#* }'
+
+
 # prepend $* with "ruckusrd:" label, while potentially reordering $* so that
 # command line args to echo (e.g., -n) are still at the front (so echo will
 # actually consume them).
@@ -293,16 +300,12 @@ special_device_lookup()
     fstype=
     case $str in
         CDLABEL=*)
-            # FIXME: does findfs work for CD/DVD drives?  maybe?  it doesn't
-            #        really matter for the type of maintenance i'm envisioning
-            #        using this script for... and i don't actually have a
-            #        CD/DVD drive to test with at the moment... maybe someday
-            #        i'll find out.  ha.
-            #
             realdev=$(findfs LABEL=${str#CDLABEL=})
+            fstype=$(eval $(blkid -o export $realdev); echo $TYPE)
             ;;
         LABEL=*|UUID=*)
             realdev=$(findfs $str)
+            fstype=$(eval $(blkid -o export $realdev); echo $TYPE)
             ;;
         ZFS=*)
             ZFS=${str#ZFS=}
@@ -316,6 +319,7 @@ special_device_lookup()
             ;;
         /dev/*)
             realdev=$str
+            fstype=$(eval $(blkid -o export $realdev); echo $TYPE)
             ;;
     esac
 

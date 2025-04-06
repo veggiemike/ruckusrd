@@ -362,7 +362,23 @@ auto_install()
     rsync="rsync -rltD -v --progress"
     zfs mount zroot/sqsh
     echo "installing sqsh_layer image files..."
-    $rsync $imgdir/${layers//:/.sqsh $imgdir/}.sqsh /sysroot/zroot/sqsh/
+    for l in $imgdir/${layers//:/.sqsh $imgdir/}.sqsh; do
+        if [ -f $l ]; then
+            # copy it
+            $rsync $l /sysroot/zroot/sqsh/
+        elif [ -f ${l}SPLIT00 ]; then
+            echo "reconstructing $(basename $l) from $(echo $(basename -a ${l}SPLIT[0-9][0-9]))..."
+            # reconstruct into image dir
+            target=/sysroot/zroot/sqsh/$(basename $l)
+            cat ${l}SPLIT[0-9][0-9] > $target
+            # match timestamp w/ the 00 file
+            touch -r ${l}SPLIT00 $target
+        else
+            # missing image file...
+            echo "ERROR: missing required image file: $l"
+            return -1
+        fi
+    done
 
     # efibootmgr
     if [ -n "$can_efi" ]; then
@@ -509,9 +525,6 @@ EOF
             umount /boot
             echo "done with $d"
         done
-
-        # umount rootdev
-        umount /tmproot
     fi
 
     # create fstab
@@ -590,6 +603,11 @@ system_installer()
 
     # resolve device name(s) - this will give us real_{devstring} and
     # {devstring}fstype
+    #
+    # NOTE: We explicitly lookup and supply fstype to mount calls below because
+    #       relying on autodetection via mount command relies on filesystem
+    #       modules already being loaded (e.g., is9660).
+    #
     special_device_lookup rootdev $root
     decho "real_rootdev: $real_rootdev"
     decho "rootdevfstype: $rootdevfstype"
@@ -606,13 +624,17 @@ system_installer()
     #
     if ! (grep -q "^$real_rootdev /tmproot" /proc/mounts); then
         mkdir -p /tmproot
-        mount $real_rootdev /tmproot
+        mount="mount"
+        [ -n "$rootdevfstype" ] && mount="$mount -t $rootdevfstype"
+        $mount $real_rootdev /tmproot
     fi
 
     # mount imgdev (if not already mounted)
     if [ -n "$real_imgdev" ] && ! (grep -q "^$real_imgdev /img" /proc/mounts); then
         mkdir -p /img
-        mount $real_imgdev /img
+        mount="mount"
+        [ -n "$imgdevfstype" ] && mount="$mount -t $imgdevfstype"
+        $mount $real_imgdev /img
     fi
 
     # set imgdir to absolute path to our images
@@ -624,12 +646,19 @@ system_installer()
 
     # locate images
     #
-    # FIXME: look for *.sqshXaa as well, for split up huge images.  can't
-    #        reassemble yet, because we don't have any target filesystems
-    #        mounted yet... but should populated our dialogs with the
-    #        appropriate names in advance
+    # NOTE: The *.sqshSPLIT[0-9][0-9] files are created during ISO creation to
+    #       workaround max file size limitations.  During installation we'll
+    #       reassemble the pieces.
     #
-    imgs=$(cd $imgdir; ls *.sqsh)
+    imgs=
+    pushd $imgdir
+    for x in *.sqsh *.sqshSPLIT[0-9][0-9]; do
+        # check to see if glob matches any actual files
+        [ -f $x ] && imgs="$imgs $x"
+    done
+    popd
+    # now prune out the SPLIT files, removing duplicates
+    imgs=$(echo $imgs | sed 's|SPLIT[0-9][0-9]||g' | tr ' ' '\n' | sort -u)
     decho "found imgs: $imgs"
 
     # prompt for uppermost layer
