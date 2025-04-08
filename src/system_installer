@@ -12,31 +12,6 @@ TTYSTR=$(tty 2>/dev/null)
 TTYSTR=${TTYSTR//\//-}
 ALREADY_DONE=/tmp/.system_installer_done-$TTYSTR
 
-# FIXME: shouldn't hard-code this... should we have source-ruckus-deb create a
-#        conf file with this info during build?
-#
-# FIXME: We're also assuming knowledge of the layering in here... it's not
-#        complicated, but still... it's also not defined anywhere outside of
-#        the source-ruckus-deb Makefile build rules
-#
-es_description="Embedded Server"
-es_file_description="Embedded File Server"
-es_auth_description="Embedded Authentication Server"
-es_web_description="Embedded Web Server"
-server_description="Server"
-vmm_description="Virtual Machine Monitor"
-workstation_description="Full Workstation of Doom"
-es_devel_description="Embedded Development Server"
-
-es_layers="es"
-es_file_layers="es-file:es"
-es_auth_layers="es-auth:es"
-es_web_layers="es-web:es"
-server_layers="server:es"
-vmm_layers="vmm:server:es"
-workstation_layers="workstation:vmm:server:es"
-es_devel_layers="es-devel"
-
 
 # NOTE: The emergency_shell() function from ruckusrd-common does shenanigans to
 #       get a controlling tty for bash... this seems unneeded at this point,
@@ -235,13 +210,6 @@ auto_install()
     #decho ashift: $ashift
 
     # can we do EFI setup?
-    #
-    # FIXME: should I allow forcing EFI setup?  would need to allow efibootmgr
-    #        to fail later on... or perhaps add
-    #        initramsys-installer=EFI=default to force inclusion of EFI setup
-    #        using default names (e.g., EFI/boot/bootx64.efi) and skip the last
-    #        call to efibootmgr?
-    #
     if [ -z "$can_efi" ] && (efibootmgr >/dev/null 2>&1); then
         can_efi=y
     fi
@@ -264,14 +232,6 @@ auto_install()
     #       only problem with that is we'll potentially loose the ability to
     #       suspend to disk w/ a failed disk in the zpool...  but we've got
     #       bigger fish to fry in that case.
-    #
-    # FIXME: Could add initramsys-installer=SWAP=1 to specify swap size on
-    #        commandline...
-    #
-    # FIXME: Maybe not the best test, but for now I'm going to key off of the
-    #        can_efi variable... because these virtual machines can't goof with
-    #        EFI and all my actual hardware at this point CAN use EFI.
-    #
     #
     if [ -z "$want_swap" ] && [ "$swap" != "0" ] && [ -n "$can_efi" ] && [ "$can_efi" != "default" ]; then
         want_swap=1
@@ -353,11 +313,6 @@ auto_install()
     #          which we want (instead of full blown -a).  We want timestamps to
     #          be preserved, so that we can keep redundant ESPs sync'd w/
     #          rsync, but vfat is going to have heartburn if we use -a.
-    #
-    # FIXME: if we split a huge.sqsh image into huge.sqshXaa, huge.sqshXab,
-    #        etc, and put huge.sqsh in our dialog to select, and the user
-    #        selected it, we need to reassembe it via `cat huge.sqshX*
-    #        huge.sqsh` here (when installing on target filesystem)
     #
     rsync="rsync -rltD -v --progress"
     zfs mount zroot/sqsh
@@ -498,9 +453,6 @@ EOF
             #
             # NOTE: We do this for EACH ESP to make sure the system is bootable
             #       even if the primary boot disk fails.
-            #
-            # FIXME: don't do this if we're using default UEFI filenames
-            #        (e.g., EFI=default)
             #
             # NOTE: from my ancient notes:
             #
@@ -661,6 +613,14 @@ system_installer()
     imgs=$(echo $imgs | sed 's|SPLIT[0-9][0-9]||g' | tr ' ' '\n' | sort -u)
     decho "found imgs: $imgs"
 
+    # load conf for images
+    #
+    # NOTE: This file, created during sourceruckus-deb build, describes the
+    #       built sqsh images, and the dependencies between them.
+    #
+    sqshconf=$imgdir/sqsh_layers.conf
+    [ -f $sqshconf ] && . $sqshconf
+
     # prompt for uppermost layer
     dlg_pick_top_layer $imgs
     [ -n "$KEEP_GOING" ] || user_abort
@@ -727,12 +687,6 @@ if [ -z "$JUST_SOURCE" ]; then
     trap 0 2
 fi
 
-
-# FIXME: instead of copying sqsh images over, and setting up a potentially
-#        complicated overlay fs, should we just mount things in an overlay and
-#        create a new custom base.sqsh?  i guess we'd want to run the firstboot
-#        dialog here, then... and probably do an apt update/upgrade if
-#        possible?
 
 # FIXME: if we're setting things up to use zfs, we should probably apt install
 #        zfs and zfs-auto-snapshot if not already included in the selected sqsh
