@@ -209,6 +209,25 @@ configuration is eth0, DHCP, no VLAN, w/ hostname of ruckusrd-TIMESTAMP.  The
 dropbear SSH server is started automatically as well.
 
 .TP
+\fBinitramsys-installer[=CONFIG]\fR
+Implies \fBinitramsys\fP, but runs a dialog-based system installer prior to
+providing a TTY for login.  This is specifically for pairing with the
+sqsh_layer images built by the Source Ruckus System Builder.  By default, one
+(or multiple identically sized) drive(s) are partitioned and put in a mirrored
+ZFS pool, an ESP is configured for EFI booting if EFI support is detected, a
+suitable ammount of swap is configured, and the selected sqsh_layer (and any
+required sub-layers) is installed.  \fBEFI\fP=\fIforce|default\fP can be
+provided to either force ESP setup even though EFI support isn't detected or to
+specify default EFI names should be used instead of configuring a boot entry
+with efibootmgr (i.e., for bootable removable media).  \fBESP\fP=\fIsize\fP can
+be used to explicitly specify the ESP size (e.g., 4G).  \fBSWAP\fP=\fIsize\fP
+can be used to explicitly specify swap partition size (e.g., 4G, 0 to disable
+swap).  \fBIMGDEV\fP=\fIdevice\fP specifies a alternate device containing
+sqsh_layer images.  \fBIMGDIR\fP=\fIdir\fP specifies an alternate name for the
+directory containing the sqsh_layer images.  Traditional BIOS bootup isn't
+supported.
+
+.TP
 \fBmodinject\fR
 Inject kernel modules (and kernel header files) from the initramfs into the
 sysroot.  This ensures that the same modules exist post bootup that exist

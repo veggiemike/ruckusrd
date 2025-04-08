@@ -3,7 +3,7 @@
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
 * v0.22.0
-2025-mm-dd: Ruckusrd v0.22.0 (under development)
+2025-04-dd: Ruckusrd v0.22.0 (under development)
 
 - Added new `initramsys-net` boot parameter.  This implies `initramsys` but
   enables networking and starts sshd.  Configuration can be specified as an
@@ -14,6 +14,11 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 - Added new `mount_sysroot`, `mount_sysroot_vfs`, and `umount_sysroot` scripts
   to facilitate easy assembly/disassembly of sysroot from inside the
   `initramsys` environment.
+- Added new `initramsys-installer` boot parameter.  This kicks off a
+  dialog-based installer that prompts for topmost sqsh_layer, then does a
+  system installation on auto-detected drives.  There isn't a manual drive
+  setup yet, just the automatic selection of one (or multiple identically
+  sized) drive(s) to be used in a ZFS pool.  See manpage for more details.
 
 * v0.21.1
 2024-10-14: Ruckusrd v0.21.1

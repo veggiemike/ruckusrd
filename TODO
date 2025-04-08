@@ -86,36 +86,6 @@
 
 * for 0.22
 
- - Add an install_on_zpool script to configure zfs datasets for a sqsh_layer
-   system.  Dialog to pick topmost layer.  Crete zpool/root, zpool/sqsh,
-   zpool/home, and maybe zpool/scrap.  Install layers into zpool/sqsh.
-   
-   Configure syslinux.  Configure EFI bootloader.  Hmm... how do we detect the
-   need (i.e., because there's no need inside a Xen PVH domain)?  I suppose
-   efibootmgr failing would do it...
-
-   Could include a corresponding boot param to automate the bootup into
-   installer process.  This should run w/out root disk setup, a la initramsys.
-   Could call it initramsys-installer.  Probably actually run as an init script
-   inside the initramsys embedded system.
-
-   If we start automatically, there's no time for user to create a zpool... so
-   we'll have to ask them to and drop to a shell.  Also, we may have to
-   partition a disk to create ESP (and swap?)
-
-   We could also create the requested pool if it doesn't exist... but out of
-   what?  If there's just one disk, it's obvious... Any more than that, and
-   it's really too complicated to make an educated guess.  Shoot, even 1 disk
-   we have to make assumptions about partitioning (e.g., ESP, swap).
-
-   I think we can take either an existing zpool, or a list of drives to make a
-   pool out of.  In that case, we're going to do either single-disk or mirrored
-   pairs (because anything else for zroot is silly), we can autodetect EFI by
-   trying to use efibootmgr, partition each disk with ESP, swap, and rest, then
-   add all the last partitions to the zpool.
-
-   initramsys-installer=IMGDEV,...
-
  - fwdev= should take a list of potential devices to try... if it doesn't
    already.  we'll need that for redundant ESP support
 

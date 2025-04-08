@@ -344,8 +344,13 @@ auto_install()
         bootnum=1
         # install boot files in ESP
         for d in $espdisks; do
-            echo "preparing ESP $d..."
-            mkfs.vfat $d
+            if [ $bootnum -gt 1 ]; then
+                esp_label="ESP$bootnum"
+            else
+                esp_label="ESP"
+            fi
+            echo "preparing $esp_label $d..."
+            mkfs.vfat -n $esp_label $d
             mount $d /boot
             # install kernel files
             echo "installing kernel files..."
@@ -469,6 +474,7 @@ EOF
                 go="$go -d $(echo $d | sed 's|[0-9]*$||')"
                 go="$go -p $(echo $d | grep -o '[0-9]*$')"
                 go="$go -l /EFI/$efidir/syslinux.efi -L syslinux"
+                [ $bootnum -gt 1 ] && go="$go$bootnum"
                 decho $go
                 eval $go || echo "WARNING: efibootmgr failed"
             fi
