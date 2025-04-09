@@ -86,8 +86,8 @@
 
 * for 0.22
 
- - fwdev= should take a list of potential devices to try... if it doesn't
-   already.  we'll need that for redundant ESP support
-
  - also, what happens to root=ZFS if a disk is bad/missing?  does it start the
    pool in degraded mode and continue booting?  or is it hosed?  test
+
+ - firstboot groomer adds localadmin user but doesn't create a homedir... was
+   that on purpose?

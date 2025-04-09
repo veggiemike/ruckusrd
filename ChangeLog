@@ -19,6 +19,9 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
   system installation on auto-detected drives.  There isn't a manual drive
   setup yet, just the automatic selection of one (or multiple identically
   sized) drive(s) to be used in a ZFS pool.  See manpage for more details.
+- The `fwdev=` parameter now treats its argument as a comma-delimited list of
+  devices to try, and the first one that shows up gets used.  This is for
+  redundant ESP support (e.g., fwdev=LABEL=ESP,LABEL=ESP2).
 
 * v0.21.1
 2024-10-14: Ruckusrd v0.21.1

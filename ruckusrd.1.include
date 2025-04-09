@@ -26,13 +26,14 @@ root device (unless \fBsqsh_layerdev\fP, see \fBBOOT PARAMETERS\fP).
 [firmware handling]
 RuckusRD initramfs images can have a traditional \fIfw.img\fP (e.g., created
 with \fBfirmwarenator\fP(1)) appended to them, or even better you can use
-\fBfwdev\fP on the kernel commandline to specify a device (which can be the same
-as the root device) containing a SquashFS image of system firmware named
-\fIfw.sqsh\fP.  This method of firmware management makes updating system
-firmware independent of the initrd or kernel upgrade process.  A giant
-\fIfw.sqsh\fP is built in \fIruckusrd/subprojects/fw.sqsh\fP out of ALL the
-latest firmware, but isn't installed (it is quite large), or you can make a
-machine-specific one (again, with \fBfirmwarenator\fP(1)).
+\fBfwdev\fP on the kernel commandline to specify a comma-delimited list of
+devices (first one that exists gets used, can be the same as the root device)
+containing a SquashFS image of system firmware named \fIfw.sqsh\fP.  This
+method of firmware management makes updating system firmware independent of the
+initrd or kernel upgrade process.  A giant \fIfw.sqsh\fP is built in
+\fIruckusrd/subprojects/fw.sqsh\fP out of ALL the latest firmware, but isn't
+installed (it is quite large), or you can make a machine-specific one (again,
+with \fBfirmwarenator\fP(1)).
 
 [microcode handling]
 Initramfs images created w/ RuckusRD automatically include
@@ -182,7 +183,7 @@ a new system.  Even if \fBfirstboot\fP is specified, if
 \fIfirstboot_wizard\fP will be skipped.
 
 .TP
-\fBfwdev\fR=\fBFWDEV\fR
+\fBfwdev\fR=\fBFWDEV[,FWDEV2,...]\fR
 Specify a device containing \fIfw.sqsh\fP.  If found, this squashfs image is
 mounted on \fI/lib/firmware\fP to provide firmware to modules loaded during the
 initramrd stage (e.g., video cards, ethernet cards).

@@ -189,7 +189,12 @@ if [ -n "$fwdev" ]; then
 
     # wait for kernel to finish iterating through devices if needed (e.g., USB
     # disks)
-    wait_for_dev 10 fwdev $fwdev
+    #
+    # NOTE: This waits for any of fwdev_ws devices to show up, and sets
+    #       /dev/lastwaited symlink to point to whichever one showed up first
+    #
+    wait_for_dev 10 fwdev $fwdev_ws
+    fwdev=$(readlink /dev/lastwaited)
 
     fwdir=/fwdev
     fwsqsh=$fwdir/fw.sqsh
@@ -249,7 +254,7 @@ start_udev
 #
 #/sbin/udevadm settle --exit-if-exists=/dev/sda
 #
-wait_for_dev 10 "at least one hdd" /dev/sda /dev/nvme0n1 /dev/xvda
+wait_for_dev 10 "at least one hdd" /dev/sda /dev/nvme0n1 /dev/xvda /dev/xvdb /dev/xvdc
 
 # activate LVM
 #

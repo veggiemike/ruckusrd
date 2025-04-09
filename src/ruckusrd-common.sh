@@ -77,12 +77,18 @@ decho2()
 #
 # Example: wait_for_dev 10 fwdev LABEL=FIRMWARE
 #
+# Example: wait_for_dev 10 fwdev LABEL=ESP LABEL=ESP2
+#
 # Example: wait_for_dev 10 "at least ond hdd" /dev/sda /dev/nvme0n1 /dev/xvda
 #
 # Example: wait_for_dev 30 "/dev/root symlink" /dev/root
 #
 # NOTE: Adds device-mapper device name responsible for the required device to
 #       global $dmneeded prior to returning.
+#
+# NOTE: Creates /dev/lastwaited symlink pointing at either the device that
+#       eventually showed up or /dev/null... in case you need an extra way of
+#       checking status.
 #
 wait_for_dev()
 {
@@ -93,6 +99,7 @@ wait_for_dev()
 
     msg="waiting up to $seconds seconds for $txt to appear..."
     found=
+    ln -fs /dev/null /dev/lastwaited
     while [ $seconds -gt 0 ]; do
         if [ -n "$msg" ]; then
             decho -n ruckusrd: $msg
@@ -118,6 +125,7 @@ wait_for_dev()
             [ -n "$dev" ] || continue
             if [ -e $dev ]; then
                 found=$dev
+                ln -fs $dev /dev/lastwaited
                 # break out of both loops, we're done done
                 break 2
             fi
@@ -583,6 +591,7 @@ parse_boot_params()
                 ;;
             fwdev=*)
                 fwdev=${o#fwdev=}
+                fwdev_ws=${fwdev//,/ }
                 ;;
             initramsys)
                 initramsys=1
