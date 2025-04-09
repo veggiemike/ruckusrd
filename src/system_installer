@@ -582,17 +582,31 @@ system_installer()
     #
     if ! (grep -q "^$real_rootdev /tmproot" /proc/mounts); then
         mkdir -p /tmproot
-        mount="mount"
-        [ -n "$rootdevfstype" ] && mount="$mount -t $rootdevfstype"
-        $mount $real_rootdev /tmproot
+        # check to see if device is already mounted somewhere else (e.g.,
+        # /fwdir), and use mount --bind if it is
+        prevmp=$(grep "^$real_rootdev" /proc/mounts | awk '{print $2}')
+        if [ -n "$prevmp" ]; then
+            mount --bind $prevmp /tmproot
+        else
+            mount="mount"
+            [ -n "$rootdevfstype" ] && mount="$mount -t $rootdevfstype"
+            $mount $real_rootdev /tmproot
+        fi
     fi
 
     # mount imgdev (if not already mounted)
     if [ -n "$real_imgdev" ] && ! (grep -q "^$real_imgdev /img" /proc/mounts); then
         mkdir -p /img
-        mount="mount"
-        [ -n "$imgdevfstype" ] && mount="$mount -t $imgdevfstype"
-        $mount $real_imgdev /img
+        # check to see if device is already mounted somewhere else (e.g.,
+        # /fwdir), and use mount --bind if it is
+        prevmp=$(grep "^$real_imgdev" /proc/mounts | awk '{print $2}')
+        if [ -n "$prevmp" ]; then
+            mount --bind $prevmp /img
+        else
+            mount="mount"
+            [ -n "$imgdevfstype" ] && mount="$mount -t $imgdevfstype"
+            $mount $real_imgdev /img
+        fi
     fi
 
     # set imgdir to absolute path to our images

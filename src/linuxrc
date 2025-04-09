@@ -209,8 +209,6 @@ if [ -n "$fwdev" ]; then
     #
     mkdir -p /lib/firmware
     mount -o ro $fwsqsh /lib/firmware
-    # unmount the fwdev since we no longer need to access it
-    umount -l $fwdir
 fi
 
 # stop normal boot if `initramsys` requested
@@ -339,6 +337,9 @@ done
 # FIXME: should we fsck sqsh_layerdev too?  same rationale applies... probably
 #        can't umount once we've put things together (unless to_ram?).
 #
+# FIXME: if the rootdev is actually already mounted as /fwdev, and we're going
+#        to --move it, it's too late to fsck.  will this fail quietly?
+#
 if ! (echo $root | grep -q "CDLABEL=\|ZFS="); then
     go="fsck -p $thingtomount"
     if [ -n "$quiet" ]; then
@@ -370,7 +371,18 @@ else
         mountoptions="$mountoptions,$rootflags"
     fi
 
-    go="mount -t $rootfstype $mountoptions $thingtomount /sysroot"
+    # check to see if $thingtomount is already mounted, and if it is, --bind
+    # from the previous mountpoint.  this is possible in the scenario where
+    # fw.sqsh is kept on the root device of a sqsh_layer system (e.g.,
+    # /mnt/root-true).
+    prevmp=$(grep "^$thingtomount" /proc/mounts | awk '{print $2}')
+    if [ -n "$prevmp" ]; then
+        # NOTE: Testing indicates mountoptions are ignored when using --bind,
+        #       so we don't specify them here.
+        go="mount --bind $prevmp /sysroot"
+    else
+        go="mount -t $rootfstype $mountoptions $thingtomount /sysroot"
+    fi
     decho2 $go
     eval $go
     RES=$?
@@ -389,7 +401,19 @@ else
     # look for sqsh_layerdev
     if [ -n "$thingtomount_sqsh" ]; then
         # NOTE: rootfstype and mountoptions do NOT follow the rootfs rules
-        go="mount -t $sqshfstype -o ro $thingtomount_sqsh /sqsh_layerdev"
+        #
+        # check if $thingtomount_sqsh is already mounted, and --bind mount if
+        # it is.  this is possible in the scenario where fw.sqsh is kept on
+        # sqshlayer_dev.
+        #
+        prevmp=$(grep "^$thingtomount_sqsh" /proc/mounts | awk '{print $2}')
+        if [ -n "$prevmp" ]; then
+            # NOTE: Testing indicates mountoptions are ignored when using --bind,
+            #       so we don't specify them here.
+            go="mount --bind $prevmp /sqsh_layerdev"
+        else
+            go="mount -t $sqshfstype -o ro $thingtomount_sqsh /sqsh_layerdev"
+        fi
         decho2 $go
         eval $go
     fi
@@ -1005,6 +1029,9 @@ fi
 
 # unmount fw.sqsh if we mounted it
 [ -n "$fwsqsh" ] && umount /lib/firmware
+
+# likewise, unmount fwdev if we mounted it
+[ -n "$fwdir" ] && umount $fwdir
 
 # FIXME: This works well enough now, I'm considering making it on by
 #        default... perhaps with a 'nofirstboot' to disable it, although that
