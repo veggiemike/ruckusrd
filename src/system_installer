@@ -346,8 +346,10 @@ auto_install()
         for d in $espdisks; do
             if [ $bootnum -gt 1 ]; then
                 esp_label="ESP$bootnum"
+                fwdevspec="$fwdevspec,LABEL=$esp_label"
             else
                 esp_label="ESP"
+                fwdevspec="fwdev=LABEL=$esp_label"
             fi
             echo "preparing $esp_label $d..."
             mkfs.vfat -n $esp_label $d
@@ -390,6 +392,18 @@ auto_install()
             #        firmware from the giant fw.sqsh on the root of the thumb
             #        drive (but don't boot the installer with fwdev=)
             #
+            #        the problem described above regarding fw being too large
+            #        we actually if you try and copy the entire fw image into
+            #        the initramfs, which uses up too much space, and the
+            #        workaround was to just mount fw.sqsh at /lib/modules.  we
+            #        *should* be able to use fw.sqsh, get all the needed
+            #        firmware, and generate a system-specific fw.sqsh image
+            #        using firmwarenator.  assuming all devices have been
+            #        loaded... which should be mostly true since udev probed
+            #        everything for us... but I seem to recall there being some
+            #        corner-case with some wifi adapters non loading firmware
+            #        until you try to actually use them?
+            #
             # FIXME: Also, what about the "default" place for EFI bootloaders?
             #        So we don't have to poke the system's EFI setup for
             #        bootable thumb drives and the like?
@@ -405,11 +419,24 @@ auto_install()
             #        supposed to be vfat, I can't imagine the capitalization
             #        really matters... but it *IS* different.
             #
-            # FIXME: get the variables set for this... $esplabels?
+            # FIXME: Should we also generate a xen.cfg and copy xen.gz into ESP
+            #        if present in the overlay?  Oh, we didn't put together the
+            #        overlay... maybe the firstboot groomer can do that for us?
+            #        and add an entry via efibootmgr?
             #
-            # FIXME: this config file's handling of fwdev= is assuming we can
-            #        specify a list of possible devices... not sure i acutally
-            #        ever implemented that.
+            # FIXME: Oh... becuase this is done in a loop, we end up with
+            #        fwdev=LABEL=ESP on the first disc,
+            #        fwdev=LABEL=ESP,LABEL=ESP2 on the 2nd, and so on.  Given
+            #        that we're really only doing that to get at fw.sqsh, and
+            #        if the 1st disk is available we don't need the subsequent
+            #        ones, this is "ok"... but I'm not loving it.  I had
+            #        planned to keep the "redundant" ESP sync'd via rsync calls
+            #        later on, so i really don't want the syslinux.cfg files to
+            #        differ on each one...
+            #
+            #        Perhaps I should create a single ESP, including the
+            #        propper fwdev referencing ALL of them, and then rsync into
+            #        subsequent ESPs?
             #
             cat > /boot/EFI/$efidir/syslinux.cfg <<EOF
 default menu.c32
@@ -440,7 +467,7 @@ menu autoboot "Booting default in # second{,s}..."
 label ruckus
  menu label Source Ruckus Linux
  linux /vmlinuz-$kernelversion
- append initrd=/initrd-$kernelversion.img root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers ro consoleblank=300 fwdev=LABEL=$esplabels quiet
+ append initrd=/initrd-$kernelversion.img root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec ro consoleblank=300 quiet
  menu default
 
 EOF
@@ -508,10 +535,6 @@ EOF
 
     # we don't really even have to assemble and mount sysroot...  just boot up
     # `firstboot` and the initial system groom will happen.
-    #
-    # FIXME: well, that's certainly an argument for `firstboot` being on by
-    #        default... perhaps i should do that and ada a `nofirstboot` flag.
-    #
 }
 
 
@@ -654,6 +677,7 @@ system_installer()
     # prompt for auto or manual configuration
     #
     # FIXME: implement this.  until then, we just run auto_install
+    #
     auto_install
 
     # NOTE: It's convenient to have the sysroot left mounted at this
