@@ -342,10 +342,10 @@ auto_install()
         kernelversion=${kernelversion//vmlinuz-/}
         echo "kernelversion: $kernelversion"
 
-        # generate syslinux.cfg
+        # figure out fwdevspec for kernel command line params
         #
-        # NOTE: We have to loop over the disks here, to figure out a few
-        #       variables and generate a syslinux.cfg to work on all ESPs.
+        # NOTE: We have to loop over all the disks here, to get a list of all
+        #       of them, before we iterate over the paritions installing files.
         #
         bootnum=1
         for d in $espdisks; do
@@ -358,17 +358,94 @@ auto_install()
             fi
             bootnum=$((bootnum+1))
         done
+
+        # create and populate primary ESP and copy to redundant ESPs
         #
-        # FIXME: i know a lot of this doesn't work... the color stuff, in
-        #        paticular.  Should test and remove things that have no
-        #        effect.
+        # NOTE: The first time through this loop, we manually populate the ESP
+        #       with files.  Subsequent iterations just rsync to copy files.
         #
-        # FIXME: Should we also generate a xen.cfg and copy xen.gz into ESP
-        #        if present in the overlay?  Oh, we didn't put together the
-        #        overlay... maybe the firstboot groomer can do that for us?
-        #        and add an entry via efibootmgr?
-        #
-        cat > /tmp/syslinux.cfg <<EOF
+        bootnum=1
+        for d in $espdisks; do
+            if [ $bootnum -gt 1 ]; then
+                esp_label="ESP$bootnum"
+            else
+                esp_label="ESP"
+            fi
+            echo "preparing $esp_label $d..."
+
+            # create and mount filesystem
+            mkfs.vfat -n $esp_label $d
+            mkdir -p /mnt/$esp_label
+            mount $d /mnt/$esp_label
+
+            if [ $bootnum -eq 1 ]; then
+                # grab /boot files from configured sqsh_layers
+                #
+                # NOTE: This is done because we're going to mount our ESP at /boot,
+                #       and it'll end up masking whatever was in there when we
+                #       built the sqsh_layers.  Shouldn't be much, if anything
+                #       (currently, xen*.{gz,efi,config} are the only files), but
+                #       we don't want apt to get all angry later if a package's
+                #       files are missing.
+                #
+                echo "grabbing /boot files from sqsh_layers..."
+                for l in $(echo $layers | tr ':' '\n' |tac | tr '\n' ' '); do
+                    l=$l.sqsh
+                    echo layer: $l
+                    # NOTE: -no-xattrs because vfat doesn't support them and
+                    #       unsquashfs will fail if we ask it to copy any.
+                    unsquashfs -no-xattrs -f -d /mnt/$esp_label $imgdir/$l /boot >/dev/null
+                done
+                mv /mnt/$esp_label/boot/* /mnt/$esp_label/
+                rmdir /mnt/$esp_label/boot
+
+                # install kernel files
+                echo "installing kernel files..."
+                $rsync /tmproot/System.map* /tmproot/vmlinuz* /tmproot/initrd* /tmproot/config* /mnt/$esp_label
+
+                # generate machine-specific fw.sqsh
+                echo "creating machine-specific fw.sqsh..."
+                firmwarenator -s /mnt/$esp_label/fw.sqsh
+                unsquashfs -ll /mnt/$esp_label/fw.sqsh
+
+                # install syslinux files
+                echo "installing syslinux files..."
+                mkdir -p /mnt/$esp_label/EFI/$efidir
+                # FIXME: historically, I've just installed chain.c32, ldlinux.e64,
+                #        libcom32.c32, libutil.c32, mboot.c32, menu.c32,
+                #        syslinux.efi, and vesamenu.c32... (and i'm pretty sure
+                #        vesamenu and mboot don't work for EFI, only BIOS) but just
+                #        copying all the files sure is easier.  let's see what
+                #        happens.
+                #
+                # FIXME: Also, what about the "default" place for EFI bootloaders?
+                #        So we don't have to poke the system's EFI setup for
+                #        bootable thumb drives and the like?
+                #
+                #        esp/EFI/syslinux/* -> esp/EFI/BOOT/*
+                #        esp/EFI/syslinux/syslinux.efi -> esp/EFI/BOOT/bootx64.efi
+                #
+                #        My laptop refuses to boot from esp/EFI/BOOT unless I
+                #        specifically add via efibootmgr... maybe I did it wrong?
+                #
+                #        Both the latest Ubuntu installer and the latest clonezilla
+                #        ISO have /EFI/boot/bootx64.efi... given that ESP is
+                #        supposed to be vfat, I can't imagine the capitalization
+                #        really matters... but it *IS* different.
+                #
+                $rsync /usr/share/syslinux/efi64/* /mnt/$esp_label/EFI/$efidir/
+                if [ "$can_efi" = "default" ]; then
+                    mv -v /mnt/$esp_label/EFI/$efidir/syslinux.efi /mnt/$esp_label/EFI/$efidir/bootx64.efi
+                fi
+
+                # generate syslinux.cfg
+                #
+                # FIXME: i know a lot of this doesn't work... the color stuff, in
+                #        paticular.  Should test and remove things that have no
+                #        effect.
+                #
+                echo "generating syslinux.cfg..."
+                cat > /mnt/$esp_label/EFI/$efidir/syslinux.cfg <<EOF
 default menu.c32
 timeout 50
 
@@ -402,98 +479,28 @@ label ruckus
 
 EOF
 
-        # generate fw.sqsh
-        #
-        # FIXME: Should i attempt to create machine-specific fw.sqsh w/
-        #        firmwarenator in here?
-        #
-        #        how about yes?
-        #
-        #        we could put the giant fw.sqsh file on the installer
-        #        thumbdrive... but i seem to recall that it's become too
-        #        large to use, at least during boot.  it's a bit of a
-        #        chicken-and-the-egg problem then.  perhaps i need to make
-        #        sure firmwarenator notes failed fw load messages as well
-        #        as sucessful ones and then i can scarf all required
-        #        firmware from the giant fw.sqsh on the root of the thumb
-        #        drive (but don't boot the installer with fwdev=)
-        #
-        #        the problem described above regarding fw being too large
-        #        we actually if you try and copy the entire fw image into
-        #        the initramfs, which uses up too much space, and the
-        #        workaround was to just mount fw.sqsh at /lib/modules.  we
-        #        *should* be able to use fw.sqsh, get all the needed
-        #        firmware, and generate a system-specific fw.sqsh image
-        #        using firmwarenator.  assuming all devices have been
-        #        loaded... which should be mostly true since udev probed
-        #        everything for us... but I seem to recall there being some
-        #        corner-case with some wifi adapters non loading firmware
-        #        until you try to actually use them?
-        echo "creating machine-specific fw.sqsh..."
-        firmwarenator -s /tmp/fw.sqsh
-        unsquashfs -ll /tmp/fw.sqsh
+                # generate xen.cfg
+                #
+                # FIXME: dom0_mem is hardocded to 4G... I don't remember the
+                #        rationale behind that on my laptop which had 8G total
+                #        RAM.
+                #
+                # FIXME: i also should re-test other params... ucode=scan in
+                #        particular i don't remember how exactly works...
+                #
+                if [ -f /mnt/$esp_label/xen*.efi ]; then
+                    echo "Generating xen.cfg..."
+                    cat > /mnt/$esp_label/xen.cfg <<EOF
+[global]
+default=linux-$kernelversion
 
-        # generate xen.cfg
-        #
-        # FIXME: maybe?
+[linux-$kernelversion]
+options=dom0_mem=4096M loglvl=all noreboot console_timestamps=boot ucode=scan
+kernel=vmlinuz-$kernelversion root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec ro consoleblank=300 quiet
+ramdisk=initrd-$kernelversion.img
 
-        # create and populate primary ESP and copy to redundant ESPs
-        #
-        # FIXME: should i really loop through each device?  or should i
-        #        populate ESP and then rsync to each redundant ESP?
-        #
-        bootnum=1
-        for d in $espdisks; do
-            if [ $bootnum -gt 1 ]; then
-                esp_label="ESP$bootnum"
-            else
-                esp_label="ESP"
-            fi
-            echo "preparing $esp_label $d..."
-
-            # create and mount filesystem
-            mkfs.vfat -n $esp_label $d
-            mkdir -p /mnt/$esp_label
-            mount $d /mnt/$esp_label
-
-            if [ $bootnum -eq 1 ]; then
-                # install kernel files
-                echo "installing kernel files..."
-                $rsync /tmproot/System.map* /tmproot/vmlinuz* /tmproot/initrd* /tmproot/config* /mnt/$esp_label
-                # install machine-specific fw.sqsh
-                $rsync /tmp/fw.sqsh /mnt/$esp_label
-                # install syslinux files
-                echo "installing syslinux files..."
-                mkdir -p /mnt/$esp_label/EFI/$efidir
-                # FIXME: historically, I've just installed chain.c32, ldlinux.e64,
-                #        libcom32.c32, libutil.c32, mboot.c32, menu.c32,
-                #        syslinux.efi, and vesamenu.c32... (and i'm pretty sure
-                #        vesamenu and mboot don't work for EFI, only BIOS) but just
-                #        copying all the files sure is easier.  let's see what
-                #        happens.
-                #
-                # FIXME: Also, what about the "default" place for EFI bootloaders?
-                #        So we don't have to poke the system's EFI setup for
-                #        bootable thumb drives and the like?
-                #
-                #        esp/EFI/syslinux/* -> esp/EFI/BOOT/*
-                #        esp/EFI/syslinux/syslinux.efi -> esp/EFI/BOOT/bootx64.efi
-                #
-                #        My laptop refuses to boot from esp/EFI/BOOT unless I
-                #        specifically add via efibootmgr... maybe I did it wrong?
-                #
-                #        Both the latest Ubuntu installer and the latest clonezilla
-                #        ISO have /EFI/boot/bootx64.efi... given that ESP is
-                #        supposed to be vfat, I can't imagine the capitalization
-                #        really matters... but it *IS* different.
-                #
-                $rsync /usr/share/syslinux/efi64/* /mnt/$esp_label/EFI/$efidir/
-                if [ "$can_efi" = "default" ]; then
-                    mv -v /mnt/$esp_label/EFI/$efidir/syslinux.efi /mnt/$esp_label/EFI/$efidir/bootx64.efi
+EOF
                 fi
-
-                # install syslinux.cfg
-                cp /tmp/syslinux.cfg /mnt/$esp_label/EFI/$efidir/syslinux.cfg
 
             else
                 # rsync to this redundant ESP
@@ -531,8 +538,17 @@ EOF
                 [ $bootnum -gt 1 ] && go="$go$bootnum"
                 decho $go
                 eval $go || echo "WARNING: efibootmgr failed"
+            fi
 
-                # FIXME: add a xen entry, too
+            # add a xen entry to EFI, too
+            if [ -f /mnt/$esp_label/xen*.efi ]; then
+                go="efibootmgr -v -c"
+                go="$go -d $(echo $d | sed 's|[0-9]*$||')"
+                go="$go -p $(echo $d | grep -o '[0-9]*$')"
+                go="$go -l /$(basename $(ls /mnt/$esp_label/xen*.efi)) -L xen"
+                [ $bootnum -gt 1 ] && go="$go$bootnum"
+                decho $go
+                eval $go || echo "WARNING: efibootmgr failed"
             fi
 
             # umount esp
@@ -540,6 +556,7 @@ EOF
             # FIXME: maybe?  i'm leaving it mounted for now, for testing...
             #
             #umount /mnt/$esp_label
+
             echo "done with $d (LABEL=$esp_label)"
             bootnum=$((bootnum+1))
         done
