@@ -384,10 +384,7 @@ else
         go="mount -t $rootfstype $mountoptions $thingtomount /sysroot"
     fi
     decho2 $go
-    eval $go
-    RES=$?
-
-    if [ "$RES" != "0" ] ; then
+    eval $go || (
         echo "---------------------------------"
         echo "WARNING: Cannot mount rootdev!"
         echo "---------------------------------"
@@ -396,7 +393,7 @@ else
         echo "Mount rootdev ro at /sysroot and exit shell to continue. Good luck!"
         echo
         control_shell
-    fi
+    )
 
     # look for sqsh_layerdev
     if [ -n "$thingtomount_sqsh" ]; then
