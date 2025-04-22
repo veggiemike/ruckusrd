@@ -278,9 +278,9 @@ if [ -n "$ZFS" ]; then
     zpool import $ZFS_POOL -N
 fi
 
-# if /dev/root is a symlink, we need to wait for device hotplug to result in it
-# really pointing at a valid device
-if [ -h /dev/root ]; then
+# /dev/root will eventually be a symlink pointing to our specified root device,
+# but we have to wait for hotplug events to get processed by udev
+if [ ! -e /dev/root ]; then
     # wait for udev symlinks to get created
     dmneeded=""
     wait_for_dev 30 "/dev/root symlink" /dev/root
