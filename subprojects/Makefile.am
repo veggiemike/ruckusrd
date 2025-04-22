@@ -10,7 +10,7 @@ all-local: fw.sqsh ucode.img
 	tar -C $^ -vcf $@ .
 
 distclean-local:
-	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,zstd,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,less}.tar
+	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,zstd,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,less,fsarchiver,newt,firmwarenator,microcodenator}.tar
 	rm -fv fw.sqsh ucode.img
 	rm -rf .build*
 	cd util-linux && git clean -dfx && git stash
