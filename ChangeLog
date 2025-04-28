@@ -24,6 +24,8 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
   redundant ESP support (e.g., fwdev=LABEL=ESP,LABEL=ESP2).
 - Fixed a bug where we weren't waiting for /dev/root to get created by udev.
 - Fixed error handling bug arround /dev/root mount failure.
+- Fixed boot failure where LVM was getting accidentally deactivated prior to
+  mounting the root device.
 
 * v0.21.1
 2024-10-14: Ruckusrd v0.21.1

@@ -282,7 +282,6 @@ fi
 # but we have to wait for hotplug events to get processed by udev
 if [ ! -e /dev/root ]; then
     # wait for udev symlinks to get created
-    dmneeded=""
     wait_for_dev 30 "/dev/root symlink" /dev/root
     root_true=`readlink /dev/root`
     ln -s $root_true /dev/root-true
@@ -307,17 +306,6 @@ if [ -n "$sqsh_layerdev" ] && [ -h /dev/sqsh_layerdev ]; then
         modprobe $sqshfstype
     fi
 fi
-
-# deactivate unneeded logvols
-#
-# FIXME: what if i just deactivate all after mounting /sysroot... will it
-#        politely refuse to deactive mounted logvols?
-#
-decho2 "deactivating unneeded LVM (dmneeded='$dmneeded')"
-vgchange -a n --quiet --quiet
-for x in $dmneeded; do
-    lvchange -a y /dev/mapper/$x --quiet --quiet
-done
 
 # run fsck on root dev
 #
@@ -1043,6 +1031,28 @@ if [ -n "$firstboot" ]; then
     setsid cttyhack env LESS=-cMR firstboot_wizard || echo -n # so exit doesn't trip emergency_shell
     mount -o remount,ro /sysroot
 fi
+
+# deactivate unneeded logvols
+#
+# NOTE: We have to loop over a list of unused logvols to deactivate, because we
+#       can't just do a `vgchange -a n` (that refuses to deactivate anything
+#       unless it can deactivate EVERYTHING).
+#
+decho2 "deactivating unneeded LVM"
+for lv in $(lvs --noheadings --options vg_name,lv_name --separator=/ --select lv_device_open!=yes); do
+    # NOTE: We already know the lv is unused, so this shouldn't ever fail, but
+    #       just in case we'll give the user some indication of what's going on.
+    lvchange -a n --quiet --quiet $lv || (
+        echo "---------------------------------"
+        echo "WARNING: Failed to deactivate unused logvol $lv"
+        echo "---------------------------------"
+        echo
+        echo "Dropping to a shell to investigate."
+        echo "When done, exit the shell to continue. Good luck!"
+        echo
+        control_shell
+    )
+done
 
 if [ -n "$maint" ]; then
     echo "Dropping to a maintenance shell, as requested. Good luck!"

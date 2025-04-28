@@ -83,9 +83,6 @@ decho2()
 #
 # Example: wait_for_dev 30 "/dev/root symlink" /dev/root
 #
-# NOTE: Adds device-mapper device name responsible for the required device to
-#       global $dmneeded prior to returning.
-#
 # NOTE: Creates /dev/lastwaited symlink pointing at either the device that
 #       eventually showed up or /dev/null... in case you need an extra way of
 #       checking status.
@@ -157,8 +154,6 @@ wait_for_dev()
         echo
         control_shell
     fi
-
-    dmneeded="$dmneeded $(dmsetup info -c --noheadings -o name $found 2>/dev/null || echo)"
 }
 
 
