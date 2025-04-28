@@ -140,7 +140,7 @@ busybox/FOO:
 mdadm/FOO:
 	pushd mdadm && \
 	rm -rf FOO && \
-	sed -i 's|-Werror||g' Makefile && \
+	sed -i 's|-Werror||' Makefile && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
