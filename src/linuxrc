@@ -280,23 +280,20 @@ fi
 
 # /dev/root will eventually be a symlink pointing to our specified root device,
 # but we have to wait for hotplug events to get processed by udev
-if [ ! -e /dev/root ]; then
-    # wait for udev symlinks to get created
-    wait_for_dev 30 "/dev/root symlink" /dev/root
-    root_true=`readlink /dev/root`
-    ln -s $root_true /dev/root-true
+wait_for_dev 30 "/dev/root symlink" /dev/root
+root_true=`readlink /dev/root`
+ln -s $root_true /dev/root-true
 
-    # autoload filesystem modules if needed
-    if [ -z "$rootfstype" ]; then
-        autoload_fs_module /dev/root
-        rootfstype=$TYPE
-    else
-        modprobe $rootfstype
-    fi
+# autoload filesystem modules if needed
+if [ -z "$rootfstype" ]; then
+    autoload_fs_module /dev/root
+    rootfstype=$TYPE
+else
+    modprobe $rootfstype
 fi
-# similarly, if we have a /dev/sqsh_layerdev symlink, we need to wait for
-# hotplug
-if [ -n "$sqsh_layerdev" ] && [ -h /dev/sqsh_layerdev ]; then
+
+# similarly, if we have a sqsh_layerdev, we need to wait for hotplug
+if [ -n "$sqsh_layerdev" ]; then
     wait_for_dev 30 "/dev/sqsh_layerdev symlink" /dev/sqsh_layerdev
 
     if [ -z "$sqshfstype" ]; then
