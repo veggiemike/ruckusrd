@@ -74,7 +74,7 @@ $(DEBARCH): $(DEBDIR)
 	dpkg-architecture --query DEB_HOST_ARCH > $@
 
 $(DEBDEPS): $(DEBDIR)
-	$(srcdir)/debian/get_deps $(DPKGDIR) > $(DEBDIR)/.tmp
+	$(srcdir)/debian/get_deps $(PACKAGE_TARNAME) $(DPKGDIR) > $(DEBDIR)/.tmp
 	awk -F": " '/^pkgs:/ {print $$2}' $(DEBDIR)/.tmp > $@
 	rm -f $(DEBDIR)/.tmp
 

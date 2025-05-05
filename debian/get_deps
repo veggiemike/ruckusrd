@@ -5,15 +5,20 @@ usage()
     echo "get a list of dependencies (based on libraries) for a deb control file from"
     echo "a bunch of files/dirs recursively"
     echo
-    echo "usage: $(basename $0) FILE1 [FILE2] ..."
+    echo "usage: $(basename $0) DEBNAME FILE1 [FILE2] ..."
 }
 
 
-if [ ! $# -ge 1 ]; then
+if [ ! $# -ge 2 ]; then
     usage
     exit 1
 fi
 
+# DEBNAME is so we can make sure we don't accidentaly depend on ourself... an
+# actual common problem if a previous version of this package is already
+# installed.
+mypkg=$1
+shift
 
 libs=$((find $* -type f | xargs ldd 2>/dev/null) | grep -v "not found" | awk '/=>/ {print $3}' | sort | uniq)
 echo
@@ -49,8 +54,13 @@ for l in $libs; do
 done
 pkgs2=$(echo $pkgs | sed 's| |\n|g' | sort | uniq)
 #echo $pkgs2
+pkgs3=
+for p in $pkgs2; do
+    [ "$p" != "$mypkg" ] && pkgs3+=" $p"
+done
+#echo $pkgs3
 echo
-echo pkgs: $(echo $pkgs2 | sed 's| |, |g')
+echo pkgs: $(echo $pkgs3 | sed 's| |, |g')
 
 if [ -n "$missing" ]; then
     echo >>/dev/stderr "Some libs weren't provided via dpkg, better fix that..."
