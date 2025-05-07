@@ -84,10 +84,14 @@
    New boot param: redundant-esp=LABEL1,LABEL2,...
 
 
-* for 0.22
+* for 0.22.x
 
  - also, what happens to root=ZFS if a disk is bad/missing?  does it start the
    pool in degraded mode and continue booting?  or is it hosed?  test
 
  - firstboot groomer adds localadmin user but doesn't create a homedir... was
    that on purpose?
+
+* for 0.22
+
+- release new firmwarenator, adjust submodule
