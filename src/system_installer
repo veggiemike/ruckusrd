@@ -737,7 +737,19 @@ system_installer()
     # NOTE: It's convenient to have the sysroot left mounted at this
     #       point... so we leave it... revisit if that causes problems.
     #
+    echo
     echo "installation complete!"
+    if [ -z "$can_efi" ]; then
+        echo
+        echo "###############################################################################"
+        echo
+        echo "WARNING: EFI booting was NOT configured.  Make sure to add something like this"
+        echo "         to the kernel command line of your bootloader:"
+        echo
+        echo "root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers ro firstboot"
+        echo
+        echo "###############################################################################"
+    fi
 }
 
 
