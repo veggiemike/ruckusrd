@@ -712,7 +712,11 @@ system_installer()
     #       built sqsh images, and the dependencies between them.
     #
     sqshconf=$imgdir/sqsh_layers.conf
-    [ -f $sqshconf ] && . $sqshconf
+    if [ ! -f $sqshconf ]; then
+        echo "ERROR: missing required file: $sqshconf"
+        return -1
+    fi
+    . $sqshconf
 
     # prompt for uppermost layer
     dlg_pick_top_layer $imgs
