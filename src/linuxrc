@@ -288,7 +288,7 @@ fi
 # NOTE: If it's ZFS, we will have already set rootfstype to "zfs", and no udev
 #       waiting is needed.
 #
-decho "rootfstype: $rootfstype"
+decho2 "rootfstype: $rootfstype"
 if [ "$rootfstype" != "zfs" ]; then
     wait_for_dev 30 "/dev/root symlink" /dev/root
     root_true=`readlink /dev/root`
@@ -304,7 +304,7 @@ else
 fi
 
 # similarly, if we have a sqsh_layerdev, we need to wait for hotplug
-decho "sqshfstype: $sqshfstype"
+decho2 "sqshfstype: $sqshfstype"
 if [ -n "$sqsh_layerdev" ] && [ "$sqshfstype" != "zfs" ]; then
     wait_for_dev 30 "/dev/sqsh_layerdev symlink" /dev/sqsh_layerdev
 
