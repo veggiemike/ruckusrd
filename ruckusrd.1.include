@@ -225,7 +225,9 @@ be used to explicitly specify the ESP size (e.g., 4G).  \fBSWAP\fP=\fIsize\fP
 can be used to explicitly specify swap partition size (e.g., 4G, 0 to disable
 swap).  \fBIMGDEV\fP=\fIdevice\fP specifies a alternate device containing
 sqsh_layer images.  \fBIMGDIR\fP=\fIdir\fP specifies an alternate name for the
-directory containing the sqsh_layer images.  Traditional BIOS bootup isn't
+directory containing the sqsh_layer images.  \fBEXCLUDE\fP=\fIdevice\fP
+specifies a disk to be excluded from the automatic disk selection done by the
+installer (and can be specified multiple times). Traditional BIOS bootup isn't
 supported.
 
 .TP

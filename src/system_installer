@@ -104,6 +104,8 @@ autopick_disks()
         this_dev=/dev/$(basename $x)
         # skip virtual devices (e.g., loop0)
         (readlink $x | grep -q virtual) && continue
+        # skip anything in real_excludes
+        (echo $real_excludes | grep -q $this_dev) && continue
         # skip our rootdev
         [ "$this_dev" = "$real_rootdev" ] && continue
         # skip our imgdev
@@ -188,9 +190,13 @@ auto_install()
     # find first non-virtual block device (that isn't rootdev or imgdev) and
     # any other disks of the same size
     autopick_disks
-    #decho disks: $disks
-    #decho size: $size
-    #decho bsize: $bsize
+    decho2 disks: $disks
+    decho2 size: $size
+    decho2 bsize: $bsize
+    if [ -z "$disks" ]; then
+        echo "ERROR: no disks detected! (excluded: $real_excludes)"
+        return 1
+    fi
 
     # pick ashift for ZFS
     #
@@ -598,6 +604,7 @@ system_installer()
     # further parse initramsys-installer config
     imgdev=
     imgdir=images
+    excludes=
     efidir=syslinux
     espsize=1G
     opts=${initramsys_installer_conf//,/ }
@@ -608,6 +615,9 @@ system_installer()
                 ;;
             IMGDIR=*)
                 imgdir=${o#IMGDIR=}
+                ;;
+            EXCLUDE=*)
+                excludes="$excludes ${o#EXCLUDE=}"
                 ;;
             EFI=*)
                 can_efi=${o#EFI=}
@@ -639,14 +649,39 @@ system_installer()
     #       relying on autodetection via mount command relies on filesystem
     #       modules already being loaded (e.g., is9660).
     #
+    real_excludes=
     special_device_lookup rootdev $root
-    decho "real_rootdev: $real_rootdev"
-    decho "rootdevfstype: $rootdevfstype"
+    decho2 "real_rootdev: $real_rootdev"
+    decho2 "rootdevfstype: $rootdevfstype"
+    real_excludes="$real_excludes $real_rootdev"
+    if [ -n "$sqsh_layerdev" ]; then
+        special_device_lookup sqsh_layerdev $sqsh_layerdev
+        decho2 "real_sqsh_layerdev: $real_sqsh_layerdev"
+        decho2 "sqsh_layerdevfstype: $sqsh_layerdevfstype"
+        real_excludes="$real_excludes $real_sqsh_layerdev"
+    fi
+    if [ -n "$fwdev" ]; then
+        special_device_lookup fwdev $fwdev
+        decho2 "real_fwdev: $real_fwdev"
+        decho2 "fwdevfstype: $fwdevfstype"
+        real_excludes="$real_excludes $real_fwdev"
+    fi
     if [ -n "$imgdev" ]; then
         special_device_lookup imgdev $imgdev
-        decho "real_imgdev: $real_imgdev"
-        decho "imgdevfstype: $imgdevfstype"
+        decho2 "real_imgdev: $real_imgdev"
+        decho2 "imgdevfstype: $imgdevfstype"
+        real_excludes="$real_excludes $real_imgdev"
     fi
+    decho2 "excludes: $excludes"
+    for e in $excludes; do
+        special_device_lookup e $e
+        decho2 "real_e: $real_e"
+        decho2 "efstype: $efstype"
+        real_excludes="$real_excludes $real_e"
+    done
+    real_excludes=$(echo $real_excludes | tr " " "\n" | sort -u | tr "\n" " ")
+    decho2 "real_excludes: $real_excludes"
+    echo "exit to continue" && control_shell
 
     # mount rootdev (if not already mounted)
     #
