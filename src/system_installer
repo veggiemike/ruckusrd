@@ -72,7 +72,7 @@ dlg_summary()
 {
     go=$DLG
     go="$go --title 'Configuration Summary'"
-    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nSetup EFI: $can_efi\nSwap: $swap\n\nContinue?'"
+    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nVDEV Type: $vdev_type\nSetup EFI: $can_efi\nSwap: $swap\n\nContinue?'"
     go="$go 0 0"
     KEEP_GOING=$(eval $go 3>&1 1>&2 2>&3 && echo yes || echo -n)
     #echo "KEEP_GOING=$KEEP_GOING"
@@ -93,13 +93,14 @@ dlg_summary()
 #}
 
 
-# find first non-virtual block device (that isn't rootdev or imgdev) and any
-# other disks of the same size
+# find first non-virtual block device (that hasn't been excluded) and other
+# disks of the same size (for a single vdev of either mirror or raidz)
 autopick_disks()
 {
     disks=
     size=
     bsize=
+    diskcount=0
     for x in /sys/block/*; do
         this_dev=/dev/$(basename $x)
         # skip virtual devices (e.g., loop0)
@@ -121,13 +122,25 @@ autopick_disks()
             [ "$bsize" != $this_bsize ] && continue
             # ok, add it
             disks="$disks $this_dev"
+            diskcount=$((diskcount+1))
         else
             # disks list empty, this one looks good.  :-)
             disks=$this_dev
             size=$this_size
             bsize=$this_bsize
+            diskcount=1
         fi
+        # stop if we just added the max number of disks
+        [ $diskcount -ge $vdev_maxsize ] && break
     done
+
+    if [ $diskcount -lt 2 ]; then
+        vdev_type=
+    elif [ $diskcount -eq 2 ]; then
+        vdev_type=mirror
+    else
+        vdev_type=raidz
+    fi
 }
 
 
@@ -193,6 +206,8 @@ auto_install()
     decho2 disks: $disks
     decho2 size: $size
     decho2 bsize: $bsize
+    decho2 diskcount: $diskcount
+    decho2 vdev_type: $vdev_type
     if [ -z "$disks" ]; then
         echo "ERROR: no disks detected! (excluded: $real_excludes)"
         return 1
@@ -249,11 +264,10 @@ auto_install()
             mem=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
             # 1.5*mem in G
             swap=$((mem*15/10/1024/1024+1))
-            numdisks=$(echo $disks | wc -w)
-            if [ $numdisks -gt 1 ]; then
-                halfswap=$((swap/numdisks))
+            if [ $diskcount -gt 1 ]; then
+                halfswap=$((swap/diskcount))
                 # round up if needed
-                if [ $((halfswap*numdisks)) -lt $swap ]; then
+                if [ $((halfswap*diskcount)) -lt $swap ]; then
                     halfswap=$((halfswap+1))
                 fi
                 swap=$halfswap
@@ -294,11 +308,9 @@ auto_install()
     # create pool
     mkdir -p /sysroot
     go="zpool create -o ashift=$ashift zroot"
-    if [ "$(echo $disks | wc -w)" != "1" ]; then
-        go="$go mirror"
-    fi
     go="$go -O compression=zstd -O relatime=on -O atime=on"
     go="$go -O acltype=posixacl -O xattr=sa"
+    [ -n "$vdev_type" ] && go="$go $vdev_type"
     go="$go $zfsdisks"
     go="$go -R /sysroot"
     decho $go
@@ -608,6 +620,7 @@ system_installer()
     excludes=
     efidir=syslinux
     espsize=1G
+    vdev_maxsize=3
     opts=${initramsys_installer_conf//,/ }
     for o in $opts; do
         case "$o" in
@@ -636,6 +649,9 @@ system_installer()
                 ;;
             ESP=*)
                 espsize=${o#ESP=}
+                ;;
+            VDEV_MAXSIZE=*)
+                vdev_maxsize=${o#VDEV_MAXSIZE=}
                 ;;
             *)
                 decho "ignoring invalid initramsys_installer config option $o"

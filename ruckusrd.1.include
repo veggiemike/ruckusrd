@@ -214,21 +214,37 @@ dropbear SSH server is started automatically as well.
 Implies \fBinitramsys\fP, but runs a dialog-based system installer prior to
 providing a TTY for login.  This is specifically for pairing with the
 sqsh_layer images built by the Source Ruckus System Builder.  By default, one
-(or multiple identically sized) drive(s) are partitioned and put in a mirrored
-ZFS pool, an ESP is configured for EFI booting if EFI support is detected, a
-suitable ammount of swap is configured, and the selected sqsh_layer (and any
-required sub-layers) is installed.  \fBEFI\fP=\fIforce|default\fP can be
-provided to either force ESP setup even though EFI support isn't detected or to
-specify default EFI names should be used instead of configuring a boot entry
-with efibootmgr (i.e., for bootable removable media).  \fBESP\fP=\fIsize\fP can
-be used to explicitly specify the ESP size (e.g., 4G).  \fBSWAP\fP=\fIsize\fP
-can be used to explicitly specify swap partition size (e.g., 4G, 0 to disable
-swap).  \fBIMGDEV\fP=\fIdevice\fP specifies a alternate device containing
-sqsh_layer images.  \fBIMGDIR\fP=\fIdir\fP specifies an alternate name for the
-directory containing the sqsh_layer images.  \fBEXCLUDE\fP=\fIdevice\fP
-specifies a disk to be excluded from the automatic disk selection done by the
-installer (and can be specified multiple times). Traditional BIOS bootup isn't
-supported.
+(or multiple identically sized) drive(s) are partitioned and put in a ZFS pool,
+an ESP is configured for EFI booting if EFI support is detected, a suitable
+ammount of swap is configured, and the selected sqsh_layer (and any required
+sub-layers) is installed.
+
+\fBEFI\fP=\fIforce|default\fP can be provided to either force ESP setup even
+though EFI support isn't detected or to specify default EFI names should be
+used instead of configuring a boot entry with efibootmgr (i.e., for bootable
+removable media).
+
+\fBESP\fP=\fIsize\fP can be used to explicitly specify the ESP size (e.g., 4G).
+
+\fBSWAP\fP=\fIsize\fP can be used to explicitly specify swap partition size
+(e.g., 4G, 0 to disable swap).
+
+\fBIMGDEV\fP=\fIdevice\fP specifies a alternate device containing sqsh_layer
+images.
+
+\fBIMGDIR\fP=\fIdir\fP specifies an alternate name for the directory containing
+the sqsh_layer images.
+
+\fBEXCLUDE\fP=\fIdevice\fP specifies a disk to be excluded from the automatic
+disk selection done by the installer (and can be specified multiple times).
+
+The first non-excluded disk plus any identically sized ones are configured in
+either a mirrored zfs pool (if only 2 found) or in a raidz zfs pool (if 3+
+disks are found).  Only a single vdev is ever created, no matter how many disks
+are available.  The raidz vdev will use only 3 disks unless
+\fBVDEV_MAXSIZE\fP=\fIN\fP is specified.
+
+Traditional BIOS bootup isn't supported.
 
 .TP
 \fBmodinject\fR
