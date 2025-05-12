@@ -92,8 +92,11 @@
  - firstboot groomer adds localadmin user but doesn't create a homedir... was
    that on purpose?
 
+
 * for 0.22
 
  - release new firmwarenator, adjust submodule
 
  - initramsys-installer testing, specifically EFI setup
+
+ - update README.md somewhere with pandoc installed
