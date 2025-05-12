@@ -197,6 +197,7 @@ auto_install()
         echo "ERROR: no disks detected! (excluded: $real_excludes)"
         return 1
     fi
+    #echo "exit to continue" && control_shell
 
     # pick ashift for ZFS
     #
@@ -213,7 +214,7 @@ auto_install()
     #       even higher value (like the Xen virtual disks do).
     ashift=$(calc_ashift $bsize)
     [ $ashift -lt 12 ] && ashift=12
-    #decho ashift: $ashift
+    decho2 ashift: $ashift
 
     # can we do EFI setup?
     if [ -z "$can_efi" ] && (efibootmgr >/dev/null 2>&1); then
@@ -260,7 +261,7 @@ auto_install()
             swap="${swap}G"
         fi
     fi
-    #decho swap: $swap
+    decho2 swap: $swap
 
     # summary - layers, disks, pool ashift, swap, EFI
     dlg_summary
@@ -337,7 +338,7 @@ auto_install()
         else
             # missing image file...
             echo "ERROR: missing required image file: $l"
-            return -1
+            return 1
         fi
     done
 
@@ -681,7 +682,7 @@ system_installer()
     done
     real_excludes=$(echo $real_excludes | tr " " "\n" | sort -u | tr "\n" " ")
     decho2 "real_excludes: $real_excludes"
-    echo "exit to continue" && control_shell
+    #echo "exit to continue" && control_shell
 
     # mount rootdev (if not already mounted)
     #
@@ -749,7 +750,7 @@ system_installer()
     sqshconf=$imgdir/sqsh_layers.conf
     if [ ! -f $sqshconf ]; then
         echo "ERROR: missing required file: $sqshconf"
-        return -1
+        return 1
     fi
     . $sqshconf
 
