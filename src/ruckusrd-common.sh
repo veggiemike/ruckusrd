@@ -306,7 +306,7 @@ special_device_lookup()
             realdev=$(findfs LABEL=${str#CDLABEL=})
             fstype=$(eval $(blkid -o export $realdev); echo $TYPE)
             ;;
-        LABEL=*|UUID=*)
+        LABEL=*|UUID=*|/dev/*)
             realdev=$(findfs $str)
             fstype=$(eval $(blkid -o export $realdev); echo $TYPE)
             ;;
@@ -319,10 +319,6 @@ special_device_lookup()
             #      via 'mount' you have to specify -t zfs (if memory serves).
             #
             fstype=zfs
-            ;;
-        /dev/*)
-            realdev=$str
-            fstype=$(eval $(blkid -o export $realdev); echo $TYPE)
             ;;
     esac
 
