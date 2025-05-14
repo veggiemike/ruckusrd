@@ -65,7 +65,7 @@ default boot parameter as to not interupt graphical boot screens.
 .TP
 \fBroot\fR=\fBDEVSPEC\fR
 The single most important boot parameter!  Specify where the root filesystem is
-located, so we can use it!  \fBDEVSPEC\fB can be a plain device name, or you
+located, so we can use it!  \fBDEVSPEC\fR can be a plain device name, or you
 can specify a filesystem label (\fILABEL\fR=), filesystem UUID (\fIUUID\fR=),
 CD/DVD-ROM label (\fICDLABEL\fR=), or ZFS dataset (\fIZFS\fR=).
 
@@ -89,6 +89,13 @@ need this.
 Make the \fIlinuxrc\fP script be extra verbose, the exact opposite of
 \fBquiet\fP.  This is \fIvery\fP noisy, so be warned.
 
+.TP
+\fBmodules-early\fR=\fBmod1,mod2,...\fR
+Supply a list of modules to be loaded as soon as possible (i.e., even beore the
+\fBshell\fR breakpoint).  This can be helpful to force the loading of any
+kernel modules that are needed to boot properly but aren't being auto-loaded by
+udev.  Use carefully, though, as these will get loaded before \fBfwdev\fR is
+mounted, so any firmware loading attempts will fail.
 
 .SS Squashfs Layers
 

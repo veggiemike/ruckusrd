@@ -106,6 +106,7 @@ fwdev=
 initramsys=
 initramsys_net=
 initramsys_net_conf=
+modules_early=
 
 # parse our config file, which could possibly override some of our hardcoded
 # default behavior
@@ -125,6 +126,15 @@ initramsys_net_conf=
 parse_boot_params
 
 decho "initramfs created with RuckusRD v$VERSION"
+
+if [ -n "$modules_early" ]; then
+    decho "early loading modules: $modules_early"
+    for m in $modules_early_ws; do
+        go="modprobe $m"
+        decho2 $go
+        eval $go || echo "WARNING: failed to load module $m"
+    done
+fi
 
 # let's make sure we have usb keyboard support early, no matter what.
 modprobe input

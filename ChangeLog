@@ -33,6 +33,9 @@ into problems or extra features needed to fully test the
   mounting the root device.
 - Ensure USB keyboard support works as early as possible by preloading required
   kernel modules.
+- Added new `modules_early=` boot parameter for specifying a comma-delimited
+  list of modules to load as soon as possible (i.e., before `shell` breakpoint)
+  instead of waiting for udev to load them on-demand.
 
 * v0.21.1
 2024-10-14: Ruckusrd v0.21.1

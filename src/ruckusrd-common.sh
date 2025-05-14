@@ -605,6 +605,10 @@ parse_boot_params()
                 initramsys_installer=1
                 initramsys_installer_conf=${o#initramsys-installer=}
                 ;;
+            modules-early=*)
+                modules_early=${o#modules-early=}
+                modules_early_ws=${modules_early//,/ }
+                ;;
             *)
                 # NOTE: putting "loop.max_loop=16" in cmdline would cause "options loop
                 #       max_loop=16" to get written in modprobe.conf...
@@ -671,4 +675,5 @@ parse_boot_params()
     decho2 "initramsys_net_conf=$initramsys_net_conf"
     decho2 "initramsys_installer=$initramsys_installer"
     decho2 "initramsys_installer_conf=$initramsys_installer_conf"
+    decho2 "modules_early=$modules_early"
 }
