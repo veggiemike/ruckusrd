@@ -407,13 +407,16 @@ auto_install()
                 #       we don't want apt to get all angry later if a package's
                 #       files are missing.
                 #
+                # NOTE: This looks in the target system, not the original
+                #       imgdir, so that it can use reconstructed .sqsh files
+                #
                 echo "grabbing /boot files from sqsh_layers..."
                 for l in $(echo $layers | tr ':' '\n' |tac | tr '\n' ' '); do
                     l=$l.sqsh
                     echo layer: $l
                     # NOTE: -no-xattrs because vfat doesn't support them and
                     #       unsquashfs will fail if we ask it to copy any.
-                    unsquashfs -no-xattrs -f -d /mnt/$esp_label $imgdir/$l /boot >/dev/null
+                    unsquashfs -no-xattrs -f -d /mnt/$esp_label /sysroot/zroot/sqsh/$l /boot >/dev/null
                 done
                 if [ -n "$(ls /mnt/$esp_label/boot/)" ]; then
                     mv /mnt/$esp_label/boot/* /mnt/$esp_label/
