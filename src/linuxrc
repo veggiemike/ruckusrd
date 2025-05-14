@@ -126,6 +126,12 @@ parse_boot_params
 
 decho "initramfs created with RuckusRD v$VERSION"
 
+# let's make sure we have usb keyboard support early, no matter what.
+modprobe input
+modprobe usbcore
+modprobe usbhid
+modprobe hid-generic
+
 if [ -n "$shell" ]; then
     echo "Dropping directly into shell, as requested.  Enjoy!"
     echo

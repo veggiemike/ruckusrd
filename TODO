@@ -100,3 +100,5 @@
  - initramsys-installer testing, specifically EFI setup
 
  - update README.md somewhere with pandoc installed
+
+ - upgrade microcode/firmware again... thanks to recent security vulerabilities
