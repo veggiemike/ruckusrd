@@ -23,6 +23,9 @@
 
 mount_sysimage()
 {
+    # enable all lvm
+    vgchange -a y --quiet --quiet
+
     parse_boot_params $*
 
     # further parse root= and sqsh_layerdev= args
@@ -124,6 +127,9 @@ mount_sysimage()
             return 1
         fi
     fi
+
+    # deactivate unneeded logvols
+    deactivate_unneeded_lvm
 }
 
 

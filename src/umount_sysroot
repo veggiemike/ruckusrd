@@ -30,3 +30,6 @@ done
 for zp in $zpools; do
     zpool export $zp
 done
+
+# deactivate unnneeded lvm
+deactivate_unneeded_lvm

@@ -384,6 +384,28 @@ start_udev()
 }
 
 
+deactivate_unneeded_lvm()
+{
+    # NOTE: We have to loop over a list of unused logvols to deactivate,
+    #       because we can't just do a `vgchange -a n` (that refuses to
+    #       deactivate anything unless it can deactivate EVERYTHING).
+    for lv in $(lvs --noheadings --options vg_name,lv_name --separator=/ --select lv_device_open!=yes); do
+        # NOTE: We already know the lv is unused, so this shouldn't ever fail, but
+        #       just in case we'll give the user some indication of what's going on.
+        lvchange -a n --quiet --quiet $lv || (
+            echo "---------------------------------"
+            echo "WARNING: Failed to deactivate unused logvol $lv"
+            echo "---------------------------------"
+            echo
+            echo "Dropping to a shell to investigate."
+            echo "When done, exit the shell to continue. Good luck!"
+            echo
+            control_shell
+        )
+    done
+}
+
+
 start_ruckusrd_system()
 {
     # set hostname to something unique
@@ -402,6 +424,9 @@ start_ruckusrd_system()
     #
     rm -rf /kernel
     rmdir /sysroot
+
+    # deactivate unneeded LVM
+    deactivate_unneeded_lvm
 
     # NOTE: Traditionally this would be done after switch_root via an rcS
     #       script, but we've already done all the rest of the stuff that

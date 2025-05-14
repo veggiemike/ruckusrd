@@ -1058,26 +1058,8 @@ if [ -n "$firstboot" ]; then
 fi
 
 # deactivate unneeded logvols
-#
-# NOTE: We have to loop over a list of unused logvols to deactivate, because we
-#       can't just do a `vgchange -a n` (that refuses to deactivate anything
-#       unless it can deactivate EVERYTHING).
-#
 decho2 "deactivating unneeded LVM"
-for lv in $(lvs --noheadings --options vg_name,lv_name --separator=/ --select lv_device_open!=yes); do
-    # NOTE: We already know the lv is unused, so this shouldn't ever fail, but
-    #       just in case we'll give the user some indication of what's going on.
-    lvchange -a n --quiet --quiet $lv || (
-        echo "---------------------------------"
-        echo "WARNING: Failed to deactivate unused logvol $lv"
-        echo "---------------------------------"
-        echo
-        echo "Dropping to a shell to investigate."
-        echo "When done, exit the shell to continue. Good luck!"
-        echo
-        control_shell
-    )
-done
+deactivate_unneeded_lvm
 
 if [ -n "$maint" ]; then
     echo "Dropping to a maintenance shell, as requested. Good luck!"
