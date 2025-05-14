@@ -498,7 +498,7 @@ menu autoboot "Booting default in # second{,s}..."
 label ruckus
  menu label Source Ruckus Linux
  linux /vmlinuz-$kernelversion
- append initrd=/initrd-$kernelversion.img root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec ro consoleblank=300 quiet
+ append initrd=/initrd-$kernelversion.img root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec firstboot ro consoleblank=300 loglevel=2
  menu default
 
 EOF
@@ -520,7 +520,7 @@ default=linux-$kernelversion
 
 [linux-$kernelversion]
 options=dom0_mem=4096M loglvl=all noreboot console_timestamps=boot ucode=scan
-kernel=vmlinuz-$kernelversion root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec ro consoleblank=300 quiet
+kernel=vmlinuz-$kernelversion root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec firstboot ro consoleblank=300 loglevel=2
 ramdisk=initrd-$kernelversion.img
 
 EOF
