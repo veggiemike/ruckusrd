@@ -383,6 +383,20 @@ auto_install()
         # NOTE: The first time through this loop, we manually populate the ESP
         #       with files.  Subsequent iterations just rsync to copy files.
         #
+        # NOTE: We will end up with multiple EFI boot entries, one for each ESP
+        #       (e.g., syslinux, syslinux2), to make sure the system is
+        #       bootable even if the primary boot disk fails.
+        #
+        # FIXME: wait, aren't these going to end up backwards (e.g., boot2,
+        #        boot1, boot) in the bootorder?  assuming we care, would it be
+        #        easier to 1) create and add the esp partitions backwards, or
+        #        2) fix the bootorder when finished?.
+        #
+        #        I'll take option 2, since we already need a way to switch
+        #        between xen-default and syslinux-default, the code will be
+        #        mostly written by the time i care about the ordering be
+        #        backwards.
+        #
         bootnum=1
         for d in $espdisks; do
             if [ $bootnum -gt 1 ]; then
@@ -541,18 +555,16 @@ EOF
 
             # add boot entry to EFI
             #
-            # NOTE: We do this for EACH ESP to make sure the system is bootable
-            #       even if the primary boot disk fails.
+            # NOTE: Here's what has to get done, for each ESP
             #
-            # NOTE: from my ancient notes:
+            #       efibootmgr -v -c -d /dev/sda -p 1 -l /EFI/syslinux/syslinux.efi -L syslinux
+            #       efibootmgr -v -c -d /dev/sda -p 1 -l /xen-4.11.1.efi -L xen
             #
-            #       efibootmgr --v -c -d /dev/sda -p 1 -l /EFI/syslinux/syslinux.efi -L syslinux
-            #       efibootmgr --v -c -d /dev/sda -p 1 -l /xen-4.11.1.efi -L xen
-            #
-            # FIXME: can i, do i need to, specify a bootnum?  similarly, i
-            #        should probably reorder the boot list... yes?  what if i
-            #        specify a bootnum that's already in use?  Could try -b a1,
-            #        a2, a3, etc, in the hopes they're not taken
+            # NOTE: Each entry gets added to the front of the boot list, so if
+            #       I add syslinux and then xen, xen will be default.  With
+            #       multiple ESPs, you'll end up with
+            #       xen2,syslinux2,xen,syslinux as the boot order.  Ugly.  So
+            #       we fix that down below after looping through the ESPs.
             #
             if [ "$can_efi" != "default" ]; then
                 go="efibootmgr -v -c"
@@ -584,6 +596,15 @@ EOF
             echo "done with $d (LABEL=$esp_label)"
             bootnum=$((bootnum+1))
         done
+
+        # now promote all the regular non-xen boot items to the front
+        #
+        # NOTE: The firstboot wizard will ask if you want Xen first later on.
+        #
+        # FIXME: what happens if we forced efi setup even though efibootmgr
+        #        doesn't work?
+        #
+        efi_set_bootorder_first syslinux
     fi
 
     # create fstab
@@ -853,8 +874,3 @@ if [ -z "$JUST_SOURCE" ]; then
     fi
     trap 0 2
 fi
-
-
-# FIXME: if we're setting things up to use zfs, we should probably apt install
-#        zfs and zfs-auto-snapshot if not already included in the selected sqsh
-#        image...
