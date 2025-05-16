@@ -258,6 +258,20 @@ firstboot_wizard()
     if [ -s /tmp/xen ] && dlg_xen && [ -z "$firstboot_dryrun" ]; then
         efi_set_bootorder_first xen
     fi
+    # remove cruft
+    #
+    # NOTE: It would be nice if we didn't need this... but chances are, we'll
+    #       always notice some errantly included packages that should be
+    #       removed from the sqsh_images.  This is where we can remove them at
+    #       the 11.9th hour w/out the user ever seeing thing.
+    #
+    # FIXME: oh, dear... it looks like we don't have any snaps installed.  I
+    #        thought installing firefox via apt automatically pulled in the
+    #        snap...?  It normally does, but from within `debootstrap`, it
+    #        definately does not.  And I can't do that here, we don't have
+    #        networking yet.
+    #
+    $CHROOT apt remove -y --autoremove gnome-initial-setup || echo
     dlg_done
     if [ -z "$firstboot_dryrun" ]; then
         touch /sysroot/$FIRSTBOOT_DONE_FILE
