@@ -1038,7 +1038,32 @@ fi
 [ -n "$root_rw" ] && mount -o remount,rw /sysroot
 
 # unmount fw.sqsh if we mounted it
-[ -n "$fwsqsh" ] && umount /lib/firmware
+#
+# NOTE: There is a possible race condition here... once in a while, I get
+#       "Device or resource busy", but then once it drops to a shell I can
+#       unmount it no problem.  I've only seen this happen when using USB for
+#       rootdev and fwdev, so suspect it's caused by slow USB devices.  We
+#       attempt a second time if umount fails after waiting a second, if the
+#       second umount fails, we drop to a control shell so the user can fix it.
+#
+if [ -n "$fwsqsh" ]; then
+    umount /lib/firmware || (
+        decho2 "waiting 1 second then trying again to unmount /lib/firmware..."
+        sleep 1
+        umount /lib/firmware || (
+            echo "---------------------------------"
+            echo "WARNING: Failed to unmount /lib/firmware.  Usually this is a symptom of a slow"
+            echo "         drive that needs to finish working (e.g., USB).  Wait a few seconds"
+            echo "         and try `umount /lib/firmware` again."
+            echo "---------------------------------"
+            echo
+            echo "Dropping to a shell to investigate."
+            echo "When done, exit the shell to continue. Good luck!"
+            echo
+            control_shell
+        )
+    )
+fi
 
 # likewise, unmount fwdev if we mounted it
 [ -n "$fwdir" ] && umount $fwdir
