@@ -169,6 +169,15 @@ configure_networking()
     fi
 }
 
+dlg_desktop()
+{
+    go=$DLG
+    go="$go --title 'Default Boot Target'"
+    go="$go --yesno 'The full graphical desktop environment has been installed, do you want to launch it by default?'"
+    go="$go 0 0"
+    eval $go
+}
+
 dlg_exit()
 {
     go=$DLG
@@ -215,6 +224,23 @@ firstboot_wizard()
     # networking
     if dlg_networking && [ -z "$firstboot_dryrun" ]; then
         configure_networking "$NETWORKING"
+    fi
+    # default target - if gdm3 installed
+    #
+    # NOTE: We check to see if gdm3 is installed, because the graphical.target
+    #       is installed by systemd prior to the rest of the desktop
+    #       environment actually being installed.  We can't key off of
+    #       ubuntu-desktop, because we remove it (so that we can remove the
+    #       silly graphical apt update pop ups that just won't go away
+    #       otherwise).
+    #
+    # FIXME: assuming this works ok, should we attempt to add `quiet splash` to
+    #        kernel command line in syslinux.cfg (and possibly xen.cfg)?  Could
+    #        sed on loglevel=2 pretty easily...
+    #
+    $CHROOT dpkg -s gdm3 2>/dev/null >/tmp/desktop
+    if [ -s /tmp/desktop ] && dlg_desktop && [ -z "$firstboot_dryrun" ]; then
+        $CHROOT systemctl set-default graphical.target
     fi
     dlg_done
     if [ -z "$firstboot_dryrun" ]; then
