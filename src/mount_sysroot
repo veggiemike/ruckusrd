@@ -135,4 +135,5 @@ mount_sysimage()
 
 if [ -z "$JUST_SOURCE" ]; then
     grep -q /sysroot /proc/mounts || mount_sysimage $*
+    sysroot_mount_vfs
 fi

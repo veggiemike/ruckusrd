@@ -706,3 +706,33 @@ parse_boot_params()
     decho2 "initramsys_installer_conf=$initramsys_installer_conf"
     decho2 "modules_early=$modules_early"
 }
+
+
+sysroot_mount_vfs()
+{
+    mount proc -t proc /sysroot/proc
+    mount sysfs -t sysfs /sysroot/sys
+    mount --rbind /dev /sysroot/dev
+    mount --make-rslave /sysroot/dev
+    mount devpts -t devpts /sysroot/dev/pts
+    mount tmpfs -t tmpfs /sysroot/dev/shm
+    mount tmpfs -t tmpfs /sysroot/tmp
+
+    # attempt to mount efivars
+    if [ -d /sysroot/sys/firmware/efi ]; then
+        decho "mounting efivars"
+        mount efivarfs -t efivarfs /sysroot/sys/firmware/efi/efivars || echo "WARNING: Failed to mount efivars. Cannot manage UEFI settings."
+    else
+        decho "system doesn't support EFI, not mounting efivars"
+    fi
+}
+
+
+sysroot_umount_vfs()
+{
+    for x in sysroot/{proc,sys{/firmware/efi/efivars,},dev{/pts,/shm,},tmp}; do
+        if (grep -q $x /proc/mounts); then
+            umount $x
+        fi
+    done
+}

@@ -19,8 +19,11 @@ for zp in $(zpool list -H |awk '{print $1}'); do
     fi
 done
 
-# unmount everything
-for x in /sysroot/dev/pts /sysroot/dev/shm /sysroot/dev /sysroot/proc /sysroot/sys /sysroot /sqsh_layer-* /sqsh_layerdev /tmproot; do
+# unmount virtual filesystems
+sysroot_umount_vfs
+
+# unmount everything else
+for x in /sysroot /sqsh_layer-* /sqsh_layerdev /tmproot; do
     if (grep -q $x /proc/mounts); then
         umount $x
     fi

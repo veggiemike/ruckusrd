@@ -59,6 +59,15 @@ mkdir -p /dev/pts
 mkdir -p /dev/shm
 mount -a
 
+# attempt to mount efivars
+if [ -d /sys/firmware/efi ]; then
+    decho2 "mounting efivars"
+    mount efivarfs -t efivarfs /sys/firmware/efi/efivars || decho2 "Failed to mount efivars. Cannot manage UEFI settings."
+else
+    decho2 "system doesn't support EFI, not mounting efivars"
+fi
+
+
 # create /etc/mtab symlink
 ln -fs /proc/mounts /etc/mtab
 
@@ -1074,11 +1083,15 @@ fi
 #
 if [ -n "$firstboot" ]; then
     mount -o remount,rw /sysroot
+    sysroot_mount_vfs
+
     # NOTE: When run directly by init, any keypress (including arrow keys)
     #       causes an error exit... but if you run it by hand immediately
     #       afterwards, it works fine.  Running via the setsid cttyhack like we
     #       do for our bash sessions seems to fix it.
     setsid cttyhack env LESS=-cMR firstboot_wizard || echo -n # so exit doesn't trip emergency_shell
+
+    sysroot_umount_vfs
     mount -o remount,ro /sysroot
 fi
 
