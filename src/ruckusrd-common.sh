@@ -409,7 +409,11 @@ deactivate_unneeded_lvm()
 start_ruckusrd_system()
 {
     # set hostname to something unique
-    hostname ruckusrd-`date +%Y%m%d%H%M%S`
+    #
+    # NOTE: The kernel supports hostname= on its command line since 5.19+.  If
+    #       hostname has been set already, we leave it alone.
+    #
+    [ "$(hostname)" == "(none)" ] && hostname ruckusrd-`date +%Y%m%d%H%M%S`
 
     # clean up some stuff we won't be needing
     #
