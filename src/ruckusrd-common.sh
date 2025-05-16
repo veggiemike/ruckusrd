@@ -708,6 +708,86 @@ parse_boot_params()
 }
 
 
+# efibootmgr calls can be slow, we need to do a bunch of querries in loops, and
+# we know when the actual boot config is changed, so we cache the results.
+# Update the cache by calling efi_update_cache before accessing this file,
+# which will refresh it if it's older than 1 minute.  Likewise, anywhere we
+# modify via efibootmgr, redirect the output to the cache file to keep it
+# correct.
+efibootcache=/tmp/efiboot.cache
+
+
+efi_update_cache()
+{
+    if [ ! -f $efibootcache ] || [ -z "$(find $efibootcache -mmin 1) 2>/devnull" ]; then
+        efibootmgr > $efibootcache
+    fi
+}
+
+
+# take efi boot entry name, echo it's associated hex id
+efi_get_bootnum()
+{
+    # can't just use $1, we need to quote the entire arg list, in case the name
+    # has spaces in it.
+    name="$*"
+
+    # update cache
+    efi_update_cache
+
+    # transform that output into a nice table that looks like this:
+    #
+    # 00001  label1
+    # 00004  label2 that could have spaces and special characters
+    # 000a0  label3
+    #
+    # then print the 1st element if the whole line matches
+    cat $efibootcache | sed 's|\t.*||g' | awk '{sub("* ","  "); if ($1 ~ "Boot[0-9a-fA-F]+") {sub("Boot",""); print}}' | awk "/^[0-9a-fA-F]+  $name\$/"' {print $1}'
+}
+
+
+efi_get_bootorder()
+{
+    # update cache
+    efi_update_cache
+
+    cat $efibootcache | awk -F: '/^BootOrder:/ {sub(" ","");print $2}'
+}
+
+
+efi_get_bootcurrent()
+{
+    # update cache
+    efi_update_cache
+
+    cat $efibootcache | awk -F: '/^BootCurrent:/ {sub(" ","");print $2}'
+}
+
+
+efi_set_bootorder_first()
+{
+    count=1
+    stem=$1
+    while : ; do
+        if [ $count -eq 1 ]; then
+            name=$stem
+        else
+            name=$stem$count
+        fi
+        bn=$(efi_get_bootnum $name)
+        [ -n "$bn" ] || break
+        decho2 "EFI bootnum for $name: $bn"
+        order=$(efi_get_bootorder)
+        decho2 "EFI bootorder: $order"
+        efibootmgr -o $bn,$order > $efibootcache
+        count=$((count+1))
+    done
+
+    # now remove duplicates
+    efibootmgr --remove-dups > $efibootcache
+}
+
+
 sysroot_mount_vfs()
 {
     mount proc -t proc /sysroot/proc

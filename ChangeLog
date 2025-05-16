@@ -36,7 +36,8 @@ into problems or extra features needed to fully test the
 - Added new `modules_early=` boot parameter for specifying a comma-delimited
   list of modules to load as soon as possible (i.e., before `shell` breakpoint)
   instead of waiting for udev to load them on-demand.
-- Added text vs graphical boot selection to firstboot_wizard.
+- Added text vs graphical, and bare metal vs xen, boot selection dialogs to
+  firstboot_wizard.
 
 * v0.21.1
 2024-10-14: Ruckusrd v0.21.1

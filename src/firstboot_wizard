@@ -3,7 +3,9 @@
 # Copyright 2012-2025 Michael D Labriola <veggiemike@sourceruckus.org>
 #
 # Licensed under the GPLv3. See the file COPYING for details. 
+#
 
+. /ruckusrd-common.sh
 
 CHROOT="chroot /sysroot /usr/bin/env -i HOME=/root TERM=$TERM PATH=$PATH"
 DLG="whiptail --backtitle 'RuckusRD Firstboot'"
@@ -178,6 +180,15 @@ dlg_desktop()
     eval $go
 }
 
+dlg_xen()
+{
+    go=$DLG
+    go="$go --title 'Xen'"
+    go="$go --yesno 'Xen has been installed, do you want to boot into it by default (starting at next boot)?'"
+    go="$go 0 0"
+    eval $go
+}
+
 dlg_exit()
 {
     go=$DLG
@@ -241,6 +252,11 @@ firstboot_wizard()
     $CHROOT dpkg -s gdm3 2>/dev/null >/tmp/desktop
     if [ -s /tmp/desktop ] && dlg_desktop && [ -z "$firstboot_dryrun" ]; then
         $CHROOT systemctl set-default graphical.target
+    fi
+    # boot into xen
+    $CHROOT dpkg -s xen 2>/dev/null >/tmp/xen
+    if [ -s /tmp/xen ] && dlg_xen && [ -z "$firstboot_dryrun" ]; then
+        efi_set_bootorder_first xen
     fi
     dlg_done
     if [ -z "$firstboot_dryrun" ]; then
