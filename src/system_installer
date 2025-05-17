@@ -191,6 +191,13 @@ partition_disks()
     espdisks=
     for d in $disks; do
         sfdisk $d < /tmp/ptable
+        # figure out if partition identifier is pN or just N (e.g., sda1 vs
+        # nvme0n1p1)
+        if [ -e ${d}p1 ]; then
+            zfspart="p$zfspart"
+            swappart="p$swappart"
+            esppart="p$esppart"
+        fi
         zfsdisks="$zfsdisks $d$zfspart"
         [ -n "$create_swap" ] && swapdisks="$swapdisks $d$swappart"
         [ -n "$create_esp" ] && espdisks="$espdisks $d$esppart"
@@ -576,7 +583,15 @@ EOF
                 fi
                 # now add the new one
                 go="efibootmgr -v -c"
-                go="$go -d $(echo $d | sed 's|[0-9]*$||')"
+                # NOTE: Gotta check for N vs pN device partition naming (i.e.,
+                #       sda1 vs nvme0n1p1) here.  We do it quickly by checking
+                #       for the existence of $d with just the trailing digit(s)
+                #       removed.
+                if [ -e "$(echo $d | sed 's|p[0-9]*$||')" ]; then
+                    go="$go -d $(echo $d | sed 's|p[0-9]*$||')"
+                else
+                    go="$go -d $(echo $d | sed 's|[0-9]*$||')"
+                fi
                 go="$go -p $(echo $d | grep -o '[0-9]*$')"
                 go="$go -l /EFI/$efidir/syslinux.efi"
                 go="$go -L $label"
@@ -597,7 +612,12 @@ EOF
                 fi
                 # now add the new one
                 go="efibootmgr -v -c"
-                go="$go -d $(echo $d | sed 's|[0-9]*$||')"
+                # same as above, check of N vs pN numbering
+                if [ -e "$(echo $d | sed 's|p[0-9]*$||')" ]; then
+                    go="$go -d $(echo $d | sed 's|p[0-9]*$||')"
+                else
+                    go="$go -d $(echo $d | sed 's|[0-9]*$||')"
+                fi
                 go="$go -p $(echo $d | grep -o '[0-9]*$')"
                 go="$go -l /$(basename $(ls /mnt/$esp_label/xen*.efi))"
                 go="$go -L $label"
