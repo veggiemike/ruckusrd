@@ -307,7 +307,7 @@ auto_install()
 
     # create pool
     mkdir -p /sysroot
-    go="zpool create -o ashift=$ashift zroot"
+    go="zpool create -f -o ashift=$ashift zroot"
     go="$go -O compression=zstd -O relatime=on -O atime=on"
     go="$go -O acltype=posixacl -O xattr=sa"
     [ -n "$vdev_type" ] && go="$go $vdev_type"
