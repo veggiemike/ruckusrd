@@ -566,23 +566,49 @@ EOF
             #       xen2,syslinux2,xen,syslinux as the boot order.  Ugly.  So
             #       we fix that down below after looping through the ESPs.
             #
+            # NOTE: If label already exists, a warning gets printed out, the
+            #       new bootnum is added, efi will still work... but that's
+            #       gonna mess with things downstream when we try to lookup
+            #       bootnums by label.  So we have to remove bootnum's with
+            #       matching labels before adding new ones.
+            #
             if [ "$can_efi" != "default" ]; then
+                label=syslinux
+                [ $bootnum -gt 1 ] && label="$label$bootnum"
+                # first remove old matching entries
+                oldone=$(efi_get_bootnum $label)
+                if [ -n "$oldone" ]; then
+                    go="efibootmgr -v -b $oldone -B"
+                    decho $go
+                    eval $go > $efibootcache || echo
+                fi
+                # now add the new one
                 go="efibootmgr -v -c"
                 go="$go -d $(echo $d | sed 's|[0-9]*$||')"
                 go="$go -p $(echo $d | grep -o '[0-9]*$')"
-                go="$go -l /EFI/$efidir/syslinux.efi -L syslinux"
-                [ $bootnum -gt 1 ] && go="$go$bootnum"
+                go="$go -l /EFI/$efidir/syslinux.efi"
+                go="$go -L $label"
                 decho $go
                 eval $go > $efibootcache || echo "WARNING: efibootmgr failed"
             fi
 
             # add a xen entry to EFI, too
-            if [ -f /mnt/$esp_label/xen*.efi ]; then
+            if [ "$can_efi" != "default" ] && [ -f /mnt/$esp_label/xen*.efi ]; then
+                label=xen
+                [ $bootnum -gt 1 ] && label="$label$bootnum"
+                # first remove old matching entries
+                oldone=$(efi_get_bootnum $label)
+                if [ -n "$oldone" ]; then
+                    go="efibootmgr -v -b $oldone -B"
+                    decho $go
+                    eval $go > $efibootcache || echo
+                fi
+                # now add the new one
                 go="efibootmgr -v -c"
                 go="$go -d $(echo $d | sed 's|[0-9]*$||')"
                 go="$go -p $(echo $d | grep -o '[0-9]*$')"
-                go="$go -l /$(basename $(ls /mnt/$esp_label/xen*.efi)) -L xen"
-                [ $bootnum -gt 1 ] && go="$go$bootnum"
+                go="$go -l /$(basename $(ls /mnt/$esp_label/xen*.efi))"
+                go="$go -L $label"
                 decho $go
                 eval $go > $efibootcache || echo "WARNING: efibootmgr failed"
             fi
