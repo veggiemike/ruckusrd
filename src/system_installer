@@ -573,7 +573,7 @@ EOF
                 go="$go -l /EFI/$efidir/syslinux.efi -L syslinux"
                 [ $bootnum -gt 1 ] && go="$go$bootnum"
                 decho $go
-                eval $go || echo "WARNING: efibootmgr failed"
+                eval $go > $efibootcache || echo "WARNING: efibootmgr failed"
             fi
 
             # add a xen entry to EFI, too
@@ -584,14 +584,12 @@ EOF
                 go="$go -l /$(basename $(ls /mnt/$esp_label/xen*.efi)) -L xen"
                 [ $bootnum -gt 1 ] && go="$go$bootnum"
                 decho $go
-                eval $go || echo "WARNING: efibootmgr failed"
+                eval $go > $efibootcache || echo "WARNING: efibootmgr failed"
             fi
 
-            # umount esp
-            #
-            # FIXME: maybe?  i'm leaving it mounted for now, for testing...
-            #
-            #umount /mnt/$esp_label
+            # NOTE: We intentionally leave each ESP mounted, in case the user
+            #       wants to poke at them prior to attempting to boot the
+            #       system.
 
             echo "done with $d (LABEL=$esp_label)"
             bootnum=$((bootnum+1))
@@ -605,6 +603,7 @@ EOF
         #        doesn't work?
         #
         efi_set_bootorder_first syslinux
+        cat $efibootcache
     fi
 
     # create fstab

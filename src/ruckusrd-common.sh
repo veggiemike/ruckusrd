@@ -714,18 +714,31 @@ parse_boot_params()
 # which will refresh it if it's older than 1 minute.  Likewise, anywhere we
 # modify via efibootmgr, redirect the output to the cache file to keep it
 # correct.
+#
+# NOTE: We need to ensure that this includes labal and disk paths.  Make sure
+#       to use '-v' on all efibootmgr invocations.
+#
 efibootcache=/tmp/efiboot.cache
 
+
+# NOTE: efibootmgr v17 vs v18 output changes annoyingly.  Starting with v18,
+#       the default verbosity has changed to the old -v verbosity level, and if
+#       you do -v now you get a ton of extra info on multiple lines per boot
+#       entry.  (so jammy good, noble bad)
+#
+#       Our parsing scripts were unaffected by this change, because we check to
+#       see if lines start with Boot[0-9a-fA-F]+. but keep this in mind when
+#       adding other parsing functions.
 
 efi_update_cache()
 {
     if [ ! -f $efibootcache ] || [ -z "$(find $efibootcache -mmin 1) 2>/devnull" ]; then
-        efibootmgr > $efibootcache
+        efibootmgr -v > $efibootcache
     fi
 }
 
 
-# take efi boot entry name, echo it's associated hex id
+# take efi boot entry label, echo it's associated hex id
 efi_get_bootnum()
 {
     # can't just use $1, we need to quote the entire arg list, in case the name
@@ -779,12 +792,12 @@ efi_set_bootorder_first()
         decho2 "EFI bootnum for $name: $bn"
         order=$(efi_get_bootorder)
         decho2 "EFI bootorder: $order"
-        efibootmgr -o $bn,$order > $efibootcache
+        efibootmgr -v -o $bn,$order > $efibootcache
         count=$((count+1))
     done
 
     # now remove duplicates
-    efibootmgr --remove-dups > $efibootcache
+    efibootmgr -v --remove-dups > $efibootcache
 }
 
 
