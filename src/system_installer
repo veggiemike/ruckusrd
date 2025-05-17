@@ -72,7 +72,7 @@ dlg_summary()
 {
     go=$DLG
     go="$go --title 'Configuration Summary'"
-    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nVDEV Type: $vdev_type\nSetup EFI: $can_efi\nSwap: $swap\n\nContinue?'"
+    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nVDEV Type: $vdev_type\nCreate ESP: $create_esp\nESP Size: $espsize\nModify EFIVARS: $modify_efivars\nSwap: $swap\n\nContinue?'"
     go="$go 0 0"
     KEEP_GOING=$(eval $go 3>&1 1>&2 2>&3 && echo yes || echo -n)
     #echo "KEEP_GOING=$KEEP_GOING"
@@ -162,7 +162,7 @@ partition_disks()
     swappart=1
     esppart=1
     echo "label: gpt" > /tmp/ptable
-    if [ -n "$can_efi" ]; then
+    if [ -n "$create_esp" ]; then
         # NOTE: Most "regular" installations I've seen use a really small
         #       partition (256M or 512M), but we're going to use ESP as the
         #       actual /boot partition and I like to keep a couple development
@@ -192,8 +192,8 @@ partition_disks()
     for d in $disks; do
         sfdisk $d < /tmp/ptable
         zfsdisks="$zfsdisks $d$zfspart"
-        [ -n "$want_swap" ] && swapdisks="$swapdisks $d$swappart"
-        [ -n "$can_efi" ] && espdisks="$espdisks $d$esppart"
+        [ -n "$create_swap" ] && swapdisks="$swapdisks $d$swappart"
+        [ -n "$create_esp" ] && espdisks="$espdisks $d$esppart"
     done
 }
 
@@ -232,16 +232,12 @@ auto_install()
     decho2 ashift: $ashift
 
     # can we do EFI setup?
-    if [ -z "$can_efi" ] && (efibootmgr >/dev/null 2>&1); then
-        can_efi=y
+    if [ -z "$create_esp" ] && (efibootmgr >/dev/null 2>&1); then
+        create_esp=y
+        modify_efivars=y
     fi
 
-    # how much ram - pick a swap size
-    #
-    # NOTE: I've historically NOT used any swap on Xen virtual machines.
-    #       Initially this was to limit conplexity (uh, or I was lazy), but
-    #       I've seen zero reason to add swap to these systems over the years.
-    #       So I will continue to not do it.
+    # pick a swap size based on ammount of RAM
     #
     # NOTE: Probably overkill, but I'll setup enough swap to support
     #       hibernation.  Ubuntu's recommendation is 1.5*RAM.  I'll calculate
@@ -255,25 +251,20 @@ auto_install()
     #       suspend to disk w/ a failed disk in the zpool...  but we've got
     #       bigger fish to fry in that case.
     #
-    if [ -z "$want_swap" ] && [ "$swap" != "0" ] && [ -n "$can_efi" ] && [ "$can_efi" != "default" ]; then
-        want_swap=1
-    fi
-    if [ -n "$want_swap" ]; then
-        if [ -z "$swap" ]; then
-            # mem in kb
-            mem=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
-            # 1.5*mem in G
-            swap=$((mem*15/10/1024/1024+1))
-            if [ $diskcount -gt 1 ]; then
-                halfswap=$((swap/diskcount))
-                # round up if needed
-                if [ $((halfswap*diskcount)) -lt $swap ]; then
-                    halfswap=$((halfswap+1))
-                fi
-                swap=$halfswap
+    if [ -n "$create_swap" ] && [ -z "$swap" ]; then
+        # mem in kb
+        mem=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+        # 1.5*mem in G
+        swap=$((mem*15/10/1024/1024+1))
+        if [ $diskcount -gt 1 ]; then
+            halfswap=$((swap/diskcount))
+            # round up if needed
+            if [ $((halfswap*diskcount)) -lt $swap ]; then
+                halfswap=$((halfswap+1))
             fi
-            swap="${swap}G"
+            swap=$halfswap
         fi
+        swap="${swap}G"
     fi
     decho2 swap: $swap
 
@@ -282,7 +273,7 @@ auto_install()
     [ -n "$KEEP_GOING" ] || user_abort
 
     # partition if needed
-    if [ -n "$can_efi" ] || [ -n "$want_swap" ]; then
+    if [ -n "$create_esp" ] || [ -n "$create_swap" ]; then
         partition_disks
     else
         zfsdisks=$disks
@@ -354,8 +345,8 @@ auto_install()
         fi
     done
 
-    # efibootmgr
-    if [ -n "$can_efi" ]; then
+    # ESP creation (and possibly EFIVAR manipulation)
+    if [ -n "$create_esp" ]; then
         kernelversion=$(basename /tmproot/vmlinuz*)
         echo "kernelversion: $kernelversion"
         kernelversion=${kernelversion//vmlinuz-/}
@@ -472,7 +463,8 @@ auto_install()
                 #        really matters... but it *IS* different.
                 #
                 $rsync /usr/share/syslinux/efi64/* /mnt/$esp_label/EFI/$efidir/
-                if [ "$can_efi" = "default" ]; then
+                # rename syslinux.efi to the default bootx64.efi
+                if [ "$efidir" == "boot" ]; then
                     mv -v /mnt/$esp_label/EFI/$efidir/syslinux.efi /mnt/$esp_label/EFI/$efidir/bootx64.efi
                 fi
 
@@ -572,7 +564,7 @@ EOF
             #       bootnums by label.  So we have to remove bootnum's with
             #       matching labels before adding new ones.
             #
-            if [ "$can_efi" != "default" ]; then
+            if [ -n "$modify_efivars" ]; then
                 label=syslinux
                 [ $bootnum -gt 1 ] && label="$label$bootnum"
                 # first remove old matching entries
@@ -593,7 +585,7 @@ EOF
             fi
 
             # add a xen entry to EFI, too
-            if [ "$can_efi" != "default" ] && [ -f /mnt/$esp_label/xen*.efi ]; then
+            if [ -n "$modify_efivars" ] && [ -f /mnt/$esp_label/xen*.efi ]; then
                 label=xen
                 [ $bootnum -gt 1 ] && label="$label$bootnum"
                 # first remove old matching entries
@@ -626,10 +618,12 @@ EOF
         # NOTE: The firstboot wizard will ask if you want Xen first later on.
         #
         # FIXME: what happens if we forced efi setup even though efibootmgr
-        #        doesn't work?
+        #        doesn't work?  i guess this won't do anything?
         #
-        efi_set_bootorder_first syslinux
-        cat $efibootcache
+        if [ -n "$modify_efivars" ]; then
+            efi_set_bootorder_first syslinux
+            cat $efibootcache
+        fi
     fi
 
     # create fstab
@@ -670,6 +664,7 @@ system_installer()
     imgdir=images
     excludes=
     efidir=syslinux
+    create_swap=y
     espsize=1G
     vdev_maxsize=3
     opts=${initramsys_installer_conf//,/ }
@@ -685,17 +680,36 @@ system_installer()
                 excludes="$excludes ${o#EXCLUDE=}"
                 ;;
             EFI=*)
-                can_efi=${o#EFI=}
-                if [ "$can_efi" = "default" ]; then
-                    efidir="boot"
-                fi
+                case "${o#EFI=}" in
+                    default)
+                        # create ESP but use default EFI bootnames and no
+                        # efibootmgr calls
+                        create_esp=y
+                        efidir="boot"
+                        modify_efivars=
+                        ;;
+                    force)
+                        # force creation of ESP and attempt efibootmgr calls
+                        # even if EFIVARS unavailable (e.g., booting from BIOS)
+                        #
+                        # NOTE: This sounds strange, but it's really for when
+                        #       booting the installer on an EFI capable system
+                        #       but from BIOS boot media (or misbehaving UEFI
+                        #       firmwware).  In this case, the ESP gets created
+                        #       and the user can fix the EFI configuration
+                        #       afterwards by hand.
+                        create_esp=y
+                        modify_efivars=y
+                        ;;
+                    *)
+                        decho "ignoring invalid initramsys_installer option $o"
+                        ;;
+                esac
                 ;;
             SWAP=*)
                 swap=${o#SWAP=}
-                if [ "$swap" != "0" ]; then
-                    want_swap=y
-                else
-                    want_swap=
+                if [ "$swap" == "0" ]; then
+                    create_swap=
                 fi
                 ;;
             ESP=*)
@@ -842,7 +856,7 @@ system_installer()
     #
     echo
     echo "installation complete!"
-    if [ -z "$can_efi" ]; then
+    if [ -z "$create_esp" ]; then
         echo
         echo "###############################################################################"
         echo
