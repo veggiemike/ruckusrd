@@ -211,10 +211,11 @@ to login on) w/out any root device.
 \fBinitramsys-net[=CONFIG]\fR
 Implies \fBinitramsys\fP, but also starts networking automatically.  Valid
 config options are \fBDEV\fP=\fIdevname\fP, \fBIP\fP=\fIip/cidr\fP|\fIauto\fP],
-\fBVLAN\fP=\fIvid\fP, \fBHOSTNAME\fP=\fIname\fP and can be provided as one big
-comma-delimited argument (e.g., \fIinitramsys-net=DEV=eth0,VLAN=20\fP).  Default
-configuration is eth0, DHCP, no VLAN, w/ hostname of ruckusrd-TIMESTAMP.  The
-dropbear SSH server is started automatically as well.
+\fBVLAN\fP=\fIvid\fP and can be provided as one big comma-delimited argument
+(e.g., \fIinitramsys-net=DEV=eth0,VLAN=20\fP).  Default configuration is eth0,
+DHCP, no VLAN, w/ hostname of ruckusrd-TIMESTAMP (hostname can be set via the
+kernel's \fIhostname=\fP param). The dropbear SSH server is started
+automatically as well.
 
 .TP
 \fBinitramsys-installer[=CONFIG]\fR

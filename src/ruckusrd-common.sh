@@ -470,9 +470,6 @@ start_ruckusrd_system()
                 VLAN=*)
                     vlan=${o#VLAN=}
                     ;;
-                HOSTNAME=*)
-                    hostname ${o#HOSTNAME=}
-                    ;;
                 *)
                     decho "ignoring invalid initramsys_net config option $o"
                     ;;
