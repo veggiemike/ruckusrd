@@ -618,7 +618,7 @@ parse_boot_params()
                 ;;
             initramsys-net)
                 initramsys=1
-                initramsys_networking=1
+                initramsys_net=1
                 ;;
             initramsys-net=*)
                 initramsys=1
