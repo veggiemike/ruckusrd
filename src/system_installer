@@ -202,6 +202,22 @@ partition_disks()
         [ -n "$create_swap" ] && swapdisks="$swapdisks $d$swappart"
         [ -n "$create_esp" ] && espdisks="$espdisks $d$esppart"
     done
+
+    # remove outdated EFI bootnums
+    #
+    # NOTE: This is detected earlier after disk selection.  It's every
+    #       existing EFI bootnum that will be invalidated by nuking our
+    #       selected disk(s).
+    #
+    decho "modify_efivars: $modify_efivars"
+    decho "efi_bootnums_to_remove: '$efi_bootnums_to_remove'"
+    if [ -n "$modify_efivars" ] && [ -n "$efi_bootnums_to_remove" ]; then
+        efibootmgr -v
+        for x in $efi_bootnums_to_remove; do
+            efibootmgr -v -b $x -B > $efibootcache
+        done
+        efibootmgr -v
+    fi
 }
 
 
@@ -242,6 +258,22 @@ auto_install()
     if [ -z "$create_esp" ] && (efibootmgr >/dev/null 2>&1); then
         create_esp=y
         modify_efivars=y
+    fi
+
+    if [ -n "$modify_efivars" ]; then
+        # NOTE: We're going to slick and repartition the selected disk(s), so
+        #       any pre-existing EFI boot entries related to them are goint to
+        #       become invalid.  We generate a list of EFI bootnums to remove
+        #       here, then actually remove them later (after we've actually
+        #       partitioned).
+        #
+        efi_bootnums_to_remove=
+        for x in $disks; do
+            efi_bootnums_to_remove="$efi_bootnums_to_remove $(efi_get_bootnum_by_disk $x)"
+        done
+        # chomp off leading whitespace
+        efi_bootnums_to_remove=$(echo $efi_bootnums_to_remove)
+        decho2 efi_bootnums_to_remove: $efi_bootnums_to_remove
     fi
 
     # pick a swap size based on ammount of RAM

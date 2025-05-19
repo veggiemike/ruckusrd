@@ -191,7 +191,7 @@ autoload_fs_module()
     # NOTE: Normal blkid can be given LABEL=whatever here and do the right
     #       thing.  The busybox version doesn't like it, though.  But busybox
     #       does provide findfs, which can do the lookup for us.
-    eval $(blkid $(findfs $1) | sed 's|.*: ||')
+    eval $(blkid -o export $(findfs $1))
     [ -n "$TYPE" ] && modprobe $TYPE
 }
 
@@ -755,7 +755,43 @@ efi_get_bootnum()
     # 000a0  label3
     #
     # then print the 1st element if the whole line matches
-    cat $efibootcache | sed 's|\t.*||g' | awk '{sub("* ","  "); if ($1 ~ "Boot[0-9a-fA-F]+") {sub("Boot",""); print}}' | awk "/^[0-9a-fA-F]+  $name\$/"' {print $1}'
+    #
+    # NOTE: At some point we started to need to escape out the asterisk in
+    #       sub("* "," ").
+    #
+    #       In ash it works fine w/ or w/out the escape.  Bash in bionic works
+    #       either way but prints a warning if you escape it (probably why I
+    #       originally didn't).  Starting with jammy, the escape is needed in
+    #       bash.  Just in case this gets sourced from actual bash, we'll
+    #       escape it.
+    #
+    cat $efibootcache | sed 's|\t.*||g' | awk '{sub("\* ","  "); if ($1 ~ "^Boot[0-9a-fA-F]+") {sub("Boot",""); print}}' | awk "/^[0-9a-fA-F]+  $name\$/"' {print $1}'
+}
+
+
+# take device name, echo list of associated efi boot numbers
+#
+# NOTE: It's entirely possible that this returns more than one
+#
+efi_get_bootnum_by_disk()
+{
+    disk=$1
+
+    # update cache
+    efi_update_cache
+
+    # get list of partitions for the specified device
+    partitions=
+    [ -e ${disk}1 ] && partitions=${disk}[0-9]*
+    [ -e ${disk}p1 ] && partitions=${disk}p[0-9]*
+
+    # iterate over each partition, looking up its UUID and then scanning
+    # efibootmgr output for the UUID
+    for x in $partitions; do
+        eval $(blkid -o export $x)
+        [ -n "$PARTUUID" ] || continue
+        cat $efibootcache | awk '{sub("\* ","  "); if ($1 ~ "^Boot[0-9a-fA-F]+$") {sub("Boot",""); print}}' | awk "/GPT,$PARTUUID/"' {print $1}'
+    done
 }
 
 
