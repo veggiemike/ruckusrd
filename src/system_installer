@@ -29,7 +29,7 @@ user_abort()
 {
     # unset our trap so we can exit normally
     trap 0 2
-    echo "installation aborted by user"
+    echo "Installation aborted by user"
     exit 0
 }
 
@@ -903,7 +903,7 @@ system_installer()
     #       point... so we leave it... revisit if that causes problems.
     #
     echo
-    echo "installation complete!"
+    echo "Installation complete!  Reboot and test it out, or login below to poke around."
     if [ -z "$create_esp" ]; then
         echo
         echo "###############################################################################"
