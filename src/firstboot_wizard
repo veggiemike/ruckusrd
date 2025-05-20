@@ -80,15 +80,21 @@ dlg_pw_loop()
 
 dlg_networking()
 {
+    # set a sane default device name, and dev2 name, to be used in this dialog
+    # and also later on in configure_networking()
+    dev=$(net_get_first_eth)
+    [ -n "$dev" ] || dev=eth0
+    dev_index=$(echo $dev | grep -o "[0-9]*$")
+    dev2=$(echo $dev | awk "{gsub($dev_index,$((dev_index+1))); print}")
+
     go=$DLG
     go="$go --title 'Networking'"
     go="$go --menu \"Select a Networking template (you may have to modify after boot)\" 0 0 5"
     go="$go \"None\" \"System defaults, configure later\""
-    go="$go \"Trunk\" \"Trunk w/ vlan20 DHCP interface (eno1)\""
-    go="$go \"Xen VM Trunk\" \"Xen VM trunk w/ vlan20 DHCP interface (enX0)\""
-    go="$go \"Xen Bridged Trunk\" \"Xen bridged trunk for domain0 w/ vlan20 DHCP interface (eno1)\""
-    go="$go \"Bonded Trunk\" \"Bonded trunk w/ vlan20 DHCP interface (ens1f0, ens1f1)\""
-    go="$go \"Xen Bridge on Bonded Trunk\" \"Xen bridge on bonded trunk w/ vlan20 DHCP interface (eno1, eno2)\""
+    go="$go \"Trunk\" \"Trunk w/ vlan20 DHCP interface ($dev)\""
+    go="$go \"Xen Bridged Trunk\" \"Xen bridged trunk for domain0 w/ vlan20 DHCP interface ($dev, xenbr0)\""
+    go="$go \"Bonded Trunk\" \"Bonded trunk w/ vlan20 DHCP interface ($dev, $dev2, bond0)\""
+    go="$go \"Xen Bridge on Bonded Trunk\" \"Xen bridge on bonded trunk w/ vlan20 DHCP interface ($dev, $dev2, bond0, xenbr0)\""
     NETWORKING=$(eval $go 3>&1 1>&2 2>&3)
 }
 
@@ -102,16 +108,7 @@ configure_networking()
                     ipv4.method disabled ipv6.method ignore > /sysroot/etc/NetworkManager/system-connections/trunk.nmconnection
             # vlan
             $CHROOT nmcli --offline connection add type vlan con-name vlan20 \
-                    vlan.id 20 vlan.parent eno1 802-3-ethernet.cloned-mac-address stable \
-                    ipv6.method ignore > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
-            ;;
-        "Xen VM Trunk")
-            # trunk
-            $CHROOT nmcli --offline connection add type ethernet con-name trunk \
-                    ipv4.method disabled ipv6.method ignore > /sysroot/etc/NetworkManager/system-connections/trunk.nmconnection
-            # vlan
-            $CHROOT nmcli --offline connection add type vlan con-name vlan20 \
-                    vlan.id 20 vlan.parent enX0 802-3-ethernet.cloned-mac-address stable \
+                    vlan.id 20 vlan.parent $dev 802-3-ethernet.cloned-mac-address stable \
                     ipv6.method ignore > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
             ;;
         "Xen Bridged Trunk")
@@ -126,10 +123,10 @@ configure_networking()
             ;;
         "Bonded Trunk")
             # slaves
-            $CHROOT nmcli --offline connection add type bond-slave ifname ens1f0 master bond0 \
-                    > /sysroot/etc/NetworkManager/system-connections/ens1f0.nmconnection
-            $CHROOT nmcli --offline connection add type bond-slave ifname ens1f1 master bond0 \
-                    > /sysroot/etc/NetworkManager/system-connections/ens1f1.nmconnection
+            $CHROOT nmcli --offline connection add type bond-slave ifname $dev master bond0 \
+                    > /sysroot/etc/NetworkManager/system-connections/$dev.nmconnection
+            $CHROOT nmcli --offline connection add type bond-slave ifname $dev2 master bond0 \
+                    > /sysroot/etc/NetworkManager/system-connections/$dev2.nmconnection
             # bond0
             $CHROOT nmcli --offline connection add type bond con-name bond0 mode active-backup \
                     ipv4.method disabled ipv6.method ignore \
@@ -141,10 +138,10 @@ configure_networking()
             ;;
         "Xen Bridge on Bonded Trunk")
             # slaves
-            $CHROOT nmcli --offline connection add type bond-slave ifname eno1 master bond0 \
-                    > /sysroot/etc/NetworkManager/system-connections/eno1.nmconnection
-            $CHROOT nmcli --offline connection add type bond-slave ifname eno2 master bond0 \
-                    > /sysroot/etc/NetworkManager/system-connections/eno2.nmconnection
+            $CHROOT nmcli --offline connection add type bond-slave ifname $dev master bond0 \
+                    > /sysroot/etc/NetworkManager/system-connections/$dev1.nmconnection
+            $CHROOT nmcli --offline connection add type bond-slave ifname $dev2 master bond0 \
+                    > /sysroot/etc/NetworkManager/system-connections/$dev2.nmconnection
             # bond0
             $CHROOT nmcli --offline connection add type bond con-name bond0 mode active-backup \
                     connection.master xenbr0 connection.slave-type bridge \
