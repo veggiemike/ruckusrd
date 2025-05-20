@@ -441,14 +441,6 @@ start_ruckusrd_system()
     start_udev
     sleep 1
 
-    # attempt to mount efivars
-    if [ -d /sys/firmware/efi ]; then
-        decho "mounting efivars"
-        mount efivarfs -t efivarfs /sys/firmware/efi/efivars || echo "WARNING: Failed to mount efivars. Cannot manage UEFI settings."
-    else
-        decho "system doesn't support EFI, not mounting efivars"
-    fi
-
     # check for existence of serial devices and uncomment getty entries in
     # /etc/inittab accordingly
     [ -c /dev/ttyS0 ] && sed -i 's|^#ttyS0::|ttyS0::|' /etc/inittab
