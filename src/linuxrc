@@ -300,9 +300,6 @@ if [ -n "$ZFS" ]; then
     # NOTE: We're only mounting the specified root dataset here.  The OS will
     #       mount the rest during it's normal bootup processing (assuming it's
     #       configured properly).
-    #
-    # FIXME: what's the harm in just letting it mount everything here?
-    #
     zpool import $ZFS_POOL -N
 fi
 
@@ -1077,13 +1074,42 @@ fi
 # likewise, unmount fwdev if we mounted it
 [ -n "$fwdir" ] && umount $fwdir
 
-# FIXME: This works well enough now, I'm considering making it on by
-#        default... perhaps with a 'nofirstboot' to disable it, although that
-#        seems like overkill...
+# NOTE: This is super handy when you want it to happen, I would almost consider
+#       making it on by default... but it would be pretty surprising behavior
+#       for somebody trying out one my kernels on an existing system.  I just
+#       trying to use ruckusrd to get the cool resuce environment.  So, no, we
+#       should NOT make this on by default, no matter how helpful it seems.
 #
 if [ -n "$firstboot" ]; then
     mount -o remount,rw /sysroot
     sysroot_mount_vfs
+
+    # mount more filesystems
+    #
+    # NOTE: Normally, we leave this up to the sysroot's init system... but
+    #       we're going to run into problems in firstboot_wizard if we're
+    #       missing expected filesystems (e.g., /home)
+    #
+    # FIXME: is it safe to leave these mounted?  or do we need to undo it
+    #        before handoff to sysroot's init?  given that this is only if the
+    #        user goes into firstboot, it's an exception to the rule, i'm gonna
+    #        leave them mounted.
+    #
+    # FIXME: this will be a problem on all the es images i built when noble
+    #        first came out.  back then, I didn't install zfs until
+    #        server.sqsh.  I mean, this all depends on wether I decide to use
+    #        ZFS for rootfs on all my domUs or not.  Historically, I didn't,
+    #        because zfs in a domU isn't the most efficient, but it was also
+    #        because I didn't have an easy installer.  Now that I do have an
+    #        easy installer, and in addition to being easy, I have to test it,
+    #        I've started using ZFS for the rootfs of my devlopment domUs...
+    #
+    #        I could use initramfs's zfs to mount remaining filesystems I
+    #        guess...
+    #
+    CHROOT="chroot /sysroot /usr/bin/env -i HOME=/root TERM=$TERM PATH=$PATH"
+    $CHROOT mount -a
+    $CHROOT zfs mount -a
 
     # NOTE: When run directly by init, any keypress (including arrow keys)
     #       causes an error exit... but if you run it by hand immediately
