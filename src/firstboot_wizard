@@ -85,7 +85,7 @@ dlg_networking()
     dev=$(net_get_first_eth)
     [ -n "$dev" ] || dev=eth0
     dev_index=$(echo $dev | grep -o "[0-9]*$")
-    dev2=$(echo $dev | awk "{gsub($dev_index,$((dev_index+1))); print}")
+    dev2=$(echo $dev | sed "s|$dev_index$|$((dev_index+1))|")
 
     go=$DLG
     go="$go --title 'Networking'"
