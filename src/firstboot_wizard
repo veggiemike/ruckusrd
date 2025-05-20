@@ -105,21 +105,22 @@ configure_networking()
         "Trunk")
             # trunk
             $CHROOT nmcli --offline connection add type ethernet con-name trunk \
-                    ipv4.method disabled ipv6.method ignore > /sysroot/etc/NetworkManager/system-connections/trunk.nmconnection
+                    ipv4.method disabled ipv6.method disabled > /sysroot/etc/NetworkManager/system-connections/trunk.nmconnection
             # vlan
             $CHROOT nmcli --offline connection add type vlan con-name vlan20 \
                     vlan.id 20 vlan.parent $dev 802-3-ethernet.cloned-mac-address stable \
-                    ipv6.method ignore > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
+                    ipv6.method disabled > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
             ;;
         "Xen Bridged Trunk")
             # xenbr0
             $CHROOT nmcli --offline connection add type ethernet con-name xenbr0 \
-                    ipv4.method disabled ipv6.method ignore \
+                    connection.interface-name xenbr0 \
+                    ipv4.method disabled ipv6.method disabled \
                     > /sysroot/etc/NetworkManager/system-connections/xenbr0.nmconnection
             # vlan
             $CHROOT nmcli --offline connection add type vlan con-name vlan20 \
                     vlan.id 20 vlan.parent xenbr0 802-3-ethernet.cloned-mac-address stable \
-                    ipv6.method ignore > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
+                    ipv6.method disabled > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
             ;;
         "Bonded Trunk")
             # slaves
@@ -129,12 +130,13 @@ configure_networking()
                     > /sysroot/etc/NetworkManager/system-connections/$dev2.nmconnection
             # bond0
             $CHROOT nmcli --offline connection add type bond con-name bond0 mode active-backup \
-                    ipv4.method disabled ipv6.method ignore \
+                    connection.interface-name bond0 \
+                    ipv4.method disabled ipv6.method disabled \
                     > /sysroot/etc/NetworkManager/system-connections/bond0.nmconnection
             # vlan
             $CHROOT nmcli --offline connection add type vlan con-name vlan20 \
                     vlan.id 20 vlan.parent bond0 802-3-ethernet.cloned-mac-address stable \
-                    ipv6.method ignore > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
+                    ipv6.method disabled > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
             ;;
         "Xen Bridge on Bonded Trunk")
             # slaves
@@ -144,16 +146,18 @@ configure_networking()
                     > /sysroot/etc/NetworkManager/system-connections/$dev2.nmconnection
             # bond0
             $CHROOT nmcli --offline connection add type bond con-name bond0 mode active-backup \
+                    connection.interface-name bond0 \
                     connection.master xenbr0 connection.slave-type bridge \
                     > /sysroot/etc/NetworkManager/system-connections/bond0.nmconnection
             # xenbr0
             $CHROOT nmcli --offline connection add type ethernet con-name xenbr0 \
-                    ipv4.method disabled ipv6.method ignore \
+                    connection.interface-name xenbr0 \
+                    ipv4.method disabled ipv6.method disabled \
                     > /sysroot/etc/NetworkManager/system-connections/xenbr0.nmconnection
             # vlan
             $CHROOT nmcli --offline connection add type vlan con-name vlan20 \
                     vlan.id 20 vlan.parent xenbr0 802-3-ethernet.cloned-mac-address stable \
-                    ipv6.method ignore > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
+                    ipv6.method disabled > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
             ;;
         None)
             # easy, nothing to do
@@ -165,6 +169,13 @@ configure_networking()
 
     if [ "$1" != "None" ]; then
         chmod 600 /sysroot/etc/NetworkManager/system-connections/*.nmconnection
+        # NOTE: Since we're in --offline, any connection we create that's
+        #       referenced by another connection will print a warning (e.g.,
+        #       Warning: master 'bond0' doesn't exist) on stdout along with the
+        #       file we're generating.  Nice.  Let's make that a comment, shall
+        #       we.
+        #
+        sed -i 's|^Warning:|# Warning:|' /sysroot/etc/NetworkManager/system-connections/*.nmconnection
     fi
 }
 
