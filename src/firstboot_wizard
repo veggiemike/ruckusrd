@@ -215,14 +215,20 @@ firstboot_wizard()
         echo $HOSTNAME > /sysroot/etc/hostname
         $CHROOT dbus-uuidgen > /sysroot/etc/machine-id
     fi
-1    # get root pw
-    if dlg_pw_loop root && [ -z "$firstboot_dryrun" ]; then
-        echo -e "$PW\n$PW2" | $CHROOT passwd root
-    fi
-    # get localadmin pw, then create that user
-    if dlg_pw_loop localadmin && [ -z "$firstboot_dryrun" ]; then
-        $CHROOT useradd -c "Local Administrator" -G adm,sudo,cdrom,dip,plugdev -m -s /bin/zsh localadmin
-        echo -e "$PW\n$PW2" | $CHROOT passwd localadmin
+    # initial user setup
+    #
+    # NOTE: We only do this ONCE, if localadmin hasn't been added yet.
+    #
+    if ! $CHROOT id localadmin >/dev/null 2>&1; then
+        # get root pw
+        if dlg_pw_loop root && [ -z "$firstboot_dryrun" ]; then
+            echo -e "$PW\n$PW2" | $CHROOT passwd root
+        fi
+        # get localadmin pw, then create that user
+        if dlg_pw_loop localadmin && [ -z "$firstboot_dryrun" ]; then
+            $CHROOT useradd -c "Local Administrator" -G adm,sudo,cdrom,dip,plugdev -m -s /bin/zsh localadmin
+            echo -e "$PW\n$PW2" | $CHROOT passwd localadmin
+        fi
     fi
     # timezone
     if [ -z "$firstboot_dryrun" ]; then
