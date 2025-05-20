@@ -619,12 +619,13 @@ EOF
                 #       sda1 vs nvme0n1p1) here.  We do it quickly by checking
                 #       for the existence of $d with just the trailing digit(s)
                 #       removed.
-                if [ -e "$(echo $d | sed 's|p[0-9]*$||')" ]; then
-                    go="$go -d $(echo $d | sed 's|p[0-9]*$||')"
-                else
-                    go="$go -d $(echo $d | sed 's|[0-9]*$||')"
+                bootdisk=$(echo $d | sed 's|[0-9]*$||')
+                if [ ! -e "$bootdisk" ]; then
+                    bootdisk=$(echo $d | sed 's|p[0-9]*$||')
                 fi
-                go="$go -p $(echo $d | grep -o '[0-9]*$')"
+                go="$go -d $bootdisk"
+                bootpart=$(echo $d | grep -o '[0-9]*$')
+                go="$go -p $bootpart"
                 go="$go -l /EFI/$efidir/syslinux.efi"
                 go="$go -L $label"
                 decho $go
@@ -644,13 +645,8 @@ EOF
                 fi
                 # now add the new one
                 go="efibootmgr -v -c"
-                # same as above, check of N vs pN numbering
-                if [ -e "$(echo $d | sed 's|p[0-9]*$||')" ]; then
-                    go="$go -d $(echo $d | sed 's|p[0-9]*$||')"
-                else
-                    go="$go -d $(echo $d | sed 's|[0-9]*$||')"
-                fi
-                go="$go -p $(echo $d | grep -o '[0-9]*$')"
+                go="$go -d $bootdisk"
+                go="$go -p $bootpart"
                 go="$go -l /$(basename $(ls /mnt/$esp_label/xen*.efi))"
                 go="$go -L $label"
                 decho $go
