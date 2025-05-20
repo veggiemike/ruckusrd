@@ -449,7 +449,9 @@ start_ruckusrd_system()
     # configure networking
     if [ -n "$initramsys_net" ]; then
         decho "starting networking"
-        dev=eth0
+        # lookup first ethernet device
+        dev=$(net_get_first_eth)
+        [ -n "$dev" ] || dev=eth0
         opts=${initramsys_net_conf//,/ }
         for o in $opts; do
             case "$o" in
@@ -823,6 +825,33 @@ efi_set_bootorder_first()
 
     # now remove duplicates
     efibootmgr -v --remove-dups > $efibootcache
+}
+
+
+# lookup the first ethernet device on the system, regardless of naming scheme
+#
+# NOTE: We *could* disable udev's persistent naming scheme by putting
+#       net.ifnames=0 on the kernel command line, but we might as well get used
+#       to it.
+#
+# FIXME: i am finding it really annoying though...  i get that from an
+#        installed system's setup, it's important that the device name not
+#        change after updating the kernel...  but from a system setup
+#        standpoint, I can't really be sure what the device is going to be
+#        named until after udev has renamed it.  Should be eno0 for 1st onboard
+#        NIC, but I have the 1st onboard NIC show up as enp2s0 so frequently
+#        I'm starting to think that's a lie.
+#
+#        and also, who on earth wants to type enp2s0 or heaven forbid
+#        enx78e7d1ea46da all over the place.
+#
+#        but from a scripting standpoint, we can't reallistically expect to
+#        only ever be used on systems that set net.ifnames=0 on the command
+#        line...
+#
+net_get_first_eth()
+{
+    ip addr | awk '/^[0-9]+:/ {gsub(":",""); if ($2 ~ /^en|^eth/) {print $2; exit}}'
 }
 
 
