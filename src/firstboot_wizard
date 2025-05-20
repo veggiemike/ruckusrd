@@ -253,6 +253,34 @@ firstboot_wizard()
     if dlg_networking && [ -z "$firstboot_dryrun" ]; then
         configure_networking "$NETWORKING"
     fi
+
+    #
+    # FIXME: maybe some type of performance vs powersave settings?  i honestly
+    #        haven't poked at this at all since bionic, is there still an
+    #        ondemand systemd service?
+    #
+    #        this looks to be a non-issue when graphical.target is in use,
+    #        because it's super easy to tune via Gnome's panel (about time...),
+    #        but it might be nice to give an easy button to console-only
+    #        setups.
+    #
+    #        it's gonna be a little complicated, though, because it depends on
+    #        intel or amd, and then depends on specific hardware supported,
+    #        etc...  I suppose we could just ask performance or powersave and
+    #        translate that accordingly (intel-pstate with hardware:
+    #        performance, powersace, inte-pstate w/out hardware: performance,
+    #        powersave, amd-pstate: ?, generic: performace, powersave).  I
+    #        guess the names line up mostly, although the sysfs paths might not
+    #
+    #        and actually, the gnome-power-manager doesn't look like it's
+    #        changing the current cpu scaling governor... but it is changing
+    #        the current cpu freq... odd.
+    #
+    #        I'm thinking we'll leave this alone for now... 99% of systems that
+    #        care about this setting are going to be desktop installations with
+    #        access to gnome-power-manager anyway.
+    #
+
     # default target - if gdm3 installed
     #
     # NOTE: We check to see if gdm3 is installed, because the graphical.target
@@ -266,12 +294,12 @@ firstboot_wizard()
     #        kernel command line in syslinux.cfg (and possibly xen.cfg)?  Could
     #        sed on loglevel=2 pretty easily...
     #
-    $CHROOT dpkg -s gdm3 2>/dev/null >/tmp/desktop
+    $CHROOT dpkg -s gdm3 2>/dev/null >/tmp/desktop || echo -n
     if [ -s /tmp/desktop ] && dlg_desktop && [ -z "$firstboot_dryrun" ]; then
         $CHROOT systemctl set-default graphical.target
     fi
     # boot into xen
-    $CHROOT dpkg -s xen 2>/dev/null >/tmp/xen
+    $CHROOT dpkg -s xen 2>/dev/null >/tmp/xen || echo -n
     if [ -s /tmp/xen ] && dlg_xen && [ -z "$firstboot_dryrun" ]; then
         efi_set_bootorder_first xen
     fi
