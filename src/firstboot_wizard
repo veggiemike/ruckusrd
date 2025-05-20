@@ -208,6 +208,9 @@ dlg_done()
 #firstboot_dryrun=y
 firstboot_wizard()
 {
+    trap "emergency_shell" 0 2
+    set -e
+
     dlg_welcome || return
     # get hostname
     if dlg_hostname && [ -z "$firstboot_dryrun" ] && [ "$(cat /sysroot/etc/hostname)" != "$HOSTNAME" ]; then
@@ -277,12 +280,15 @@ firstboot_wizard()
     #        definately does not.  And I can't do that here, we don't have
     #        networking yet.
     #
-    $CHROOT apt remove -y --autoremove gnome-initial-setup || echo
-    dlg_done
+    $CHROOT apt remove -y --autoremove gnome-initial-setup || echo -n
+    dlg_done || echo -n
     if [ -z "$firstboot_dryrun" ]; then
         touch /sysroot/$FIRSTBOOT_DONE_FILE
     fi
+    trap 0 2
 }
 
 
-[ -f /sysroot/$FIRSTBOOT_DONE_FILE ] || firstboot_wizard
+if [ -z "$JUST_SOURCE" ]; then
+    [ -f /sysroot/$FIRSTBOOT_DONE_FILE ] || firstboot_wizard
+fi
