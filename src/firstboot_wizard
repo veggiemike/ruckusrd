@@ -254,6 +254,10 @@ firstboot_wizard()
     if [ -z "$firstboot_dryrun" ]; then
         $CHROOT dpkg-reconfigure locales
     fi
+    # console font
+    if [ -z "$firstboot_dryrun" ]; then
+        $CHROOT dpkg-reconfigure console-setup
+    fi
     # networking
     if dlg_networking && [ -z "$firstboot_dryrun" ]; then
         configure_networking "$NETWORKING"
