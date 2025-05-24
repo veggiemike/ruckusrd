@@ -101,6 +101,7 @@ dlg_networking()
 configure_networking()
 {
     echo "Configuring for: $1..."
+    [ "$1" != "None" ] && rm -vf /sysroot/etc/NetworkManager/system-connections/*.nmconnection
     case $1 in
         "Trunk")
             # trunk
@@ -112,8 +113,12 @@ configure_networking()
                     ipv6.method disabled > /sysroot/etc/NetworkManager/system-connections/vlan20.nmconnection
             ;;
         "Xen Bridged Trunk")
+            # trunk
+            $CHROOT nmcli --offline connection add type ethernet con-name trunk \
+                    connection.master xenbr0 connection.slave-type bridge \
+                    > /sysroot/etc/NetworkManager/system-connections/trunk.nmconnection
             # xenbr0
-            $CHROOT nmcli --offline connection add type ethernet con-name xenbr0 \
+            $CHROOT nmcli --offline connection add type bridge con-name xenbr0 \
                     connection.interface-name xenbr0 \
                     ipv4.method disabled ipv6.method disabled \
                     > /sysroot/etc/NetworkManager/system-connections/xenbr0.nmconnection
@@ -141,7 +146,7 @@ configure_networking()
         "Xen Bridge on Bonded Trunk")
             # slaves
             $CHROOT nmcli --offline connection add type bond-slave ifname $dev master bond0 \
-                    > /sysroot/etc/NetworkManager/system-connections/$dev1.nmconnection
+                    > /sysroot/etc/NetworkManager/system-connections/$dev.nmconnection
             $CHROOT nmcli --offline connection add type bond-slave ifname $dev2 master bond0 \
                     > /sysroot/etc/NetworkManager/system-connections/$dev2.nmconnection
             # bond0
@@ -150,7 +155,7 @@ configure_networking()
                     connection.master xenbr0 connection.slave-type bridge \
                     > /sysroot/etc/NetworkManager/system-connections/bond0.nmconnection
             # xenbr0
-            $CHROOT nmcli --offline connection add type ethernet con-name xenbr0 \
+            $CHROOT nmcli --offline connection add type bridge con-name xenbr0 \
                     connection.interface-name xenbr0 \
                     ipv4.method disabled ipv6.method disabled \
                     > /sysroot/etc/NetworkManager/system-connections/xenbr0.nmconnection
