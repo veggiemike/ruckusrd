@@ -149,9 +149,17 @@ eval $go
 # NOTE: We have to chmod a couple files to allow strip to work.  We re-chmod to
 #       original settings afterwards.
 #
+# NOTE: We also skip the syslinux install dir entirely, because we do NOT want
+#       to modify anything in there.  I knew that, but forgot, and the result
+#       was that syslinux.efi actually got larger and only worked on some
+#       systems.  Took me a couple days of compare-and-contrast to eventually
+#       figure out why my rucksusb flash drive would boot, but "the same"
+#       syslinux files wouldn't once I'd installed (hint, they weren't the
+#       same).
+#
 echo '********** STRIPPING UNNEEDED SYMBOLS FROM IMAGE *******************************'
 chmod +w initramfs/bin/{dmsetup,lvm} initramfs/lib/libdevmapper.so.*
-go="find initramfs \( -type f -a -perm /111 \) -exec strip --strip-unneeded {} \;"
+go="find initramfs -path initramfs/usr/share/syslinux -prune -o \( -type f -a -perm /111 \) -exec strip --strip-unneeded {} \;"
 echo $go
 eval $go
 chmod -w initramfs/bin/{dmsetup,lvm} initramfs/lib/libdevmapper.so.*
