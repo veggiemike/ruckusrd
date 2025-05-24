@@ -53,7 +53,14 @@ Strengths:
      kernel commandline.  The maintenence shell provided is a fully functional
      embedded rootfs with BusyBox, eudev, lvm, mdadm, e2fsprogs,
      squashfs-tools, the OpenZFS userland tools, syslinux, efibootmgr, wired
-     networking utilities, rsync, ssh, and fsarchiver.
+     networking utilities, rsync, ssh, and fsarchiver.  When the `maint` shell
+     exits, bootup continues.
+
+     Alternatively, you can use `initramsys` or `initramsys-net` to forgo the
+     sysroot entirely and just launch an embedded Linux system.  In this case,
+     you can do sysroot maintenance easily using the `mount_sysroot` command to
+     get yourself ready to chroot into the sysroot (complete with virutal
+     filesystems and all additional sysroot mountpoints (e.g., /home)).
 
  4.  Easy microcode loading/updating.  Initramfs images created w/ RuckusRD
      automatically include `/boot/ucode.img` (`subprojects/ucode.img` gets
@@ -69,6 +76,25 @@ Strengths:
      `subprojects/fw.sqsh` out of ALL the latest firmware, but isn't installed.
      Alternatively, you can create a machine-specific set of firmware with
      `firmwarenator`.
+
+ 6.  Built-in `firstboot_wizard` for last-minute configuration of newly built
+     systems.  Similar to most distro installers and/or firstboot wizards, this
+     is perfect if you're fapidly provisioning machines based off of a common
+     image (or set of sqsh_layers!).  All configuration is done from within the
+     initramfs, prior to handing off control to the system's init process.
+
+ 7.  Embedded system installer right in the initramfs!  You can bundle up
+     sqsh_layers (and a config file describing them) and use
+     `initramsys-installer` to boot up and install on blank disks.  Disks will
+     be auto-detected, setup in an appropriate ZFS pool (yes, ZFS for rootfs!),
+     and prepped with selected sqsh_layers.  EFI booting will be configured via
+     syslinux on potentially multiple ESPs.
+
+     See https://github.com/sourceruckus/sourceruckus-deb for an example
+     project that wraps Ubuntu sqsh_layers with a RuckusRD initramfs installer,
+     and https://github.com/sourceruckus/linux-mdl for longterm kernel sources
+     w/ ZFS already merged in!
+
 
 See the [manpage](ruckusrd.1.md) for more details, or [docs](docs/)
 for more developmental ramblings.  ;-)

@@ -83,21 +83,37 @@
 
    New boot param: redundant-esp=LABEL1,LABEL2,...
 
+ - inotify-based esp sync?  or just cron rsync once a minute?  could do
+   `inotifywait -q -m /boot -e close_write` and parse it's output, or
+   `inotify-hookable --watch-directories /boot --watch-directories /boot2` and
+   force rsync back and forth... but if we're doing it via inotify, the sync
+   from boot->boot2 is going to grigger inotify and sync back to boot, over and
+   over... so that's probably bad.
 
-* for 0.22.x
+   doing cron, on the other hand, means if the user modifies boot params and
+   reboots w/out waiting a minute first, they may or may not see their changes
+   (e.g., which ESP did they edit?  was it the first one that's going to boot
+   next?)
 
- - also, what happens to root=ZFS if a disk is bad/missing?  does it start the
-   pool in degraded mode and continue booting?  or is it hosed?  test
+   might have to write a little thing using inotify that in addition to
+   triggering an rsync also logs the file being edited somewhere where the
+   other inotify proces can see it and ignore it.
 
- - firstboot groomer adds localadmin user but doesn't create a homedir... was
-   that on purpose?
+   or maybe STOP the other inotify during the sync, and start it back up again
+   afterwards?  there would be a window of time where the 2nd inotify isnt
+   running, but it would be pretty small (possible to break, but difficult and
+   unlikely to happen on its own).  replicatenator, here we come.  could use
+   pyinotify.
+
+ - ruckusrd --get-libdir to userland scripts can use ruckusrd-common.sh w/out
+   having to hardcode its intallation path?
+
+ - maybe allow NFS/SMB for imgdir in system_installer?
 
 
 * for 0.22
 
  - release new firmwarenator, adjust submodule
-
- - initramsys-installer testing, specifically EFI setup
 
  - update README.md somewhere with pandoc installed
 
