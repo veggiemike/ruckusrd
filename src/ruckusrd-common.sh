@@ -480,7 +480,7 @@ start_ruckusrd_system()
         if [ -n "$ip" ] && [ "$ip" != "auto" ]; then
             ip addr add $ip dev $dev
         else
-            udhcpc -i $dev -qf -F `hostname -s` >/dev/null 2>&1
+            udhcpc -i $dev -qb -F `hostname -s` >/dev/null 2>&1
         fi
         dropbear -RB
     else
