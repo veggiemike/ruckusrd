@@ -855,15 +855,20 @@ net_get_first_eth()
 }
 
 
+# this mounts enough for us to do a chrooted mount -a to get the rest.  in
+# other words, it mounts the "special" ones.
 sysroot_mount_vfs()
 {
+    decho "mounting virtual filesystems"
+
+    # gotta mount /proc so sysroot can actually tell what's already mounted
     mount proc -t proc /sysroot/proc
+
+    # bind mount our already populated /dev
+    mount --bind /dev /sysroot/dev
+
+    # gotta mount /sys so we can chek for efivars
     mount sysfs -t sysfs /sysroot/sys
-    mount --rbind /dev /sysroot/dev
-    mount --make-rslave /sysroot/dev
-    mount devpts -t devpts /sysroot/dev/pts
-    mount tmpfs -t tmpfs /sysroot/dev/shm
-    mount tmpfs -t tmpfs /sysroot/tmp
 
     # attempt to mount efivars
     if [ -d /sysroot/sys/firmware/efi ]; then
@@ -877,9 +882,13 @@ sysroot_mount_vfs()
 
 sysroot_umount_vfs()
 {
-    for x in sysroot/{proc,sys{/firmware/efi/efivars,},dev{/pts,/shm,},tmp}; do
+    for x in proc sys/firmware/efi/efivars sys dev/pts dev/shm dev tmp; do
+        x="/sysroot/$x"
+        #decho "checking: $x"
         if (grep -q $x /proc/mounts); then
-            umount $x
+            go="umount $x"
+            decho $go
+            eval $go
         fi
     done
 }

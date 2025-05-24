@@ -20,9 +20,14 @@
 
 . /ruckusrd-common.sh
 
+CHROOT="chroot /sysroot /usr/bin/env -i HOME=/root TERM=$TERM PATH=$PATH"
 
-mount_sysimage()
+
+mount_sysroot()
 {
+    # bail on any errors
+    set -e
+
     # enable all lvm
     vgchange -a y --quiet --quiet
 
@@ -53,7 +58,9 @@ mount_sysimage()
     #
     if [ -n "$ZFS" ]; then
         modprobe zfs
-        zpool import $ZFS_POOL -N
+        go="zpool import $ZFS_POOL -N"
+        decho $go
+        eval $go
     fi
 
     # autoload filesystem modules if needed
@@ -128,12 +135,38 @@ mount_sysimage()
         fi
     fi
 
+    # NOTE: It's very likely that sysroot's /boot entry is already mounted ro
+    #       as our fwdev.  In order to allow sysroot to mount it (again) on its
+    #       own, we have to make it read-write.
+    if grep -q /fwdev /proc/mounts; then
+        go="mount -o remount,rw /fwdev"
+        decho $go
+        eval $go
+    fi
+
+    sysroot_mount_vfs
+
+    decho "mounting other configured sysroot mountpoints"
+    $CHROOT mount -a
+
+    if [ -n "$ZFS" ]; then
+        decho "mounting additional ZFS datasets"
+        $CHROOT zfs mount -a
+    fi
+
     # deactivate unneeded logvols
     deactivate_unneeded_lvm
+
+    echo "You can now chroot into /sysroot with the following command:"
+    echo
+    echo '  chroot /sysroot /usr/bin/env -i HOME=/root TERM=$TERM PATH=$PATH /bin/bash --login'
+    echo
+    echo "When finished, use 'umount_sysroot' to safely disassemble everything."
+    echo
 }
 
 
 if [ -z "$JUST_SOURCE" ]; then
-    grep -q /sysroot /proc/mounts || mount_sysimage $*
-    sysroot_mount_vfs
+    # NOTE: If no arguments specified, /proc/cmdline is used.
+    grep -q /sysroot /proc/mounts || mount_sysroot $*
 fi

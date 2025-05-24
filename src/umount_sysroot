@@ -8,31 +8,63 @@
 
 . /ruckusrd-common.sh
 
-# exit immediately if a command fails
-set -e
+CHROOT="chroot /sysroot /usr/bin/env -i HOME=/root TERM=$TERM PATH=$PATH"
 
-# check to see of anything was using a zpool
-zpools=
-for zp in $(zpool list -H |awk '{print $1}'); do
-    if (grep -q "^$zp" /proc/mounts); then
-        zpools="$zpools $zp"
+
+umount_sysroot()
+{
+    # exit immediately if a command fails
+    set -e
+
+    # check to see of anything was using a zpool
+    #
+    # FIXME: this checks for zpools that are mounted, not necesarily inside
+    #        /sysroot
+    #
+    zpools=
+    for zp in $(zpool list -H |awk '{print $1}'); do
+        if (grep -q "^$zp" /proc/mounts); then
+            zpools="$zpools $zp"
+        fi
+    done
+
+    # unmount zfs mountpoints
+    if [ -n "$zpools" ]; then
+        decho "unmounting sysroot ZFS datasets"
+        $CHROOT zfs unmount -a
     fi
-done
 
-# unmount virtual filesystems
-sysroot_umount_vfs
+    # ummount sysroot mountpoints
+    #
+    # NOTE: Technically, this also unmounts all the virtual filesystems inside
+    #       /sysroot and /sysroot itself.  We use -l to because it's not smart
+    #       enough to remove the nested mounts in the right order, but it all
+    #       works out in the end.
+    #
+    decho "unmounting configured sysroot mountpoints"
+    $CHROOT umount -la
 
-# unmount everything else
-for x in /sysroot /sqsh_layer-* /sqsh_layerdev /tmproot; do
-    if (grep -q $x /proc/mounts); then
-        umount $x
-    fi
-done
+    # unmount everything else
+    for x in /sysroot /sqsh_layer-* /sqsh_layerdev /tmproot; do
+        #decho "checking: $x"
+        if (grep -q $x /proc/mounts); then
+            go="umount $x"
+            decho $go
+            eval $go
+        fi
+    done
 
-# export any used zpools
-for zp in $zpools; do
-    zpool export $zp
-done
+    # export any used zpools
+    for zp in $zpools; do
+        decho "deactivating zpool: $zp"
+        zpool export $zp
+    done
 
-# deactivate unnneeded lvm
-deactivate_unneeded_lvm
+    # deactivate unnneeded lvm
+    deactivate_unneeded_lvm
+}
+
+
+if [ -z "$JUST_SOURCE" ]; then
+    umount_sysroot
+fi
