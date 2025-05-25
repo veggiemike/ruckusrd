@@ -113,8 +113,4 @@
 
 * for 0.22
 
- - release new firmwarenator, adjust submodule
-
- - update README.md somewhere with pandoc installed
-
- - upgrade microcode/firmware again... thanks to recent security vulerabilities
+ - update ruckusrd.1.md somewhere with pandoc installed

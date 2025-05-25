@@ -3,13 +3,14 @@
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
 * v0.22.0
-2025-05-dd: Ruckusrd v0.22.0 (under development)
+2025-05-25: Ruckusrd v0.22.0
 
 This is shaping up to be a much larger release than planned, as I kept bumping
 into problems or extra features needed to fully test the
 `initramsys-installer`.
 
-- Upgraded all subprojects to latest available versions as of 04/28/25.
+- Upgraded all subprojects to latest available versions as of 04/28/25, and
+  microcode and firmware again on 05/24/25.
 - Added new `initramsys-net` boot parameter.  This implies `initramsys` but
   enables networking and starts sshd.  Configuration can be specified as an
   argument (e.g., `initramsys-net=DEV=eth0,VLAN=20`).  See manpage for more
@@ -38,6 +39,7 @@ into problems or extra features needed to fully test the
   instead of waiting for udev to load them on-demand.
 - Added text vs graphical, and bare metal vs xen, boot selection dialogs to
   firstboot_wizard.
+- Fixed Busybox ash compatibility in firmwarenator and microcodenator.
 
 * v0.21.1
 2024-10-14: Ruckusrd v0.21.1
