@@ -1,6 +1,6 @@
 # NAME
 
-Ruckusrd - manual page for Ruckusrd 0.22.0-dev
+Ruckusrd - manual page for Ruckusrd 0.22.0
 
 # DESCRIPTION
 
@@ -72,14 +72,14 @@ PARAMETERS**).
 
 RuckusRD initramfs images can have a traditional *fw.img* (e.g., created
 with **firmwarenator**(1)) appended to them, or even better you can use
-**fwdev** on the kernel commandline to specify a device (which can be
-the same as the root device) containing a SquashFS image of system
-firmware named *fw.sqsh*. This method of firmware management makes
-updating system firmware independent of the initrd or kernel upgrade
-process. A giant *fw.sqsh* is built in *ruckusrd/subprojects/fw.sqsh*
-out of ALL the latest firmware, but isn't installed (it is quite large),
-or you can make a machine-specific one (again, with
-**firmwarenator**(1)).
+**fwdev** on the kernel commandline to specify a comma-delimited list of
+devices (first one that exists gets used, can be the same as the root
+device) containing a SquashFS image of system firmware named *fw.sqsh*.
+This method of firmware management makes updating system firmware
+independent of the initrd or kernel upgrade process. A giant *fw.sqsh*
+is built in *ruckusrd/subprojects/fw.sqsh* out of ALL the latest
+firmware, but isn't installed (it is quite large), or you can make a
+machine-specific one (again, with **firmwarenator**(1)).
 
 # MICROCODE HANDLING
 
@@ -108,9 +108,10 @@ as a default boot parameter as to not interupt graphical boot screens.
 
 **root**=**DEVSPEC**  
 The single most important boot parameter! Specify where the root
-filesystem is located, so we can use it! **DEVSPEC can be a plain device
-name, or you** can specify a filesystem label (*LABEL*=), filesystem
-UUID (*UUID*=), CD/DVD-ROM label (*CDLABEL*=), or ZFS dataset (*ZFS*=).
+filesystem is located, so we can use it! **DEVSPEC** can be a plain
+device name, or you can specify a filesystem label (*LABEL*=),
+filesystem UUID (*UUID*=), CD/DVD-ROM label (*CDLABEL*=), or ZFS dataset
+(*ZFS*=).
 
 **rootflags**=**FLAGS**  
 Specify extra **FLAGS** for mounting the root device.
@@ -128,6 +129,14 @@ sometimes you need this.
 **verbose**  
 Make the *linuxrc* script be extra verbose, the exact opposite of
 **quiet**. This is *very* noisy, so be warned.
+
+**modules-early**=**mod1,mod2,...**  
+Supply a list of modules to be loaded as soon as possible (i.e., even
+beore the **shell** breakpoint). This can be helpful to force the
+loading of any kernel modules that are needed to boot properly but
+aren't being auto-loaded by udev. Use carefully, though, as these will
+get loaded before **fwdev** is mounted, so any firmware loading attempts
+will fail.
 
 ## Squashfs Layers
 
@@ -210,7 +219,7 @@ of a new system. Even if **firstboot** is specified, if
 *.ruckusrd_firstboot_done* exists at the root of the sysroot filesystem,
 *firstboot_wizard* will be skipped.
 
-**fwdev**=**FWDEV**  
+**fwdev**=**FWDEV\[,FWDEV2,...\]**  
 Specify a device containing *fw.sqsh*. If found, this squashfs image is
 mounted on */lib/firmware* to provide firmware to modules loaded during
 the initramrd stage (e.g., video cards, ethernet cards).
@@ -222,8 +231,55 @@ image (i.e., an installer or live-disk).
 
 **initramsys**  
 Completely ignore sysroot. Invoke the initramfs's init instead, and
-you've got a fully functional embedded system (complete with networking
-and multiple TTYs to login on) w/out any root device.
+you've got a fully functional embedded system (complete with wired
+networking and multiple TTYs to login on) w/out any root device.
+
+**initramsys-net\[=CONFIG\]**  
+Implies **initramsys**, but also starts networking automatically. Valid
+config options are **DEV**=*devname*, **IP**=*ip/cidr*\|*auto*\],
+**VLAN**=*vid* and can be provided as one big comma-delimited argument
+(e.g., *initramsys-net=DEV=eth0,VLAN=20*). Default configuration is
+eth0, DHCP, no VLAN, w/ hostname of ruckusrd-TIMESTAMP (hostname can be
+set via the kernel's *hostname=* param). The dropbear SSH server is
+started automatically as well.
+
+**initramsys-installer\[=CONFIG\]**  
+Implies **initramsys**, but runs a dialog-based system installer prior
+to providing a TTY for login. This is specifically for pairing with the
+sqsh_layer images built by the Source Ruckus System Builder. By default,
+one (or multiple identically sized) drive(s) are partitioned and put in
+a ZFS pool, an ESP is configured for EFI booting if EFI support is
+detected, a suitable ammount of swap is configured, and the selected
+sqsh_layer (and any required sub-layers) is installed.
+
+**EFI**=*force\|default* can be provided to either force ESP setup even
+though EFI support isn't detected or to specify default EFI names should
+be used instead of configuring a boot entry with efibootmgr (i.e., for
+bootable removable media).
+
+**ESP**=*size* can be used to explicitly specify the ESP size (e.g.,
+4G).
+
+**SWAP**=*size* can be used to explicitly specify swap partition size
+(e.g., 4G, 0 to disable swap).
+
+**IMGDEV**=*device* specifies a alternate device containing sqsh_layer
+images.
+
+**IMGDIR**=*dir* specifies an alternate name for the directory
+containing the sqsh_layer images.
+
+**EXCLUDE**=*device* specifies a disk to be excluded from the automatic
+disk selection done by the installer (and can be specified multiple
+times).
+
+The first non-excluded disk plus any identically sized ones are
+configured in either a mirrored zfs pool (if only 2 found) or in a raidz
+zfs pool (if 3+ disks are found). Only a single vdev is ever created, no
+matter how many disks are available. The raidz vdev will use only 3
+disks unless **VDEV_MAXSIZE**=*N* is specified.
+
+Traditional BIOS bootup isn't supported.
 
 **modinject**  
 Inject kernel modules (and kernel header files) from the initramfs into

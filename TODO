@@ -109,8 +109,3 @@
    having to hardcode its intallation path?
 
  - maybe allow NFS/SMB for imgdir in system_installer?
-
-
-* for 0.22
-
- - update ruckusrd.1.md somewhere with pandoc installed
