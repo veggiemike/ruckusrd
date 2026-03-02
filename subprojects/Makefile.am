@@ -32,6 +32,7 @@ distclean-local:
 	cd newt && git clean -dfx && git stash
 	cd firmwarenator && git clean -dfx && git stash
 	cd microcodenator && git clean -dfx && git stash
+	cd linux-firmware && git clean -dfx && git stash
 	rm -rf syslinux*
 
 
@@ -478,6 +479,14 @@ microcodenator/FOO:
 	popd || exit 1
 
 
+linux-firmware/FOO:
+	pushd linux-firmware && \
+	rm -rf FOO && \
+	make DESTDIR=$$PWD/FOO FIRMWAREDIR=/ install && \
+	make DESTDIR=$$PWD/FOO FIRMWAREDIR=/ dedup && \
+	popd || exit 1
+
+
 # NOTE: We use the mksquashfs we've built against our libztd to ensure
 #       that old systems (e.g., Ubuntu 18.04) have a working mksquashfs
 #       that can use zstd.  The resulting .sqsh file is slightly
@@ -489,9 +498,9 @@ microcodenator/FOO:
 #       That's handled via the generated ucode.img being preppended to
 #       our resulting initrd.
 #
-fw.sqsh: squashfs-tools.tar
+fw.sqsh: linux-firmware/FOO squashfs-tools.tar
 	LD_LIBRARY_PATH=$PWD/zstd/FOO/usr/lib \
-	  ./squashfs-tools/FOO/bin/mksquashfs linux-firmware $@ -comp zstd -e .git -noappend
+	  ./squashfs-tools/FOO/bin/mksquashfs linux-firmware/FOO $@ -comp zstd -e .git -noappend
 	LD_LIBRARY_PATH=$PWD/zstd/FOO/usr/lib \
 	  ./squashfs-tools/FOO/bin/mksquashfs wireless-regdb/regulatory.db* $@
 	LD_LIBRARY_PATH=$PWD/zstd/FOO/usr/lib \
