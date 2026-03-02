@@ -24,7 +24,7 @@ install-exec-hook:
 uninstall-local:
 	rm -f $(DESTDIR)$(bindir)/mkinitrd
 
-initramfs.cpio.xz: ../Makefile ruckusrd.prep linuxrc mount_sysroot umount_sysroot system_installer firstboot_wizard ruckusrd.sh ruckusrd-common.sh ../subprojects/busybox.tar ../subprojects/util-linux.tar ../subprojects/eudev.tar ../subprojects/mdadm.tar ../subprojects/lvm2.tar ../subprojects/e2fsprogs.tar ../subprojects/squashfs-tools.tar ../subprojects/zfs.tar ../subprojects/syslinux.tar ../subprojects/dropbear.tar ../subprojects/rsync.tar ../subprojects/efibootmgr.tar ../subprojects/groff.tar ../subprojects/zstd.tar ../subprojects/less.tar
+initramfs.cpio.xz: ../Makefile ruckusrd.prep linuxrc mount_sysroot umount_sysroot system_installer firstboot_wizard ruckusrd.sh ruckusrd-common.sh ../subprojects/busybox.tar ../subprojects/util-linux.tar ../subprojects/eudev.tar ../subprojects/mdadm.tar ../subprojects/lvm2.tar ../subprojects/e2fsprogs.tar ../subprojects/squashfs-tools.tar ../subprojects/zfs.tar ../subprojects/syslinux.tar ../subprojects/dropbear.tar ../subprojects/rsync.tar ../subprojects/efibootmgr.tar ../subprojects/groff.tar ../subprojects/zstd.tar ../subprojects/less.tar ../subprojects/fsarchiver.tar ../subprojects/newt.tar ../subprojects/firmwarenator.tar ../subprojects/microcodenator.tar
 	./ruckusrd.prep
 
 

@@ -2,6 +2,12 @@
 
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
+* v0.22.1
+2026-03-02: Ruckusrd v0.22.1
+
+- Updated microcode and firmware files
+- Upgraded firmwarenator to v1.0.2 (deref symlinks)
+
 * v0.22.0
 2025-05-25: Ruckusrd v0.22.0
 

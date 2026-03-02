@@ -1,11 +1,11 @@
 # NAME
 
-Ruckusrd - manual page for Ruckusrd 0.22.0
+Ruckusrd - manual page for Ruckusrd 0.22.1
 
 # DESCRIPTION
 
 RuckusRD - a super awesome, yet simple, mkinitrd replacement Copyright ©
-2012-2025 Michael D Labriola \<veggiemike@sourceruckus.org\>
+2012-2026 Michael D Labriola \<veggiemike@sourceruckus.org\>
 
 usage: ruckusrd OPTIONS \<out-initrd-image\> \<kernel-version\>
 
