@@ -275,7 +275,8 @@ start_udev
 #       our own waiting for /dev/sda or /dev/nvme0n1 (or anything else I decide
 #       to wait on in the future).
 #
-#/sbin/udevadm settle --exit-if-exists=/dev/sda
+#       When we're all done, before switching to sysroot, we do a settle to
+#       make sure things are done.
 #
 wait_for_dev 10 "at least one hdd" /dev/sda /dev/nvme0n1 /dev/xvda /dev/xvdb /dev/xvdc
 
@@ -1043,14 +1044,20 @@ fi
 # remount final root dev rw if requested
 [ -n "$root_rw" ] && mount -o remount,rw /sysroot
 
+# make sure udev is done handling devices, loading modules (and firmware), etc
+settle_udev
+
 # unmount fw.sqsh if we mounted it
 #
-# NOTE: There is a possible race condition here... once in a while, I get
-#       "Device or resource busy", but then once it drops to a shell I can
-#       unmount it no problem.  I've only seen this happen when using USB for
-#       rootdev and fwdev, so suspect it's caused by slow USB devices.  We
-#       attempt a second time if umount fails after waiting a second, if the
-#       second umount fails, we drop to a control shell so the user can fix it.
+# NOTE: Hystorically, there was a possible race condition here because I wasn't
+#       waiting for udev to finish its work.  Once in a while, I was getting
+#       "Device or resource busy", but then once it dropped to a shell I could
+#       unmount it no problem.  I most commonly saw this happen when using USB
+#       for rootdev and fwdev, but also saw it on new fast hardware with fast
+#       nvme rootdevs.  Just in case this problem comes back, we keep the
+#       error-handling in place: We attempt to umount again after waiting a
+#       second, if the second umount fails, we drop to a control shell so the
+#       user can fix it.
 #
 if [ -n "$fwsqsh" ]; then
     umount /lib/firmware || (
@@ -1072,7 +1079,24 @@ if [ -n "$fwsqsh" ]; then
 fi
 
 # likewise, unmount fwdev if we mounted it
-[ -n "$fwdir" ] && umount $fwdir
+#
+# NOTE: The error handling here *should* be overkill... but just in case, let's
+#       do the same thing we do for /lib/firmware unmount failure above.
+#
+if [ -n "$fwdir" ]; then
+     umount $fwdir || (
+        echo "---------------------------------"
+        echo "WARNING: Failed to unmount fwdir $fwdir.  Usually this is a symptom of a slow"
+        echo "         drive that needs to finish working (e.g., USB).  Wait a few seconds"
+        echo "         and try `umount $fwdir` again."
+        echo "---------------------------------"
+        echo
+        echo "Dropping to a shell to investigate."
+        echo "When done, exit the shell to continue. Good luck!"
+        echo
+        control_shell
+    )
+fi
 
 # NOTE: This is super handy when you want it to happen, I would almost consider
 #       making it on by default... but it would be pretty surprising behavior

@@ -375,12 +375,23 @@ start_udev()
     # tell udevd to start processing its queue
     #
     # NOTE: I used to just trigger and settle...  LFS does these 3 triggers and
-    #       then conditionally settles.  Not 100% sure of the rationale, but
-    #       I'll follow LFS on this one.
+    #       then conditionally settles (user controlled via a conf variable).
+    #       Not 100% sure of the rationale, but I'll follow LFS on this one.
+    #       Only difference is we DO NOT settle here, we leave that up to the
+    #       caller.  In our linuxrc script, so we can go as fast as possible,
+    #       we use wait-loops where needed to wait on device node creation, and
+    #       settle at the very end pior to unmounting fwdev.
     #
     /sbin/udevadm trigger --action=add --type=subsystems
     /sbin/udevadm trigger --action=add --type=devices
     /sbin/udevadm trigger --action=change --type=devices
+}
+
+
+settle_udev()
+{
+    decho2 "waiting for udev to settle"
+    /sbin/udevadm settle
 }
 
 
@@ -439,7 +450,13 @@ start_ruckusrd_system()
     #       rootfs.  So we do it here.
     #
     start_udev
-    sleep 1
+
+    # FIXME: was this random sleep here because I didn't know what to wait on
+    #        but had problems?  I'm assuming yes, so let's replace it with a
+    #        settle_udev now that we have that function.
+    #
+    #sleep 1
+    settle_udev
 
     # check for existence of serial devices and uncomment getty entries in
     # /etc/inittab accordingly
