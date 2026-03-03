@@ -486,6 +486,10 @@ auto_install()
                 #        copying all the files sure is easier.  let's see what
                 #        happens.
                 #
+                #        Ha!  Update to that, vesamenu DOES work if you also
+                #        include libmenu.c32!  Not sure when that lib got
+                #        introduced... ;-)
+                #
                 # FIXME: Also, what about the "default" place for EFI bootloaders?
                 #        So we don't have to poke the system's EFI setup for
                 #        bootable thumb drives and the like?
@@ -507,6 +511,9 @@ auto_install()
                     mv -v /mnt/$esp_label/EFI/$efidir/syslinux.efi /mnt/$esp_label/EFI/$efidir/bootx64.efi
                 fi
 
+                # install splash image(s)
+                $rsync /tmproot/EFI/boot/*.png /mnt/$esp_label/EFI/$efidir/
+
                 # generate syslinux.cfg
                 #
                 # FIXME: i know a lot of this doesn't work... the color stuff, in
@@ -515,9 +522,10 @@ auto_install()
                 #
                 echo "generating syslinux.cfg..."
                 cat > /mnt/$esp_label/EFI/$efidir/syslinux.cfg <<EOF
-default menu.c32
+ui vesamenu.c32
 timeout 50
 
+menu background sourceruckus-640x480.png
 menu title RuckusRD is your daddy!
 menu rows 5
 menu passwordrow 4
