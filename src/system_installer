@@ -490,6 +490,10 @@ auto_install()
                 #        include libmenu.c32!  Not sure when that lib got
                 #        introduced... ;-)
                 #
+                #        Not so fast... that seems to only work "most of the
+                #        time", with an annoyingly non-zero percent of machines
+                #        failing to boot at all and hanging at a black screen.
+                #
                 # FIXME: Also, what about the "default" place for EFI bootloaders?
                 #        So we don't have to poke the system's EFI setup for
                 #        bootable thumb drives and the like?
@@ -520,12 +524,20 @@ auto_install()
                 #        paticular.  Should test and remove things that have no
                 #        effect.
                 #
+                # FIXME: sticking with menu.c32 here instead of vesamenu.c32
+                #        because using a background image seems to only work
+                #        "most of the time", no matter how hard I try.  Even on
+                #        machines that seem to usually work, it occasionally
+                #        hangs on a black screen and doesn't boot.  And some
+                #        machines seem to never work... :-/
+                #
                 echo "generating syslinux.cfg..."
                 cat > /mnt/$esp_label/EFI/$efidir/syslinux.cfg <<EOF
-ui vesamenu.c32
+ui menu.c32
+#ui vesamenu.c32 # your mileage may vary
 timeout 50
 
-menu background sourceruckus-640x480.png
+#menu background sourceruckus-640x480.png
 menu title RuckusRD is your daddy!
 menu rows 5
 menu passwordrow 4

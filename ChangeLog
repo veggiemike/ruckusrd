@@ -2,6 +2,11 @@
 
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
+* v0.22.2
+2026-07-dd: Ruckusrd v0.22.2
+
+- Switched system_installer's syslinux conf back to plain menu
+
 * v0.22.1
 2026-03-03: Ruckusrd v0.22.1
 
