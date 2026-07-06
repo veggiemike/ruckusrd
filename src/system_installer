@@ -70,9 +70,14 @@ dlg_pick_top_layer()
 
 dlg_summary()
 {
+    if [ -n "$create_boot" ]; then
+        bootstuff="BIOS (no-EFI) /boot size: $bootsize"
+    else
+        bootstuff="Create ESP: $create_esp\nESP Size: $espsize\nModify EFIVARS: $modify_efivars"
+    fi
     go=$DLG
     go="$go --title 'Configuration Summary'"
-    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nVDEV Type: $vdev_type\nCreate ESP: $create_esp\nESP Size: $espsize\nModify EFIVARS: $modify_efivars\nSwap: $swap\n\nContinue?'"
+    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nVDEV Type: $vdev_type\n$bootstuff\nSwap: $swap\n\nContinue?'"
     go="$go 0 0"
     KEEP_GOING=$(eval $go 3>&1 1>&2 2>&3 && echo yes || echo -n)
     #echo "KEEP_GOING=$KEEP_GOING"
@@ -161,7 +166,12 @@ partition_disks()
     zfspart=1
     swappart=1
     esppart=1
-    echo "label: gpt" > /tmp/ptable
+    bootpart=1
+    if [ -n "$create_boot" ]; then
+        echo "label: dos" > /tmp/ptable
+    else
+        echo "label: gpt" > /tmp/ptable
+    fi
     if [ -n "$create_esp" ]; then
         # NOTE: Most "regular" installations I've seen use a really small
         #       partition (256M or 512M), but we're going to use ESP as the
@@ -170,6 +180,10 @@ partition_disks()
         #       overridable via the ESP= kernel command line arg.
         #
         echo ",$espsize,U" >> /tmp/ptable
+        zfspart=$((zfspart+1))
+        swappart=$((swappart+1))
+    elif [ -n "$create_boot" ]; then
+        echo ",$bootsize,U" >> /tmp/ptable
         zfspart=$((zfspart+1))
         swappart=$((swappart+1))
     fi
@@ -189,6 +203,7 @@ partition_disks()
     zfsdisks=
     swapdisks=
     espdisks=
+    bootdisks=
     for d in $disks; do
         sfdisk $d < /tmp/ptable
         # figure out if partition identifier is pN or just N (e.g., sda1 vs
@@ -197,10 +212,12 @@ partition_disks()
             zfspart="p$zfspart"
             swappart="p$swappart"
             esppart="p$esppart"
+            bootpart="p$bootpart"
         fi
         zfsdisks="$zfsdisks $d$zfspart"
         [ -n "$create_swap" ] && swapdisks="$swapdisks $d$swappart"
         [ -n "$create_esp" ] && espdisks="$espdisks $d$esppart"
+        [ -n "$create_boot" ] && bootdisks="$bootdisks $d$bootpart"
     done
 
     # remove outdated EFI bootnums
@@ -254,8 +271,13 @@ auto_install()
     [ $ashift -lt 12 ] && ashift=12
     decho2 ashift: $ashift
 
-    # can we do EFI setup?
-    if [ -z "$create_esp" ] && (efibootmgr >/dev/null 2>&1); then
+    # autodetect EFI setup
+    #
+    # FIXME: should we fallback to BIOS booting if no EFI?  Originally, the
+    #        no-efi scenario was for domU's that don't need any boot
+    #        configuration...
+    #
+    if [ -z "$create_esp" ] && [ -z "$create_boot" ] && (efibootmgr >/dev/null 2>&1); then
         create_esp=y
         modify_efivars=y
     fi
@@ -312,14 +334,18 @@ auto_install()
     [ -n "$KEEP_GOING" ] || user_abort
 
     # partition if needed
-    if [ -n "$create_esp" ] || [ -n "$create_swap" ]; then
+    if [ -n "$create_esp" ] || [ -n "$create_boot" ] || [ -n "$create_swap" ]; then
         partition_disks
     else
         zfsdisks=$disks
         swapdisks=
+        espdisks=
+        bootdisks=
     fi
     decho zfsdisks: $zfsdisks
     decho swapdisks: $swapdisks
+    decho espdisks: $espdisks
+    decho bootdisks: $bootdisks
 
     # create swap if desired
     #
@@ -384,13 +410,17 @@ auto_install()
         fi
     done
 
-    # ESP creation (and possibly EFIVAR manipulation)
-    if [ -n "$create_esp" ]; then
-        kernelversion=$(basename /tmproot/vmlinuz*)
-        echo "kernelversion: $kernelversion"
-        kernelversion=${kernelversion//vmlinuz-/}
-        echo "kernelversion: $kernelversion"
+    # autodetect kernelversion
+    kernel=$(basename /tmproot/vmlinuz*)
+    echo "kernel: $kernel"
+    kernelversion=${kernel//vmlinuz-/}
+    echo "kernelversion: $kernelversion"
 
+    # ESP creation (and possibly EFIVAR manipulation)
+    #
+    # FIXME: well this is a huge if block... might want to break it up?
+    #
+    if [ -n "$create_esp" ]; then
         # figure out fwdevspec for kernel command line params
         #
         # NOTE: We have to loop over all the disks here, to get a list of all
@@ -426,6 +456,10 @@ auto_install()
         #        between xen-default and syslinux-default, the code will be
         #        mostly written by the time i care about the ordering be
         #        backwards.
+        #
+        # FIXME: there's complicated stuff that's common with BIOS booting in
+        #        here... and this is a huge loop.  probably need to make some
+        #        functions?
         #
         bootnum=1
         for d in $espdisks; do
@@ -696,6 +730,27 @@ EOF
             efi_set_bootorder_first syslinux
             cat $efibootcache
         fi
+    elif [ -n "$create_boot" ]; then
+        # figure out fwdevspec for kernel command line params
+        #
+        # NOTE: This is easy for BIOS, because we can boot off of raid1... no
+        #       looping, no multiple fwdev specification needed.
+        #
+        fwdevspec="fwdev=LABEL=bootishness"
+
+        # setup mdraid for /boot
+
+        # create ext4 fs for /boot
+
+        # populate /boot
+
+        # install extlinux
+
+        # generate extlinux.conf
+
+        # update fstab
+        echo "LABEL=bootishness /boot auto defaults 1 1" >> /tmp/fstab
+
     fi
 
     # create fstab
@@ -738,6 +793,9 @@ system_installer()
     efidir=syslinux
     create_swap=y
     espsize=1G
+    # used bootsize to indiceate old BIOS based boot method with /boot of
+    # specified size.  this should disable all EFI stuff.
+    bootsize=
     vdev_maxsize=3
     opts=${initramsys_installer_conf//,/ }
     for o in $opts; do
@@ -789,6 +847,12 @@ system_installer()
                 ;;
             VDEV_MAXSIZE=*)
                 vdev_maxsize=${o#VDEV_MAXSIZE=}
+                ;;
+            BOOT=*)
+                bootsize=${o#BOOT=}
+                create_boot=y
+                create_esp=
+                modify_efivars=
                 ;;
             *)
                 decho "ignoring invalid initramsys_installer config option $o"
@@ -928,7 +992,7 @@ system_installer()
     #
     echo
     echo "Installation complete!  Reboot and test it out, or login below to poke around."
-    if [ -z "$create_esp" ]; then
+    if [ -z "$create_esp" ] && [ -z "$create_boot"]; then
         echo
         echo "###############################################################################"
         echo
