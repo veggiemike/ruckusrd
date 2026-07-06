@@ -105,7 +105,14 @@
    unlikely to happen on its own).  replicatenator, here we come.  could use
    pyinotify.
 
- - ruckusrd --get-libdir to userland scripts can use ruckusrd-common.sh w/out
+ - ruckusrd --get-libdir so userland scripts can use ruckusrd-common.sh w/out
    having to hardcode its intallation path?
 
  - maybe allow NFS/SMB for imgdir in system_installer?
+
+ - system_installer: syslinux efi vesamenu doesn't always work... either fix it or switch back to
+   plain menu
+
+ - system_installer: maybe add legacy BIOS mode to seutp extlinux?  I do
+   actually still have a couple ancient supermicro servers that don't have EFI
+   support... (lame, I know)
