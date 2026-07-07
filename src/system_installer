@@ -183,7 +183,7 @@ partition_disks()
         zfspart=$((zfspart+1))
         swappart=$((swappart+1))
     elif [ -n "$create_boot" ]; then
-        echo ",$bootsize,U" >> /tmp/ptable
+        echo ",$bootsize,R,*" >> /tmp/ptable
         zfspart=$((zfspart+1))
         swappart=$((swappart+1))
     fi
@@ -234,6 +234,217 @@ partition_disks()
             efibootmgr -v -b $x -B > $efibootcache
         done
         efibootmgr -v
+    fi
+}
+
+
+populate_boot()
+{
+    boot_dir=$1
+
+    # grab /boot files from configured sqsh_layers
+    #
+    # NOTE: This is done because we're going to mount our ESP (or BIOS /boot
+    #       partition) at /boot, and it'll end up masking whatever was in there
+    #       when we built the sqsh_layers.  Shouldn't be much, if anything
+    #       (currently, xen*.{gz,efi,config} are the only files), but we don't
+    #       want apt to get all angry later if a package's files are missing.
+    #
+    # NOTE: This looks in the target system, not the original imgdir, so that
+    #       it can use reconstructed .sqsh files
+    #
+    echo "grabbing /boot files from sqsh_layers..."
+    for l in $(echo $layers | tr ':' '\n' |tac | tr '\n' ' '); do
+        l=$l.sqsh
+        echo layer: $l
+        # NOTE: -no-xattrs because vfat doesn't support them and
+        #       unsquashfs will fail if we ask it to copy any.
+        unsquashfs -no-xattrs -f -d $boot_dir /sysroot/zroot/sqsh/$l /boot >/dev/null
+    done
+    if [ -n "$(ls $boot_dir/boot/)" ]; then
+        mv $boot_dir/boot/* $boot_dir/
+    fi
+    rmdir $boot_dir/boot
+
+    # install kernel files
+    echo "installing kernel files..."
+    $rsync /tmproot/System.map* /tmproot/vmlinuz* /tmproot/initrd* /tmproot/config* $boot_dir
+
+    # generate machine-specific fw.sqsh
+    echo "creating machine-specific fw.sqsh..."
+    firmwarenator -s $boot_dir/fw.sqsh
+    unsquashfs -ll $boot_dir/fw.sqsh
+}
+
+
+install_syslinux()
+{
+    boot_dir=$1
+
+    echo "installing syslinux files..."
+    mkdir -p $boot_dir/EFI/$efidir
+    # FIXME: historically, I've just installed chain.c32, ldlinux.e64,
+    #        libcom32.c32, libutil.c32, mboot.c32, menu.c32,
+    #        syslinux.efi, and vesamenu.c32... (and i'm pretty sure
+    #        vesamenu and mboot don't work for EFI, only BIOS) but just
+    #        copying all the files sure is easier.  let's see what
+    #        happens.
+    #
+    #        Ha!  Update to that, vesamenu DOES work if you also
+    #        include libmenu.c32!  Not sure when that lib got
+    #        introduced... ;-)
+    #
+    #        Not so fast... that seems to only work "most of the
+    #        time", with an annoyingly non-zero percent of machines
+    #        failing to boot at all and hanging at a black screen.
+    #
+    # FIXME: Also, what about the "default" place for EFI bootloaders?
+    #        So we don't have to poke the system's EFI setup for
+    #        bootable thumb drives and the like?
+    #
+    #        esp/EFI/syslinux/* -> esp/EFI/BOOT/*
+    #        esp/EFI/syslinux/syslinux.efi -> esp/EFI/BOOT/bootx64.efi
+    #
+    #        My laptop refuses to boot from esp/EFI/BOOT unless I
+    #        specifically add via efibootmgr... maybe I did it wrong?
+    #
+    #        Both the latest Ubuntu installer and the latest clonezilla
+    #        ISO have /EFI/boot/bootx64.efi... given that ESP is
+    #        supposed to be vfat, I can't imagine the capitalization
+    #        really matters... but it *IS* different.
+    #
+    $rsync /usr/share/syslinux/efi64/* $boot_dir/EFI/$efidir/
+    # rename syslinux.efi to the default bootx64.efi
+    if [ "$efidir" == "boot" ]; then
+        mv -v $boot_dir/EFI/$efidir/syslinux.efi $boot_dir/EFI/$efidir/bootx64.efi
+    fi
+}
+
+
+install_extlinux()
+{
+    boot_dir=$1
+
+    # create extlinux/ldlinux.sys w/ raid configuration
+    mkdir -p $boot_dir/extlinux
+    pushd $boot_dir/extlinux
+    extlinux --install --raid .
+
+    # install into MBR on all disks
+    for p in $bootdisks; do
+        # this needs to go to the toplevel block device (e.g., sda not sda1)
+        d=/dev/$(basename $(dirname $(ls -d /sys/block/*/$(basename $p))))
+        cat /usr/lib/syslinux/mbr/mbr.bin > $d
+    done
+
+    # install other needed files
+    #
+    # NOTE: I have historically only installed
+    #       {chain,libcom32,libutil,mboot,vesamenu}.c32, but since then
+    #       libmenu.c32 has been added... and just to be sure, when doing the
+    #       syslinux installations for EFI, I've been installing *.c32.  We do
+    #       the same here.
+    #
+    cp -va /usr/lib/syslinux/modules/bios/* .
+    popd
+}
+
+
+generate_syslinux_cfg()
+{
+    boot_dir=$1
+
+    if [ -n "$create_boot" ]; then
+        cfgdir=$boot_dir/extlinux
+        cfg=$cfgdir/extlinux.cfg
+        ui=vesamenu.c32
+        graphics=" vga=0x31a"
+        serial=" console=tty0 console=ttyS0,115200n8"
+        extra=
+    else
+        cfgdir=$boot_dir/EFI/$efidir
+        cfg=$cfgdir/syslinux.cfg
+        # FIXME: sticking with menu.c32 here instead of vesamenu.c32 because
+        #        using a background image seems to only work "most of the
+        #        time", no matter how hard I try.  Even on machines that seem
+        #        to usually work, it occasionally hangs on a black screen and
+        #        doesn't boot.  And some machines seem to never work... :-/
+        #
+        ui=menu.c32
+        graphics=""
+        serial=" console=tty0 console=ttyS0,115200n8"
+        extra=
+    fi
+
+    # install splash image(s)
+    $rsync /tmproot/EFI/boot/*.png $cfgdir/
+
+    # generate syslinux.cfg
+    #
+    # FIXME: i know a lot of this doesn't work... the color stuff, in
+    #        paticular.  Should test and remove things that have no
+    #        effect.
+    #
+    echo "generating $cfg..."
+    cat > $cfg <<EOF
+serial 0 115200
+
+# use either menu.c32 or vesamenu.c32, but on EFI menu.c32 is safest
+ui $ui
+timeout 50
+
+menu background sourceruckus-640x480.png
+menu title RuckusRD is your daddy!
+menu rows 5
+menu passwordrow 4
+menu tabmsgrow 11
+menu cmdlinerow 11
+menu timeoutrow 13
+menu endrow 17
+menu color border 0 #ffffffff #00000000
+menu color sel 7 #ffffffff #ffd09000
+menu color title 0 #ffffffff #00000000
+menu color tabmsg 0 #ffffffff #00000000
+menu color unsel 0 #ffffffff #00000000
+menu color hotsel 0 #ff000000 #ffffffff
+menu color hotkey 7 #ffffffff #ff000000
+menu color timeout_msg 0 #ffffffff #00000000
+menu color timeout 0 #ffffffff #00000000
+menu color cmdline 0 #ffffffff #00000000
+menu hidden
+menu hiddenrow 5
+menu autoboot "Booting default in # second{,s}..."
+
+
+label linux
+ menu label Linux ($kernelversion)
+ linux /vmlinuz-$kernelversion
+ append initrd=/initrd-$kernelversion.img root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec firstboot ro consoleblank=300$graphics$serial$extra loglevel=2
+ menu default
+
+label ruckus
+ menu label RuckusRD Embedded System ($kernelversion, for maintenance)
+ linux /vmlinuz-$kernelversion
+ append initrd=/initrd-$kernelversion.img root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec firstboot ro consoleblank=300$graphics$serial$extra loglevel=2 initramsys
+
+EOF
+
+    # add xen stanza if installing for BIOS and we've selected an uppermost
+    # sqsh that includes the xen package(s)
+    #
+    # NOTE: This is only valid for BIOS booting, EFI uses xen.cfg instead.
+    #
+    # FIXME: is console=hvc0 needed if no serial console redirection is
+    #        happening?  doesn't look like i needed in on frankennas1...
+    #
+    if [ -n "$create_boot" ] && [ -f $boot_dir/xen*.gz ]; then
+        cat >> $cfg <<EOF
+label xen
+ menu label Xen/Linux ($kernelversion)
+ kernel mboot.c32
+ append /xen.gz dom0_mem=4096M loglvl=all noreboot console_timestamps=boot ucode=scan com1=115200,8n1 console=com1,vga vga=mode-0x31a --- /vmlinuz-$kernelversion root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec firstboot ro consoleblank=300$serial console=hvc0$extra loglevel=2 --- /initrd-$kernelversion.img
+
+EOF
     fi
 }
 
@@ -476,135 +687,12 @@ auto_install()
             mount $d /mnt/$esp_label
 
             if [ $bootnum -eq 1 ]; then
-                # grab /boot files from configured sqsh_layers
-                #
-                # NOTE: This is done because we're going to mount our ESP at /boot,
-                #       and it'll end up masking whatever was in there when we
-                #       built the sqsh_layers.  Shouldn't be much, if anything
-                #       (currently, xen*.{gz,efi,config} are the only files), but
-                #       we don't want apt to get all angry later if a package's
-                #       files are missing.
-                #
-                # NOTE: This looks in the target system, not the original
-                #       imgdir, so that it can use reconstructed .sqsh files
-                #
-                echo "grabbing /boot files from sqsh_layers..."
-                for l in $(echo $layers | tr ':' '\n' |tac | tr '\n' ' '); do
-                    l=$l.sqsh
-                    echo layer: $l
-                    # NOTE: -no-xattrs because vfat doesn't support them and
-                    #       unsquashfs will fail if we ask it to copy any.
-                    unsquashfs -no-xattrs -f -d /mnt/$esp_label /sysroot/zroot/sqsh/$l /boot >/dev/null
-                done
-                if [ -n "$(ls /mnt/$esp_label/boot/)" ]; then
-                    mv /mnt/$esp_label/boot/* /mnt/$esp_label/
-                fi
-                rmdir /mnt/$esp_label/boot
-
-                # install kernel files
-                echo "installing kernel files..."
-                $rsync /tmproot/System.map* /tmproot/vmlinuz* /tmproot/initrd* /tmproot/config* /mnt/$esp_label
-
-                # generate machine-specific fw.sqsh
-                echo "creating machine-specific fw.sqsh..."
-                firmwarenator -s /mnt/$esp_label/fw.sqsh
-                unsquashfs -ll /mnt/$esp_label/fw.sqsh
+                populate_boot /mnt/$esp_label
 
                 # install syslinux files
-                echo "installing syslinux files..."
-                mkdir -p /mnt/$esp_label/EFI/$efidir
-                # FIXME: historically, I've just installed chain.c32, ldlinux.e64,
-                #        libcom32.c32, libutil.c32, mboot.c32, menu.c32,
-                #        syslinux.efi, and vesamenu.c32... (and i'm pretty sure
-                #        vesamenu and mboot don't work for EFI, only BIOS) but just
-                #        copying all the files sure is easier.  let's see what
-                #        happens.
-                #
-                #        Ha!  Update to that, vesamenu DOES work if you also
-                #        include libmenu.c32!  Not sure when that lib got
-                #        introduced... ;-)
-                #
-                #        Not so fast... that seems to only work "most of the
-                #        time", with an annoyingly non-zero percent of machines
-                #        failing to boot at all and hanging at a black screen.
-                #
-                # FIXME: Also, what about the "default" place for EFI bootloaders?
-                #        So we don't have to poke the system's EFI setup for
-                #        bootable thumb drives and the like?
-                #
-                #        esp/EFI/syslinux/* -> esp/EFI/BOOT/*
-                #        esp/EFI/syslinux/syslinux.efi -> esp/EFI/BOOT/bootx64.efi
-                #
-                #        My laptop refuses to boot from esp/EFI/BOOT unless I
-                #        specifically add via efibootmgr... maybe I did it wrong?
-                #
-                #        Both the latest Ubuntu installer and the latest clonezilla
-                #        ISO have /EFI/boot/bootx64.efi... given that ESP is
-                #        supposed to be vfat, I can't imagine the capitalization
-                #        really matters... but it *IS* different.
-                #
-                $rsync /usr/share/syslinux/efi64/* /mnt/$esp_label/EFI/$efidir/
-                # rename syslinux.efi to the default bootx64.efi
-                if [ "$efidir" == "boot" ]; then
-                    mv -v /mnt/$esp_label/EFI/$efidir/syslinux.efi /mnt/$esp_label/EFI/$efidir/bootx64.efi
-                fi
+                install_syslinux /mnt/$esp_label
 
-                # install splash image(s)
-                $rsync /tmproot/EFI/boot/*.png /mnt/$esp_label/EFI/$efidir/
-
-                # generate syslinux.cfg
-                #
-                # FIXME: i know a lot of this doesn't work... the color stuff, in
-                #        paticular.  Should test and remove things that have no
-                #        effect.
-                #
-                # FIXME: sticking with menu.c32 here instead of vesamenu.c32
-                #        because using a background image seems to only work
-                #        "most of the time", no matter how hard I try.  Even on
-                #        machines that seem to usually work, it occasionally
-                #        hangs on a black screen and doesn't boot.  And some
-                #        machines seem to never work... :-/
-                #
-                echo "generating syslinux.cfg..."
-                cat > /mnt/$esp_label/EFI/$efidir/syslinux.cfg <<EOF
-ui menu.c32
-#ui vesamenu.c32 # your mileage may vary
-timeout 50
-
-#menu background sourceruckus-640x480.png
-menu title RuckusRD is your daddy!
-menu rows 5
-menu passwordrow 4
-menu tabmsgrow 11
-menu cmdlinerow 11
-menu timeoutrow 13
-menu endrow 17
-menu color border 0 #ffffffff #00000000
-menu color sel 7 #ffffffff #ffd09000
-menu color title 0 #ffffffff #00000000
-menu color tabmsg 0 #ffffffff #00000000
-menu color unsel 0 #ffffffff #00000000
-menu color hotsel 0 #ff000000 #ffffffff
-menu color hotkey 7 #ffffffff #ff000000
-menu color timeout_msg 0 #ffffffff #00000000
-menu color timeout 0 #ffffffff #00000000
-menu color cmdline 0 #ffffffff #00000000
-menu hidden
-menu hiddenrow 5
-menu autoboot "Booting default in # second{,s}..."
-
-
-label linux
- menu label Linux ($kernelversion)
- linux /vmlinuz-$kernelversion
- append initrd=/initrd-$kernelversion.img root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec firstboot ro consoleblank=300 loglevel=2
- menu default
-
-label ruckus
- menu label RuckusRD Embedded System ($kernelversion, for maintenance)
- linux /vmlinuz-$kernelversion
- append initrd=/initrd-$kernelversion.img root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec firstboot ro consoleblank=300 loglevel=2 initramsys
-EOF
+                generate_syslinux_cfg /mnt/$esp_label
 
                 # generate xen.cfg
                 #
@@ -613,7 +701,12 @@ EOF
                 #        RAM.
                 #
                 # FIXME: i also should re-test other params... ucode=scan in
-                #        particular i don't remember how exactly works...
+                #        particular i don't remember how exactly works...  i
+                #        know it's for early loading of microcode, but is it
+                #        needed (and does it cause any problems?)?
+                #
+                # FIXME: experiment with serial redirection?  is it supported
+                #        like it was with the old BIOS command line params?
                 #
                 if [ -f /mnt/$esp_label/xen*.efi ]; then
                     echo "Generating xen.cfg..."
@@ -730,26 +823,41 @@ EOF
             efi_set_bootorder_first syslinux
             cat $efibootcache
         fi
+
     elif [ -n "$create_boot" ]; then
+        boot_label=bootishness
+
         # figure out fwdevspec for kernel command line params
         #
         # NOTE: This is easy for BIOS, because we can boot off of raid1... no
         #       looping, no multiple fwdev specification needed.
         #
-        fwdevspec="fwdev=LABEL=bootishness"
+        fwdevspec="fwdev=LABEL=$boot_label"
 
         # setup mdraid for /boot
+        #
+        # FIXME: what if /dev/md0 is already in use?  :-/
+        #
+        numdisks=$(echo $bootdisks | awk '{print NF}')
+        devmd=/dev/md0
+        mdadm --create $devmd --level=1 --metadata=1.0 --raid-devices=$numdisks $bootdisks
 
         # create ext4 fs for /boot
+        mkfs.ext4 -L $boot_label -O^64bit $devmd
 
         # populate /boot
+        mkidr -p /mnt/$boot_label
+        mount $devmd /mnt/$boot_label
+        populate_boot /mnt/$boot_label
 
         # install extlinux
+        install_extlinux /mnt/$boot_label
 
         # generate extlinux.conf
+        generate_syslinux_cfg /mnt/$boot_label
 
         # update fstab
-        echo "LABEL=bootishness /boot auto defaults 1 1" >> /tmp/fstab
+        echo "LABEL=$boot_label /boot auto defaults 1 1" >> /tmp/fstab
 
     fi
 
