@@ -104,8 +104,8 @@ wait_for_dev()
         else
             decho -n "."
         fi
-        # just in case we need to activate LVM on a freshly plugged device
-        # (e.g., USB that was a bit slow to register)
+        # in case we need to activate RAID or LVM on a freshly plugged device
+        mdadm --assemble --scan >/dev/null 2>&1 || echo -n
         vgchange -a y --quiet --quiet
         # check for each device
         for dev in $devices; do
