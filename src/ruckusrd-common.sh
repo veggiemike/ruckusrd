@@ -192,7 +192,12 @@ autoload_fs_module()
     #       thing.  The busybox version doesn't like it, though.  But busybox
     #       does provide findfs, which can do the lookup for us.
     eval $(blkid -o export $(findfs $1))
-    [ -n "$TYPE" ] && modprobe $TYPE
+    if [ "$TYPE" = "linux_raid_member" ]; then
+        mod="raid1"
+    else
+        mod=$TYPE
+    fi
+    [ -n "$mod" ] && modprobe $mod
 }
 
 

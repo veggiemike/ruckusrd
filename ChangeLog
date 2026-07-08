@@ -8,7 +8,8 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 - Updated microcode and firmware files
 - Switched system_installer's syslinux conf back to plain menu
 - Added experimental BIOS support to system_installer
-- Fixed RAID1 not activated bug
+- Fixed RAID not activated bug
+- Fixed module loading bug for linux_raid_member devices
 
 * v0.22.1
 2026-03-03: Ruckusrd v0.22.1
