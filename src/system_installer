@@ -327,14 +327,17 @@ install_extlinux()
 
     # create extlinux/ldlinux.sys w/ raid configuration
     mkdir -p $boot_dir/extlinux
-    pushd $boot_dir/extlinux
-    extlinux --install --raid .
+    go="extlinux --install --raid $boot_dir/extlinux"
+    echo $go
+    eval $go
 
     # install into MBR on all disks
     for p in $bootdisks; do
         # this needs to go to the toplevel block device (e.g., sda not sda1)
         d=/dev/$(basename $(dirname $(ls -d /sys/block/*/$(basename $p))))
-        cat /usr/lib/syslinux/mbr/mbr.bin > $d
+        go="cat /usr/share/syslinux/mbr.bin > $d"
+        echo $go
+        eval $go
     done
 
     # install other needed files
@@ -345,8 +348,9 @@ install_extlinux()
     #       syslinux installations for EFI, I've been installing *.c32.  We do
     #       the same here.
     #
-    cp -va /usr/lib/syslinux/modules/bios/* .
-    popd
+    go="cp -va /usr/share/syslinux/*.c32 $boot_dir/extlinux"
+    echo $go
+    eval $go
 }
 
 
@@ -816,13 +820,17 @@ EOF
         #
         # NOTE: The firstboot wizard will ask if you want Xen first later on.
         #
-        # FIXME: what happens if we forced efi setup even though efibootmgr
-        #        doesn't work?  i guess this won't do anything?
+        # NOTE: If we forced efi setup even though efibootmgr doesn't work,
+        #       this is going to fail... so we skip it by checking the size of
+        #       $efibootcache, which will be 0 bytes if our calls have all been
+        #       failing.
         #
-        if [ -n "$modify_efivars" ]; then
+        if [ -n "$modify_efivars" ] && [ -s $efibootcache ]; then
             efi_set_bootorder_first syslinux
             cat $efibootcache
         fi
+
+        echo "done with ESP creation"
 
     elif [ -n "$create_boot" ]; then
         boot_label=bootishness
@@ -840,13 +848,17 @@ EOF
         #
         numdisks=$(echo $bootdisks | awk '{print NF}')
         devmd=/dev/md0
-        mdadm --create $devmd --level=1 --metadata=1.0 --raid-devices=$numdisks $bootdisks
+        go="mdadm --create $devmd --level=1 --metadata=1.0 --bitmap=internal --raid-devices=$numdisks $bootdisks"
+        echo $go
+        eval $go
 
         # create ext4 fs for /boot
-        mkfs.ext4 -L $boot_label -O^64bit $devmd
+        go="mkfs.ext4 -L $boot_label -O^64bit $devmd"
+        echo $go
+        eval $go
 
         # populate /boot
-        mkidr -p /mnt/$boot_label
+        mkdir -p /mnt/$boot_label
         mount $devmd /mnt/$boot_label
         populate_boot /mnt/$boot_label
 
@@ -859,6 +871,7 @@ EOF
         # update fstab
         echo "LABEL=$boot_label /boot auto defaults 1 1" >> /tmp/fstab
 
+        echo "done with /boot creation"
     fi
 
     # create fstab
@@ -1100,7 +1113,7 @@ system_installer()
     #
     echo
     echo "Installation complete!  Reboot and test it out, or login below to poke around."
-    if [ -z "$create_esp" ] && [ -z "$create_boot"]; then
+    if [ -z "$create_esp" ] && [ -z "$create_boot" ]; then
         echo
         echo "###############################################################################"
         echo

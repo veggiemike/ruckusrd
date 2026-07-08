@@ -109,7 +109,3 @@
    having to hardcode its intallation path?
 
  - maybe allow NFS/SMB for imgdir in system_installer?
-
- - system_installer: maybe add legacy BIOS mode to seutp extlinux?  I do
-   actually still have a couple ancient supermicro servers that don't have EFI
-   support... (lame, I know)
