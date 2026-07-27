@@ -308,8 +308,11 @@ firstboot_wizard()
         $CHROOT systemctl set-default graphical.target
     fi
     # boot into xen
+    #
+    # NOTE: only valid for efi booting
+    #
     $CHROOT dpkg -s xen 2>/dev/null >/tmp/xen || echo -n
-    if [ -s /tmp/xen ] && dlg_xen && [ -z "$firstboot_dryrun" ]; then
+    if [ -s /tmp/xen ] && efibootmgr >/dev/null 2>&1 && dlg_xen && [ -z "$firstboot_dryrun" ]; then
         efi_set_bootorder_first xen
     fi
     # remove cruft

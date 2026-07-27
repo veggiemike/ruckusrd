@@ -205,7 +205,10 @@ partition_disks()
     espdisks=
     bootdisks=
     for d in $disks; do
-        sfdisk $d < /tmp/ptable
+        # FIXME: mdraid might have started for this disk, in which case this
+        #        might fail.  what about LVM autostarting?
+        #
+        sfdisk --wipe=always $d < /tmp/ptable
         # figure out if partition identifier is pN or just N (e.g., sda1 vs
         # nvme0n1p1)
         if [ -e ${d}p1 ]; then
@@ -269,6 +272,15 @@ populate_boot()
     # install kernel files
     echo "installing kernel files..."
     $rsync /tmproot/System.map* /tmproot/vmlinuz* /tmproot/initrd* /tmproot/config* $boot_dir
+
+    # make some symlinks if needed
+    if [ -n "$create_boot" ]; then
+        xengz=$boot_dir/xen.gz
+        xenvergz=$boot_dir/xen-*.gz
+        if [ ! -e $xengz ] && [ -e $xenvergz ]; then
+            ln -s $(basename $xenvergz) $xengz
+        fi
+    fi
 
     # generate machine-specific fw.sqsh
     echo "creating machine-specific fw.sqsh..."
@@ -360,9 +372,13 @@ generate_syslinux_cfg()
 
     if [ -n "$create_boot" ]; then
         cfgdir=$boot_dir/extlinux
-        cfg=$cfgdir/extlinux.cfg
+        cfg=$cfgdir/extlinux.conf
         ui=vesamenu.c32
         graphics=" vga=0x31a"
+        # FIXME: these serial options definately made my Supermicro Super
+        #        Server X12SCZ-F test system unbootable... :-/ odd, it's the
+        #        same serial config i've used forever on other systems...
+        #
         serial=" console=tty0 console=ttyS0,115200n8"
         extra=
     else
@@ -441,7 +457,7 @@ EOF
     # FIXME: is console=hvc0 needed if no serial console redirection is
     #        happening?  doesn't look like i needed in on frankennas1...
     #
-    if [ -n "$create_boot" ] && [ -f $boot_dir/xen*.gz ]; then
+    if [ -n "$create_boot" ] && [ -f $boot_dir/xen.gz ]; then
         cat >> $cfg <<EOF
 label xen
  menu label Xen/Linux ($kernelversion)
@@ -844,16 +860,39 @@ EOF
 
         # setup mdraid for /boot
         #
-        # FIXME: what if /dev/md0 is already in use?  :-/
+        # NOTE: If there's only 1 disk, we *still* create a raid1 array with 2
+        #       disks, but with one disk specified as missing.  This allows us
+        #       to add a 2nd disk easily later, and makes the code simpler (we
+        #       can assume /boot is always a raid1 device).
+        #
+        #       But we take care not to make $numdisks or $bootdisks misleading
+        #       for further processing (e.g., we don't want anything trying to
+        #       use the string "missing" as a device).
+        #
+        # NOTE: --force and --run to avoid y/n prompts if there's already raid
+        #       metadata or previously existing filesystems there.
+        #
+        # FIXME: what if /dev/md0 is already in use?  :-/ It'll fail
+        #        immediately and I guess it's up to the user to mdadm --stop
+        #        and mdadm --zero-superblock the devices.
         #
         numdisks=$(echo $bootdisks | awk '{print NF}')
         devmd=/dev/md0
-        go="mdadm --create $devmd --level=1 --metadata=1.0 --bitmap=internal --raid-devices=$numdisks $bootdisks"
+        go="mdadm --create $devmd --level=1 --metadata=1.0 --bitmap=internal --force --run"
+        if [ $numdisks -eq 1 ]; then
+            go="$go --raid-devices=2 $bootdisks missing"
+        else
+            go="$go --raid-devices=$numdisks $bootdisks"
+        fi
         echo $go
         eval $go
 
         # create ext4 fs for /boot
-        go="mkfs.ext4 -L $boot_label -O^64bit $devmd"
+        #
+        # NOTE: -F to force w/out prompting if there's already filesystem
+        #       metadata there
+        #
+        go="mkfs.ext4 -L $boot_label -O^64bit -F $devmd"
         echo $go
         eval $go
 
