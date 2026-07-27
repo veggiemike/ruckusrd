@@ -1,6 +1,6 @@
 # NAME
 
-Ruckusrd - manual page for Ruckusrd 0.22.1
+Ruckusrd - manual page for Ruckusrd 0.22.2
 
 # DESCRIPTION
 
@@ -259,6 +259,10 @@ bootable removable media).
 
 **ESP**=*size* can be used to explicitly specify the ESP size (e.g.,
 4G).
+
+**BOOT**=*size* specify size (e.g., 4G) of /boot partition, disable EFI
+support, configure experimental BIOS booting via extlinux (ha, the
+irony).
 
 **SWAP**=*size* can be used to explicitly specify swap partition size
 (e.g., 4G, 0 to disable swap).
