@@ -46,24 +46,6 @@ install -dv -m 0750 initramfs/root || exit 1
 install -dv -m 1777 initramfs/tmp initramfs/var/tmp || exit 1
 
 
-# Make a couple symlinks
-echo '********** MAKING SYMLINKS *****************************************************'
-ln -vs bin initramfs/sbin &&
-ln -vs ../bin initramfs/usr/bin &&
-ln -vs ../sbin initramfs/usr/sbin &&
-ln -vs ../lib initramfs/usr/lib &&
-ln -vs ../lib64 initramfs/usr/lib64 &&
-# Fixup lib vs lib64
-#
-# NOTE: We symlink lib64->lib here to ensure that our runtime linker works on
-#       x86, x86_64 multilib, and pure64.  There does exist the possibility
-#       that we're copying in binaries with conflicting runtime libs, though
-#       (e.g., say mdadm is 32bit on host system, it will put the 32bit
-#       libc.so.6 in /lib which will break all the 64bi binaries...).
-#
-ln -vs lib initramfs/lib64 || exit 1
-
-
 # Copy all the PROGS into the initramfs
 echo '********** COPYING PROGS TO INITRAMFS ******************************************'
 for x in ../subprojects/{busybox,util-linux,eudev,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,zstd,less,fsarchiver,newt,firmwarenator,microcodenator}.tar; do
@@ -74,6 +56,37 @@ for x in ../subprojects/{busybox,util-linux,eudev,mdadm,lvm2,e2fsprogs,squashfs-
     #       it's build to remove unneeded symlinks.
     tar -C initramfs --keep-old-files -vxf $x || exit 1
 done
+
+
+# Merge together some dirs to make things tidier/consistent
+#
+# NOTE: We used to do this more sneaky-like by prepopulating initramfs with
+#       symlinks first, then extracting our tarballs, letting tar merge things
+#       together implicitly... and that worked for a loong time.  Until
+#       somewhere between 5/25/25 and 7/27/26 when tar on both jammy and noble
+#       started throwing up tons of "Invalid cross-device link" errors during
+#       extraction.  I'm pretty sure it's a tar bug, but it's convoluted to
+#       describe and probably not getting fixed (i.e., what I was doing might
+#       be considered too sneaky ;-)).  So, we'll do it by hand here instead.
+#
+echo '********** MERGING /bin ********************************************************'
+mv -v initramfs/usr/{bin,sbin}/* initramfs/bin/ &&
+mv -v initramfs/sbin/* initramfs/bin/ &&
+rmdir initramfs/usr/{bin,sbin} initramfs/sbin &&
+ln -vs ../bin initramfs/usr/bin &&
+ln -vs ../bin initramfs/usr/sbin &&
+ln -vs bin initramfs/sbin || exit 1
+
+echo '********** MERGING /lib ********************************************************'
+mv -v initramfs/usr/lib/udev/rules.d/* initramfs/lib/udev/rules.d/ &&
+rmdir initramfs/usr/lib/udev/rules.d &&
+mv -v initramfs/usr/lib/udev/* initramfs/lib/udev/ &&
+rmdir initramfs/usr/lib/udev &&
+mv -v initramfs/usr/lib/* initramfs/lib/ &&
+rmdir initramfs/usr/lib &&
+ln -vs ../lib initramfs/usr/lib &&
+ln -vs ../lib initramfs/usr/lib64 &&
+ln -vs lib initramfs/lib64 || exit 1
 
 
 # Copy all required shared libs
