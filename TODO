@@ -115,3 +115,15 @@
    technically it has all the appropriate sqsh files to easily create domUs,
    but then the resulting embedded system doesn't have any xen tools.  could be
    interesting... maybe for Xen testing?
+
+ - Hmm... looks like the eudev project is dead.  At some point we'll have to
+   start building just the bits of systemd we want (e.g., udev, systemd-boot)
+   and firgure out a path forward.  Hopefully something like this will do:
+
+   meson setup build -Dmode=minimal -Dlink-udev-shared=false -Dboot=true \
+    -Dcore=false -Dnetworkd=false -Dresolved=false -Dhomed=false \
+    -Duserdb=false -Dtimedated=false -Dlocaled=false
+
+   ninja -C build && ninja -C build install
+
+ - maybe play with erofs to see how it compairs to squashfs?
