@@ -379,7 +379,20 @@ generate_syslinux_cfg()
         #        Server X12SCZ-F test system unbootable... :-/ odd, it's the
         #        same serial config i've used forever on other systems...
         #
-        serial=" console=tty0 console=ttyS0,115200n8"
+        #        ha, foolish self.  it wasn't unbootable, it was displaying the
+        #        firstboot dialogs on the serial console waiting for
+        #        input... duh.  specifying two console= devices causes the
+        #        kernel to use multiple devices, but the *last* one is used for
+        #        /dev/console (which is where initramfs output goes, including
+        #        the firstboot wizard).  Putting console=tty0 last ensures the
+        #        person physically sitting at the screen sees all the initramfs
+        #        output.  The downside there (and why I traditionally had it
+        #        the other way around), is that /dev/console not being tied to
+        #        the serial device means you can't remotely troubleshoot early
+        #        boot problems via serial console (e.g., ssh into a box
+        #        connected to your server via serial to watch it boot).
+        #
+        serial=" console=ttyS0,115200n8 console=tty0"
         extra=
     else
         cfgdir=$boot_dir/EFI/$efidir
@@ -392,7 +405,7 @@ generate_syslinux_cfg()
         #
         ui=menu.c32
         graphics=""
-        serial=" console=tty0 console=ttyS0,115200n8"
+        serial=" console=ttyS0,115200n8 console=tty0"
         extra=
     fi
 
@@ -457,12 +470,16 @@ EOF
     # FIXME: is console=hvc0 needed if no serial console redirection is
     #        happening?  doesn't look like i needed in on frankennas1...
     #
+    #        in fact, is it needed at all?  It doesn't seem to be needed in my
+    #        most recent batch of testing... I'm fairly sure I've got serial
+    #        access via ttyS0 and regular access via /dev/tty0 on my dom0...
+    #
     if [ -n "$create_boot" ] && [ -f $boot_dir/xen.gz ]; then
         cat >> $cfg <<EOF
 label xen
  menu label Xen/Linux ($kernelversion)
  kernel mboot.c32
- append /xen.gz dom0_mem=4096M loglvl=all noreboot console_timestamps=boot ucode=scan com1=115200,8n1 console=com1,vga vga=mode-0x31a --- /vmlinuz-$kernelversion root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec firstboot ro consoleblank=300$serial console=hvc0$extra loglevel=2 --- /initrd-$kernelversion.img
+ append /xen.gz dom0_mem=4096M loglvl=all noreboot console_timestamps=boot ucode=scan com1=115200,8n1 console=com1,vga vga=mode-0x31a --- /vmlinuz-$kernelversion root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers $fwdevspec firstboot ro consoleblank=300 console=hvc0$serial$extra loglevel=2 --- /initrd-$kernelversion.img
 
 EOF
     fi

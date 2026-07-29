@@ -109,3 +109,9 @@
    having to hardcode its intallation path?
 
  - maybe allow NFS/SMB for imgdir in system_installer?
+
+ - could we install basic xl tools in initramfs?  sounds crazy, but my
+   ruckususb installer actually has all the files to BOOT into xen, and
+   technically it has all the appropriate sqsh files to easily create domUs,
+   but then the resulting embedded system doesn't have any xen tools.  could be
+   interesting... maybe for Xen testing?
