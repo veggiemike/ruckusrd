@@ -297,6 +297,9 @@ syslinux-6.03.tar.xz:
 #        more discussion.  Hopefully fixed in 6.04 if it ever gets
 #        released... :-/
 #
+# FIXME: The debug.c sed statement was added to fix compilation
+#        problems on Ubuntu 26.04.
+#
 # FIXME: Perhaps we should build 6.04-pre3 from git?  I noticed Ubuntu
 #        22.04 is using 6.04~git20190206.bf6db5b4+dfsg1-3ubuntu1
 #
@@ -307,6 +310,9 @@ syslinux/FOO: syslinux-6.03.tar.xz
 	sed -i \
 	    -e 's|^#include <sys/types.h>|#include <sys/types.h>\n#include <sys/sysmacros.h>|' \
 	    extlinux/main.c && \
+	sed -i \
+	    -e 's|^#include <stdbool.h>|#include <stdbool.h>\n#include <stdio.h>|' \
+	    com32/lib/syslinux/debug.c && \
 	sed -i \
 	    -e 's|\(^GCCWARN.*\)|\1 -fcommon|' \
 	    mk/syslinux.mk && \
