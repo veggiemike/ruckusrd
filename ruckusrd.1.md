@@ -1,6 +1,6 @@
 # NAME
 
-Ruckusrd - manual page for Ruckusrd 0.22.2
+Ruckusrd - manual page for Ruckusrd 0.22.3
 
 # DESCRIPTION
 
@@ -99,12 +99,18 @@ command line parameters, provided in groupings based on use-case.
 Add the specified **MODULE** to the system's kernel module blacklist
 file, to prevent it from being autoloaded by udev.
 
+<!-- -->
+
 **init**=**INIT**  
 Provide path to alternate init binary, **INIT**.
+
+<!-- -->
 
 **quiet**  
 Don't make any terminal output if you can help it. Most distros use this
 as a default boot parameter as to not interupt graphical boot screens.
+
+<!-- -->
 
 **root**=**DEVSPEC**  
 The single most important boot parameter! Specify where the root
@@ -113,12 +119,18 @@ device name, or you can specify a filesystem label (*LABEL*=),
 filesystem UUID (*UUID*=), CD/DVD-ROM label (*CDLABEL*=), or ZFS dataset
 (*ZFS*=).
 
+<!-- -->
+
 **rootflags**=**FLAGS**  
 Specify extra **FLAGS** for mounting the root device.
+
+<!-- -->
 
 **rootfstype**=**FSTYPE**  
 Explicitly state the **FSTYPE** of the root device, instead of
 auto-detecting.
+
+<!-- -->
 
 **rw**  
 Leave the sysroot mounted read-write before handing off to sysroot's
@@ -126,9 +138,13 @@ init system. Most init systems expect sysroot to be read-only when they
 start (and that's the default behavior of *ruckusrd* initramfs), but
 sometimes you need this.
 
+<!-- -->
+
 **verbose**  
 Make the *linuxrc* script be extra verbose, the exact opposite of
 **quiet**. This is *very* noisy, so be warned.
+
+<!-- -->
 
 **modules-early**=**mod1,mod2,...**  
 Supply a list of modules to be loaded as soon as possible (i.e., even
@@ -143,15 +159,21 @@ will fail.
 **overlayflags**=**FLAGS**  
 Specify extra **FLAGS** for mounting the Overlay File System.
 
+<!-- -->
+
 **ram_layer**=**SIZE**  
 Use RAM for the upper layer. This will result in tmpfs of the requested
 **SIZE** mounted at **/upper**. Any valid value for the tmpfs **size**
 option can be specified (e.g., 2G, 50%). Since rootdev will no longer
 need to be writable, it will be mounted read-only.
 
+<!-- -->
+
 **root_true_rw**  
 Similar to **rw**, leave the root-true device mounted read-write before
 handing off to sysroot's init system.
+
+<!-- -->
 
 **sqsh_layerdev**=**DEV**  
 Use **DEV** as an alternate device for locating the sqsh layers. **DEV**
@@ -172,19 +194,27 @@ would work in theory, as long as we copy layers from the correct path,
 but how many different pieces of removable media are really going to
 require at bootup? More than 1? I see no use-case for that.
 
+<!-- -->
+
 **sqsh_layerdir**=**DIR**  
 Use **DIR** as the relative path to the images provided via
 **sqsh_layers**. This is so that the layers can be located somewhere
 other than at the root of the specified device.
+
+<!-- -->
 
 **sqsh_layers**=**SQSH_LAYERS**  
 Specifiy tiered list of lower layers to be used along with a read-write
 upper layer (on the **root** device) in an OverlayFS mount to be userd
 as the sysroot. See **SQUASHFS LAYERS** for more details.
 
+<!-- -->
+
 **sqshfstype**=**FSTYPE**  
 Explicitly state the **FSTYPE** of the **sqsh_layerdev** device, instead
 of auto-detecting.
+
+<!-- -->
 
 **to_ram**  
 Used in conjunction with **ram_layer**, causes the entire contents of
@@ -219,20 +249,28 @@ of a new system. Even if **firstboot** is specified, if
 *.ruckusrd_firstboot_done* exists at the root of the sysroot filesystem,
 *firstboot_wizard* will be skipped.
 
+<!-- -->
+
 **fwdev**=**FWDEV\[,FWDEV2,...\]**  
 Specify a device containing *fw.sqsh*. If found, this squashfs image is
 mounted on */lib/firmware* to provide firmware to modules loaded during
 the initramrd stage (e.g., video cards, ethernet cards).
+
+<!-- -->
 
 **hoststamp**  
 Append a timestamp to system hostname. Probably only desired when using
 **ram_layer** and/or **to_ram** to boot a bunch of systems from a common
 image (i.e., an installer or live-disk).
 
+<!-- -->
+
 **initramsys**  
 Completely ignore sysroot. Invoke the initramfs's init instead, and
 you've got a fully functional embedded system (complete with wired
 networking and multiple TTYs to login on) w/out any root device.
+
+<!-- -->
 
 **initramsys-net\[=CONFIG\]**  
 Implies **initramsys**, but also starts networking automatically. Valid
@@ -242,6 +280,8 @@ config options are **DEV**=*devname*, **IP**=*ip/cidr*\|*auto*\],
 eth0, DHCP, no VLAN, w/ hostname of ruckusrd-TIMESTAMP (hostname can be
 set via the kernel's *hostname=* param). The dropbear SSH server is
 started automatically as well.
+
+<!-- -->
 
 **initramsys-installer\[=CONFIG\]**  
 Implies **initramsys**, but runs a dialog-based system installer prior
@@ -261,8 +301,7 @@ bootable removable media).
 4G).
 
 **BOOT**=*size* specify size (e.g., 4G) of /boot partition, disable EFI
-support, configure experimental BIOS booting via extlinux (ha, the
-irony).
+support, configure legacy BIOS booting via extlinux.
 
 **SWAP**=*size* can be used to explicitly specify swap partition size
 (e.g., 4G, 0 to disable swap).
@@ -283,7 +322,7 @@ zfs pool (if 3+ disks are found). Only a single vdev is ever created, no
 matter how many disks are available. The raidz vdev will use only 3
 disks unless **VDEV_MAXSIZE**=*N* is specified.
 
-Traditional BIOS bootup isn't supported.
+<!-- -->
 
 **modinject**  
 Inject kernel modules (and kernel header files) from the initramfs into

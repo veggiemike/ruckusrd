@@ -2,6 +2,12 @@
 
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
+* v0.22.3
+2026-07-31: Ruckusrd v0.22.3
+
+- Fixed build problems on Ubuntu 26.04
+- Removed sysroot zfs dependency for firstboot_wizard
+
 * v0.22.2
 2026-07-27: Ruckusrd v0.22.2
 
