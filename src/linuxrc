@@ -1119,21 +1119,19 @@ if [ -n "$firstboot" ]; then
     #        user goes into firstboot, it's an exception to the rule, i'm gonna
     #        leave them mounted.
     #
-    # FIXME: this will be a problem on all the es images i built when noble
-    #        first came out.  back then, I didn't install zfs until
-    #        server.sqsh.  I mean, this all depends on wether I decide to use
-    #        ZFS for rootfs on all my domUs or not.  Historically, I didn't,
-    #        because zfs in a domU isn't the most efficient, but it was also
-    #        because I didn't have an easy installer.  Now that I do have an
-    #        easy installer, and in addition to being easy, I have to test it,
-    #        I've started using ZFS for the rootfs of my devlopment domUs...
-    #
-    #        I could use initramfs's zfs to mount remaining filesystems I
-    #        guess...
+    # NOTE: We very intentionally avoid doing `$CHROOT zfs mount -a` because
+    #       thus far there is actually no requirement for the sysroot to
+    #       actually have zfs-utils, and we don't want to start now.  Sounds
+    #       silly, but we do have a corner-case while bootstrapping a new
+    #       version of Ubuntu and haven't built our Source Ruckus PPA packages
+    #       yet... including the zfs one.  We have to boot up once first in
+    #       order to compile them, so it's a chicken-and-the-egg problem very
+    #       easily solved by the fact that the initramfs already has the zfs
+    #       utils installed.
     #
     CHROOT="chroot /sysroot /usr/bin/env -i HOME=/root TERM=$TERM PATH=$PATH"
     $CHROOT mount -a
-    $CHROOT zfs mount -a
+    zfs get mountpoint |awk '/local/ {printf "%s /sysroot%s\n", $1,$3}' | xargs -n2 mount -t zfs
 
     # NOTE: When run directly by init, any keypress (including arrow keys)
     #       causes an error exit... but if you run it by hand immediately
