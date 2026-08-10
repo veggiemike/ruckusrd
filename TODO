@@ -178,6 +178,9 @@
    The resulting system might not have the needed working bits, either.  We
    need to be able to setup a bridge interface for networking, for example.
 
+   Oh, shoot... this adds a python3 requirement to initramfs, which will also
+   bloat things up...
+   
    In all likelihood, it will also pull in a ton of system libs that I've been
    trying to avoid....
    

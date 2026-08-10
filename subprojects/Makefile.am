@@ -494,6 +494,15 @@ linux-firmware/FOO:
 	popd || exit 1
 
 
+# FIXME: link against our libzstd?  i see configure checking for it at
+#        the toplevel despite it being disabled inside qemu-xen
+#
+#        i also see it looking for ext2/3/4 headers and uuid headers
+#
+# FIXME: bigger problem... it's going to require python3 on the
+#        initramfs...  :-/ I can totally build that, but size is gonna
+#        start getting stupid big.
+#
 xen/FOO:
 	pushd xen && \
 	rm -rf FOO && \
@@ -503,7 +512,7 @@ xen/FOO:
 	  --localstatedir=/var --sysconfdir=/etc --disable-werror \
 	  --disable-monitors --disable-ocamltools --disable-xsmpolicy \
 	  --disable-seabios --disable-golang --disable-pygrub --disable-pvshim \
-	  --with-extra-qemuu-configure-args="--without-default-features --enable-xen --disable-debug-info --enable-strip"
+	  --with-extra-qemuu-configure-args="--without-default-features --enable-xen --disable-debug-info --enable-strip" && \
 	make -j$(JOBCOUNT) dist && \
 	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
