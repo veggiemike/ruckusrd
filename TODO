@@ -24,12 +24,6 @@
 
 * For 0.x
 
- - Should prefix all our non-standard kernel commandline options w/
-   ruckusrd.whatever.  Once we have config-file support, we should be able to
-   keep it a bit less verbose, and this will guard us against accidentally
-   using the same option as something in the kernel or systemd.  A couple
-   should probably stay unprefixed (e.g., root=, quiet).
-
  - Consider adding `rescue` to kick-off a dialog-based rootfs recovery of some
    sort?  Or maybe just add a /bin/rescue script to run via `initramsys` shell?
 
@@ -71,36 +65,6 @@
    update bootloader config and reboot (if non syslinux), or just go right
    ahead and autoreboot after updating syslinux.conf (ha, don't forget to make
    sure to remove sqsh_layer-commit and sqsh_layer-merge before rebooting)?
-
- - Can ruckusrd detect a secondary ESP and keep it in sync with the primary?
-   This wouldn't be as good as automatically making them match after dorking
-   around with ESP1 (e.g., installing a new kernel, tweaking syslinux.conf),
-   but it's better than doing nothing and leaving it up to the user (in which
-   case, they'll never match)
-
-   New boot param: redundant-esp=LABEL1,LABEL2,...
-
- - inotify-based esp sync?  or just cron rsync once a minute?  could do
-   `inotifywait -q -m /boot -e close_write` and parse it's output, or
-   `inotify-hookable --watch-directories /boot --watch-directories /boot2` and
-   force rsync back and forth... but if we're doing it via inotify, the sync
-   from boot->boot2 is going to grigger inotify and sync back to boot, over and
-   over... so that's probably bad.
-
-   doing cron, on the other hand, means if the user modifies boot params and
-   reboots w/out waiting a minute first, they may or may not see their changes
-   (e.g., which ESP did they edit?  was it the first one that's going to boot
-   next?)
-
-   might have to write a little thing using inotify that in addition to
-   triggering an rsync also logs the file being edited somewhere where the
-   other inotify proces can see it and ignore it.
-
-   or maybe STOP the other inotify during the sync, and start it back up again
-   afterwards?  there would be a window of time where the 2nd inotify isnt
-   running, but it would be pretty small (possible to break, but difficult and
-   unlikely to happen on its own).  replicatenator, here we come.  could use
-   pyinotify.
 
  - Hmm... looks like the eudev project is dead.  At some point we'll have to
    start building just the bits of systemd we want (e.g., udev, systemd-boot)
@@ -146,15 +110,6 @@
    111)'.  ok, i can '-o nolock' but perhaps that's bad.  otherwise i have to
    start the rpc.statd (and rpcbind?) sevice.  using -o nolock is fine for ro
    mounts.
-
- - could we install basic xl tools in initramfs?  sounds crazy, but my
-   ruckususb installer actually has all the files to BOOT into xen, and
-   technically it has all the appropriate sqsh files to easily create domUs,
-   but then the resulting embedded system doesn't have any xen tools.  could be
-   interesting... maybe for Xen testing?
-
-
-
 
  - update zfs... gotta keep this at least as new as what's in my kernel
 
