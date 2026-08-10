@@ -153,8 +153,36 @@
    but then the resulting embedded system doesn't have any xen tools.  could be
    interesting... maybe for Xen testing?
 
+   Downside would be additional time and space to build ruckusrd, and
+   additional space per initramfs generated.  But how much...?
 
+   Cloning my xen repo from github takes a non-trivial ammount of time... on
+   the ship it's taking a 15 mins or so.
 
+   Even only building tools, this is gonna add significant time to building.
+   My laptop, doing a 'make dist' w/out any -j options, is probably gonna take
+   45 mins or so.  and the resulting dist dir is 450M (350M after stripping).
+
+   ^^ that test was with ./configure --disable-xen --disable-stubdom
+   --disable-kernels --disable-docs --prefix=/usr --disable-werror
+
+   We could also --disable-monitors --disable-ocamltools --disable-xsmpolicy
+   --disable-seabios --disable-golang --disable-pygrub --disable-pvshim
+
+   and --with-extra-qemuu-configure-args="--without-default-features --enable-xen --disable-debug-info --enable-strip"
+
+   ^^ ok all that dropped compile time down to 15 mins (although there may have
+   been some already downloaded stuff on the 2nd run) and dist size to 319M
+   (318M after stripping).
+   
+   The resulting system might not have the needed working bits, either.  We
+   need to be able to setup a bridge interface for networking, for example.
+
+   In all likelihood, it will also pull in a ton of system libs that I've been
+   trying to avoid....
+   
+   I'd say only do this if there's a use case, but so often the use case pops
+   up once the tooling is in place.
 
  - update zfs... gotta keep this at least as new as what's in my kernel
 

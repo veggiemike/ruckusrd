@@ -3,7 +3,7 @@
 # in here for each subproject.
 
 
-all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar fsarchiver.tar newt.tar firmwarenator.tar microcodenator.tar
+all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar fsarchiver.tar newt.tar firmwarenator.tar microcodenator.tar xen.tar
 all-local: fw.sqsh ucode.img
 
 %.tar: %/FOO
@@ -33,6 +33,7 @@ distclean-local:
 	cd firmwarenator && git clean -dfx && git stash
 	cd microcodenator && git clean -dfx && git stash
 	cd linux-firmware && git clean -dfx && git stash
+	cd xen && git clean -dfx && git stash
 	rm -rf syslinux*
 
 
@@ -490,6 +491,21 @@ linux-firmware/FOO:
 	rm -rf FOO && \
 	make DESTDIR=$$PWD/FOO FIRMWAREDIR=/ install && \
 	make DESTDIR=$$PWD/FOO FIRMWAREDIR=/ dedup && \
+	popd || exit 1
+
+
+xen/FOO:
+	pushd xen && \
+	rm -rf FOO && \
+	./autogen.sh && \
+	./configure --disable-xen --disable-stubdom --disable-kernels \
+	  --disable-docs --prefix=/usr --bindir=/sbin --sbindir=/sbin \
+	  --localstatedir=/var --sysconfdir=/etc --disable-werror \
+	  --disable-monitors --disable-ocamltools --disable-xsmpolicy \
+	  --disable-seabios --disable-golang --disable-pygrub --disable-pvshim \
+	  --with-extra-qemuu-configure-args="--without-default-features --enable-xen --disable-debug-info --enable-strip"
+	make -j$(JOBCOUNT) dist && \
+	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
 
 
