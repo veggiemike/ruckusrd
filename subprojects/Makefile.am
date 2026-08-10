@@ -320,6 +320,11 @@ syslinux/FOO: syslinux-6.03.tar.xz
 	popd || exit 1
 
 
+# FIXME: Looks like autoconf 2.70 or higher is needed starting in
+#        DROPBEAR_2026.90... so as long as I'm building ruckusrd for
+#        my old bionic kernel build box, I'm stuck with older
+#        versions.
+#
 dropbear/FOO:
 	pushd dropbear && \
 	rm -rf FOO && \
