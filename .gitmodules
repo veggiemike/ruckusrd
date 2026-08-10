@@ -63,3 +63,6 @@
 [submodule "subprojects/microcodenator"]
 	path = subprojects/microcodenator
 	url = https://github.com/sourceruckus/microcodenator.git
+[submodule "subprojects/xen"]
+	path = subprojects/xen
+	url = https://github.com/xen-project/xen.git
