@@ -39,9 +39,6 @@
    https://systemd.io/PREDICTABLE_INTERFACE_NAMES/
    https://wiki.archlinux.org/title/Network_configuration#Change_interface_name
 
-
-* proposed for 0.23
-
  - For long-lasting systems, constantly installing updates, doing regular work,
    etc, eventually results in essentially the entire collection of sqsh_layers
    being replaced in upper with new files.  So keeping the original sqsh_layers
@@ -105,17 +102,6 @@
    unlikely to happen on its own).  replicatenator, here we come.  could use
    pyinotify.
 
- - ruckusrd --get-libdir so userland scripts can use ruckusrd-common.sh w/out
-   having to hardcode its intallation path?
-
- - maybe allow NFS/SMB for imgdir in system_installer?
-
- - could we install basic xl tools in initramfs?  sounds crazy, but my
-   ruckususb installer actually has all the files to BOOT into xen, and
-   technically it has all the appropriate sqsh files to easily create domUs,
-   but then the resulting embedded system doesn't have any xen tools.  could be
-   interesting... maybe for Xen testing?
-
  - Hmm... looks like the eudev project is dead.  At some point we'll have to
    start building just the bits of systemd we want (e.g., udev, systemd-boot)
    and firgure out a path forward.  Hopefully something like this will do:
@@ -126,4 +112,51 @@
 
    ninja -C build && ninja -C build install
 
+ - syslinux looks dead as a doornail as well.  that's sad.  there do seem to be
+   some patched versions in distros, that may support dual EFI/BIOS booting via
+   syslinux/isolinux... dunno if that's worth investigating.  I can't imagine
+   using anything other than extlinux for BIOS systems, but we shuld probably
+   start playing with systemd-boot for EFI booting
+ 
  - maybe play with erofs to see how it compairs to squashfs?
+
+
+* proposed for 0.23
+
+ - ruckusrd --get-libdir so userland scripts can use ruckusrd-common.sh w/out
+   having to hardcode its intallation path?  like what...?  do we have userland
+   scripts that need this?
+
+ - maybe allow NFS/SMB for imgdir in system_installer?  could be handy,
+   probably wouldn't be hard, assuming we have NFS or SMB tools available in
+   initramsys...
+
+   looks like i can `mount -ousername=,domainname=,password=
+   //hostname/sharename t` from initramsys, but I have to specify password on
+   commandline.  there's no password helper prompt.
+
+   i feel like nfs should be working, but when i try it hangs forever.  i can
+   see the server has authenticated the mount request... it just never
+   finishes?  i'm having strange networking behavior on this test, so perhaps
+   i'll reboot and try again.
+
+   that may have been because lo was down.  with it up i imediately get
+   "Connection refused", even though i can see the server has granted me
+   permission.  dmesg shows 'svc:failed to register lockdv1 RPC service (error
+   111)'.  ok, i can '-o nolock' but perhaps that's bad.  otherwise i have to
+   start the rpc.statd (and rpcbind?) sevice.  using -o nolock is fine for ro
+   mounts.
+
+ - could we install basic xl tools in initramfs?  sounds crazy, but my
+   ruckususb installer actually has all the files to BOOT into xen, and
+   technically it has all the appropriate sqsh files to easily create domUs,
+   but then the resulting embedded system doesn't have any xen tools.  could be
+   interesting... maybe for Xen testing?
+
+
+
+
+ - update zfs... gotta keep this at least as new as what's in my kernel
+
+ - Hmm... how come we're not raising the loopback interface in
+   initramsys-net...?  ip link set up lo
