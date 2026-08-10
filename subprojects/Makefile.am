@@ -3,14 +3,14 @@
 # in here for each subproject.
 
 
-all-local: util-linux.tar eudev.tar busybox.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar fsarchiver.tar newt.tar firmwarenator.tar microcodenator.tar
+all-local: busybox.tar util-linux.tar eudev.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar fsarchiver.tar newt.tar firmwarenator.tar microcodenator.tar
 all-local: fw.sqsh ucode.img
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
 
 distclean-local:
-	rm -fv {util-linux,eudev,busybox,mdadm,lvm2,e2fsprogs,zstd,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,less,fsarchiver,newt,firmwarenator,microcodenator}.tar
+	rm -fv {busybox,util-linux,eudev,mdadm,lvm2,e2fsprogs,zstd,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,less,fsarchiver,newt,firmwarenator,microcodenator}.tar
 	rm -fv fw.sqsh ucode.img
 	rm -rf .build*
 	cd util-linux && git clean -dfx && git stash
@@ -34,6 +34,48 @@ distclean-local:
 	cd microcodenator && git clean -dfx && git stash
 	cd linux-firmware && git clean -dfx && git stash
 	rm -rf syslinux*
+
+
+# NOTE: We remove a couple bb symlinks here because some of our other
+#       subprojects provide them.  We could stop compiling them by
+#       tweaking .config, but this seems easier (and more flexible)
+#       for now.
+#
+# NOTE: For building on jammy (or anything with newer versions of
+#       glibc that no longer include rpc/rpc.h), you have to specify
+#       additional CFLAGS to get things building.  For jammy, the
+#       libtripc-dev package seems to be the one installed by default,
+#       so setting CFLAGS=-I/usr/include/tirpc and
+#       CONFIG_EXTRA_LDLIBS=tirpc will make it compile with
+#       CONFIG_FEATURE_INETD_RPC enabled.  For now, we'll just leave
+#       RPC disabled in our .config file.
+#
+# FIXME: For building on noble (or anything that's using kernel
+#        headers newer than v6.8), the tc module fails to build
+#        because CBQ support was removed from the kernel.  It looks
+#        like this hasn't been fixed upstream yet, even in the newer
+#        1.37 release, so we'll disable tc for now in our .config
+#        file.
+#
+#        https://bugs.busybox.net/show_bug.cgi?id=15931
+#
+busybox/FOO:
+	pushd busybox && \
+	rm -rf FOO && \
+	make mrproper && \
+	cp ../busybox.config .config && \
+	make oldconfig && \
+	make -j$(JOBCOUNT_KBUILD) && \
+	make CONFIG_PREFIX=$$PWD/FOO install && \
+	rm -f FOO/bin/{lsattr,chattr,less} && \
+	rm -f FOO/sbin/{fdisk,sfdisk,cfdisk,blkid} && \
+	rm -f FOO/sbin/{fsck,tune2fs,mke2fs,mkfs.ext2} && \
+	mkdir -p FOO/usr/share/udhcpc && \
+	cp -va examples/udhcp/{sample,simple}.* FOO/usr/share/udhcpc/ && \
+	chmod +x FOO/usr/share/udhcpc/* && \
+	sed -i 's|^RESOLV_CONF=.*|RESOLV_CONF="/etc/resolv.conf"|' FOO/usr/share/udhcpc/* && \
+	ln -vs sample.script FOO/usr/share/udhcpc/default.script && \
+	popd || exit 1
 
 
 # NOTE: This is added because the busybox fdisk applet doesn't work
@@ -93,48 +135,6 @@ eudev/FOO: util-linux.tar
 	  BLKID_LIBS="-L$$PWD/../util-linux/FOO/usr/lib/ -lblkid" && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
-	popd || exit 1
-
-
-# NOTE: We remove a couple bb symlinks here because some of our other
-#       subprojects provide them.  We could stop compiling them by
-#       tweaking .config, but this seems easier (and more flexible)
-#       for now.
-#
-# NOTE: For building on jammy (or anything with newer versions of
-#       glibc that no longer include rpc/rpc.h), you have to specify
-#       additional CFLAGS to get things building.  For jammy, the
-#       libtripc-dev package seems to be the one installed by default,
-#       so setting CFLAGS=-I/usr/include/tirpc and
-#       CONFIG_EXTRA_LDLIBS=tirpc will make it compile with
-#       CONFIG_FEATURE_INETD_RPC enabled.  For now, we'll just leave
-#       RPC disabled in our .config file.
-#
-# FIXME: For building on noble (or anything that's using kernel
-#        headers newer than v6.8), the tc module fails to build
-#        because CBQ support was removed from the kernel.  It looks
-#        like this hasn't been fixed upstream yet, even in the newer
-#        1.37 release, so we'll disable tc for now in our .config
-#        file.
-#
-#        https://bugs.busybox.net/show_bug.cgi?id=15931
-#
-busybox/FOO:
-	pushd busybox && \
-	rm -rf FOO && \
-	make mrproper && \
-	cp ../busybox.config .config && \
-	make oldconfig && \
-	make -j$(JOBCOUNT_KBUILD) && \
-	make CONFIG_PREFIX=$$PWD/FOO install && \
-	rm -f FOO/bin/{lsattr,chattr,less} && \
-	rm -f FOO/sbin/{fdisk,sfdisk,cfdisk,blkid} && \
-	rm -f FOO/sbin/{fsck,tune2fs,mke2fs,mkfs.ext2} && \
-	mkdir -p FOO/usr/share/udhcpc && \
-	cp -va examples/udhcp/{sample,simple}.* FOO/usr/share/udhcpc/ && \
-	chmod +x FOO/usr/share/udhcpc/* && \
-	sed -i 's|^RESOLV_CONF=.*|RESOLV_CONF="/etc/resolv.conf"|' FOO/usr/share/udhcpc/* && \
-	ln -vs sample.script FOO/usr/share/udhcpc/default.script && \
 	popd || exit 1
 
 
