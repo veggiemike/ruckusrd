@@ -373,8 +373,8 @@ rsync/FOO: zstd.tar
 	popd || exit 1
 
 
-# NOTE: Leaving this at v16 because bionic problems.  Either fix or
-#       wait until we've disowned 18.04 to upgrade to v18.
+# FIXME: Leaving this at v16 because bionic problems.  Either fix or
+#        wait until we've disowned 18.04 to upgrade to v18.
 #
 # NOTE: Oooh, one of my favorite pet peevs... -Werror on by default.
 #       Thanks developers for making packagers lives harder for no
@@ -399,6 +399,9 @@ efibootmgr/FOO:
 #
 # NOTE: We delete /usr/share/doc because it's 12M of html/pdf docs
 #       we'll never see.
+#
+# FIXME: Looks like v1.24.1 and v1.24.0 don't build... staying at
+#        v1.23.0
 #
 groff/FOO:
 	pushd groff && \
@@ -428,6 +431,10 @@ less/FOO:
 # NOTE: This compiles and links against our freshly built libblkid and
 #       libuuid (util-linux), libext2fs, libcom_err, and libe2p
 #       (e2fsprogs), and libzstd (zstd).
+#
+# FIXME: Looks like autoconf 2.72 or higher is needes starting with
+#        v0.8.9... so as long as I'm targetting building kernels on
+#        bionic, I'm stuck at v0.8.8.
 #
 fsarchiver/FOO: util-linux.tar e2fsprogs.tar zstd.tar
 	pushd fsarchiver && \
@@ -510,11 +517,11 @@ linux-firmware/FOO:
 #       our resulting initrd.
 #
 fw.sqsh: linux-firmware/FOO squashfs-tools.tar
-	LD_LIBRARY_PATH=$PWD/zstd/FOO/usr/lib \
+	LD_LIBRARY_PATH=$$PWD/zstd/FOO/usr/lib \
 	  ./squashfs-tools/FOO/bin/mksquashfs linux-firmware/FOO $@ -comp zstd -e .git -noappend
-	LD_LIBRARY_PATH=$PWD/zstd/FOO/usr/lib \
+	LD_LIBRARY_PATH=$$PWD/zstd/FOO/usr/lib \
 	  ./squashfs-tools/FOO/bin/mksquashfs wireless-regdb/regulatory.db* $@
-	LD_LIBRARY_PATH=$PWD/zstd/FOO/usr/lib \
+	LD_LIBRARY_PATH=$$PWD/zstd/FOO/usr/lib \
 	  ./squashfs-tools/FOO/bin/mksquashfs intel-ucode/intel-ucode $@ -keep-as-directory
 
 
