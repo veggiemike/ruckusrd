@@ -2,6 +2,11 @@
 
 See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 
+* v0.23.0
+2026-mm-dd: Ruckusrd v0.23.0
+
+- Upgraded all subprojects to latest working versions as of 8/10/26.
+
 * v0.22.3
 2026-07-31: Ruckusrd v0.22.3
 

@@ -76,6 +76,10 @@
 
    ninja -C build && ninja -C build install
 
+   Keep in mind, we've got at least one initramfs prog that links against the
+   host system's libsystemd.so and also libnss_systemd.so, so we'll have to
+   watch out for library mismatches... :-/
+
  - syslinux looks dead as a doornail as well.  that's sad.  there do seem to be
    some patched versions in distros, that may support dual EFI/BIOS booting via
    syslinux/isolinux... dunno if that's worth investigating.  I can't imagine
@@ -89,7 +93,11 @@
 
  - ruckusrd --get-libdir so userland scripts can use ruckusrd-common.sh w/out
    having to hardcode its intallation path?  like what...?  do we have userland
-   scripts that need this?
+   scripts that need this?  firstboot_wizard, linuxrc, mount_sysroot,
+   mount_sysroot_vfs, system_installer, and umount_sysroot all source it from
+   inside the initramfs, but it's guaranteed to live at /ruckusrd-common.sh in
+   there.  If we had *real* userland usage, this comment would make sense.  And
+   I don't think we'd *want* that file sourced by scripts post-boot anyway.
 
  - maybe allow NFS/SMB for imgdir in system_installer?  could be handy,
    probably wouldn't be hard, assuming we have NFS or SMB tools available in
@@ -110,8 +118,3 @@
    111)'.  ok, i can '-o nolock' but perhaps that's bad.  otherwise i have to
    start the rpc.statd (and rpcbind?) sevice.  using -o nolock is fine for ro
    mounts.
-
- - update zfs... gotta keep this at least as new as what's in my kernel
-
- - Hmm... how come we're not raising the loopback interface in
-   initramsys-net...?  ip link set up lo
