@@ -431,6 +431,9 @@ start_ruckusrd_system()
     #
     [ "$(hostname)" == "(none)" ] && hostname ruckusrd-`date +%Y%m%d%H%M%S`
 
+    # raise loopback device
+    ip link set up lo
+
     # clean up some stuff we won't be needing
     #
     # FIXME: should we consider removing more?  We've only got 25% of total RAM
