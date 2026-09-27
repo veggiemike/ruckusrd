@@ -35,6 +35,7 @@ Makefile.in
 /subprojects/fsarchiver.tar
 /subprojects/fw.sqsh
 /subprojects/groff.tar
+/subprojects/grub.tar
 /subprojects/less.tar
 /subprojects/lvm2.tar
 /subprojects/mdadm.tar

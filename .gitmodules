@@ -63,3 +63,6 @@
 [submodule "subprojects/microcodenator"]
 	path = subprojects/microcodenator
 	url = https://github.com/sourceruckus/microcodenator.git
+[submodule "subprojects/grub"]
+	path = subprojects/grub
+	url = https://gitlab.freedesktop.org/gnu-grub/grub.git

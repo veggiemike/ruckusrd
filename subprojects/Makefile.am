@@ -3,14 +3,14 @@
 # in here for each subproject.
 
 
-all-local: busybox.tar util-linux.tar eudev.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar fsarchiver.tar newt.tar firmwarenator.tar microcodenator.tar
+all-local: busybox.tar util-linux.tar eudev.tar mdadm.tar lvm2.tar e2fsprogs.tar zstd.tar squashfs-tools.tar zfs.tar syslinux.tar dropbear.tar rsync.tar efibootmgr.tar groff.tar less.tar fsarchiver.tar newt.tar firmwarenator.tar microcodenator.tar grub.tar
 all-local: fw.sqsh ucode.img
 
 %.tar: %/FOO
 	tar -C $^ -vcf $@ .
 
 distclean-local:
-	rm -fv {busybox,util-linux,eudev,mdadm,lvm2,e2fsprogs,zstd,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,less,fsarchiver,newt,firmwarenator,microcodenator}.tar
+	rm -fv {busybox,util-linux,eudev,mdadm,lvm2,e2fsprogs,zstd,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,less,fsarchiver,newt,firmwarenator,microcodenator,grub}.tar
 	rm -fv fw.sqsh ucode.img
 	rm -rf .build*
 	cd util-linux && git clean -dfx && git stash
@@ -32,6 +32,7 @@ distclean-local:
 	cd newt && git clean -dfx && git stash
 	cd firmwarenator && git clean -dfx && git stash
 	cd microcodenator && git clean -dfx && git stash
+	cd grub && git clean -dfx && git stash
 	cd linux-firmware && git clean -dfx && git stash
 	rm -rf syslinux*
 
@@ -492,6 +493,44 @@ microcodenator/FOO:
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
           --disable-static && \
+	make -j$(JOBCOUNT) && \
+	make DESTDIR=$$PWD/FOO install && \
+	popd || exit 1
+
+
+# FIXME: ugh, gnulib.  this is the 2nd thing using it now...  we
+#        should pull it out and have a single instance in
+#        subprojects/gnulib.  groff is the other thing, so far.
+#
+#        does git clean -dfx nuke the clone? no, it doesn't.
+#
+# NOTE: This builds and installs for BIOS, then cleans and
+#       reconfigures and builds for 64-bit EFI.
+#
+# FIXME: grub-mount needs fuse or fuse3 libs - apt install libfuse-dev
+#
+# FIXME: grub-protect needs libtasn1 library - apt install
+#        libtasn1-6-dev
+#
+# FIXME: dude, it's been in po for almost an hour now...  we should
+#        --disable-nls or something...
+#
+grub/FOO: groff.tar
+	pushd grub && \
+	rm -rf FOO && \
+	./bootstrap --gnulib-srcdir=$(srcdir)/../groff/gnulib && \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static --disable-nls \
+	  --disable-efiemu --disable-werror && \
+	make -j$(JOBCOUNT) && \
+	make DESTDIR=$$PWD/FOO install && \
+	make clean && \
+	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
+          --disable-static --disable-nls \
+	  --disable-efiemu --disable-werror \
+	  --target=x86_64 --with-platform=efi && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
