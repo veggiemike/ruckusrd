@@ -85,11 +85,27 @@
    syslinux/isolinux... dunno if that's worth investigating.  I can't imagine
    using anything other than extlinux for BIOS systems, but we shuld probably
    start playing with systemd-boot for EFI booting
- 
+
+   I've played around with systemd-boot a bit.  Config is broken up into lots
+   of little files instead of one, which seems annoyingly
+   overcomplicated... but I suppose I can get used to it.  At least it's a
+   project with a future.  It does not, however, support booting the xen.gz
+   multiboot binary... which is unfortunate, becuase getting xen.efi to boot
+   can be a PITA on some systems (e.g., I've actualy never gotten it to boot on
+   my Threadripper box).  It looks like grub is the only mainstream, maintained
+   bootloaded that will do that...
+
+   I've done some playing with grub now after decades of ignoring its annoying
+   distro auto-gen config file nonsense.  I was able to quite easily get xen.gz
+   booted via multiboot2 and xen.efi via chainloader, so that does offer an
+   obvious standard boot approach... but I loathe the grub-mkconfig setup.
+   It's trying way too hard to do everything for everyone and as a result just
+   does it poorly.  I'll probably generate a hand updatable custom grub.cfg and
+   attempt to disable update-grub and grub-mkconfig (although that will surely
+   get undone by distro updates, maybe I can add a grub.d rule to just bomb out
+   really early?)
+
  - maybe play with erofs to see how it compairs to squashfs?
-
-
-* proposed for 0.23
 
  - ruckusrd --get-libdir so userland scripts can use ruckusrd-common.sh w/out
    having to hardcode its intallation path?  like what...?  do we have userland
@@ -98,6 +114,9 @@
    inside the initramfs, but it's guaranteed to live at /ruckusrd-common.sh in
    there.  If we had *real* userland usage, this comment would make sense.  And
    I don't think we'd *want* that file sourced by scripts post-boot anyway.
+
+
+* proposed for 0.23
 
  - maybe allow NFS/SMB for imgdir in system_installer?  could be handy,
    probably wouldn't be hard, assuming we have NFS or SMB tools available in
@@ -118,3 +137,59 @@
    111)'.  ok, i can '-o nolock' but perhaps that's bad.  otherwise i have to
    start the rpc.statd (and rpcbind?) sevice.  using -o nolock is fine for ro
    mounts.
+
+ - Would be nice to be able to extract ruckusrd version from a built initramfs
+   image... w/out having to interrupt bootup and inspect.
+
+   I mean, I don't even *know* what the compression algorithm is w/out attempty
+   to xzcat, lzcat, etc...
+
+   zstdcat whatever.img | cpio --extract
+
+   jeeze that just extracts the microcode now... and i don't remember how to
+   skip it.
+
+   `cat initrd.img | cpio --extract -t` to get block offset of main compressed
+   initrd.  output should be pretty standard... it specifically has a -q to NOT
+   print the number of blocks... so we could just parse the last line.
+
+   `dd if=initrd.img skip=OFFSET | zstdcat | cpio --extract ruckusrd.sh` to get
+   the file with the version and built-in options in it.
+
+   `(cpio --extract -t; zstdcat | cpio --extract -t) < initrd.img` will give a
+   full listing w/out needing to depend on cpio's output on stderr.
+
+   how about `ruckusrd --examine initrd.img` to give a full listing and the
+   contents of ruckusrd.sh.  could also add `ruckusrd --extract initrd.img` to
+   make life easier.
+
+   for now, the magic recipe for checking what version of ruckusrd built an
+   initrd.img is
+
+   (cpio --extract -t >/dev/null 2>&1; zstdcat | cpio --extract --to-stdout ruckusrd.sh 2>/dev/null) < initrd.img
+
+   assuming zstd compression... if we did this in code, we'd want to cycle
+   through zstdcat, xzcat, zcat until we find one that exits 0.
+
+   hm, that's also assuming we've *got* microcode in there... older ruckusrd
+   versions didn't do that at all... and it can be disabled, too... so probably
+   not a safe assumption
+
+ - try and make sure ucode.img actually gets installed... i keep forgetting to
+   do it on my kernel build box, so while i'm developing and creating initrd in
+   the src dir, i get new firmware... but one installing ruckusrd via apt it's
+   going back to old firmware.
+
+   maybe i should make it complain if /boot/ucode.img is missing or older than
+   6 months?  or older than the ruckusrd release date?
+
+ - I've seen an ash error a couple times, perhaps just on really old debian
+   boxes?  The host os shouldn't matter, though, it's coming out of initramfs.
+
+   ash: .: unknown operand
+
+   But then it boots fine...?  Definately saw it with my 6.18.44 kernel package
+   w/ initrd built with v0.22.3... oh and that initrd doesn't have any
+   microcode in it (I built it on feanor, I think... which must not have
+   ucode.img in /boot).  I wonder if the lack of microcode is somehow related
+   to the ash error...?
