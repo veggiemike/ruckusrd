@@ -413,6 +413,7 @@ groff/FOO:
           --disable-static && \
         make -j$(JOBCOUNT) && make DESTDIR=$$PWD/FOO install && \
 	rm -rf $$PWD/FOO/usr/share/doc/ && \
+	rm -f $$PWD/FOO/usr/share/info/dir && \
 	popd || exit 1
 
 
@@ -507,14 +508,6 @@ microcodenator/FOO:
 # NOTE: This builds and installs for BIOS, then cleans and
 #       reconfigures and builds for 64-bit EFI.
 #
-# FIXME: grub-mount needs fuse or fuse3 libs - apt install libfuse-dev
-#
-# FIXME: grub-protect needs libtasn1 library - apt install
-#        libtasn1-6-dev
-#
-# FIXME: dude, it's been in po for almost an hour now...  we should
-#        --disable-nls or something...
-#
 grub/FOO: groff.tar
 	pushd grub && \
 	rm -rf FOO && \
@@ -533,6 +526,7 @@ grub/FOO: groff.tar
 	  --target=x86_64 --with-platform=efi && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
+	rm -f $$PWD/FOO/usr/share/info/dir && \
 	popd || exit 1
 
 
