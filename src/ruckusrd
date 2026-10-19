@@ -73,6 +73,9 @@ usage()
     echo "  -N, --no-ucode              Do NOT append any microcode to the generated"
     echo "                              initramfs (probably only useful for testing)."
     echo
+    echo "  -X, --examine INITRD        Examine the specified INITRD, printing embedded"
+    echo "                              configuration and version info to stdout."
+    echo
     echo "example: $(basename $0) /boot/myinitramfs.img \`uname -r\`"
 }
 
@@ -82,11 +85,145 @@ usage()
 #        prevents us from actually debugging problems.  perhaps just cleanup if
 #        it's some type of user error?
 #
+# FIXME: not sure why I didn't register this as an exit handler via trap...?
+#        does that work in busybox?  do we care?  I don't think we do... the
+#        main ruckusrd script runs via bash on a real system, not inside the
+#        initramfs via busybox.
+#
+#        if we register this via trap, we can do it conditionally and check for
+#        --no-cleanup or something like that...
+#
 cleanup()
 {
     retcode=$1
-    rm -rf $TEMPDIR
+    if [ -n "$TEMPDIR" ]; then
+        rm -rf $TEMPDIR
+    fi
     exit $retcode
+}
+
+
+# examine an initrd, printing contents of the embedded ruckusrd.sh to stdout
+#
+# FIXME: should this list firmware files and timestamps?  other initrd
+#        contents?  maybe only if --verbose?
+#
+# FIXME: now that i have this, should i embedd more info into ruckusrd.sh?
+#        ucode date?  compression settings?  commandline that generated it?
+#        date or host info when generated?
+#
+# FIXME: can we somehow ensure ruckusrd.sh is the first file in the archive, so
+#        this will always be as fast as possible?
+#
+examine()
+{
+    initrd=$1
+    echo examining $initrd...
+    # FIXME: this assumes zstd and ucode...
+    #
+    #        we can capture output of just the 2nd part, and see if it's empty.
+    #        if it is, then try the full blown listing.  annoyingly, cpio
+    #        returns success even if no file is found.
+    #
+    #        zstd -l initrd will return 0 if zstd, non-zero otherwise.
+    #
+    #        gzip -l initrd behaves the same
+    #
+    #        xz -l initrd same
+    #
+    #        actually, zstd -l of an initrd with ucode is failing... oh duh,
+    #        it's becuase the ucode isn't compressed... riiiiight.
+    #
+    #        so we can quickly check for cpio ucode by doing `cat
+    #        initrd-6.18.y.img | cpio --list 2>/tmp/offset` and checking return
+    #        value.  then we know if there's ucode, and we can stash the size
+    #        offset so we can skip it via dd later.
+    #
+    #(cpio --extract -t --verbose 2>/dev/null |grep -v "drwx" ; zstdcat | cpio --extract --to-stdout ruckusrd.sh 2>/dev/null) < $initrd
+
+    # check for uncompressed - this suggests, but doesn't 100% guarantee, that
+    # we have the expected small microcode segment.  we can ensure it's not an
+    # uncompressed initramfs by checking for ruckusrd.sh.
+    #
+    TEMPDIR=`mktemp -dt ruckusrd-XXXX`
+    #echo $TEMPDIR
+    cpio --extract -t --verbose 2>$TEMPDIR/unc_size 1>$TEMPDIR/unc_list < $initrd
+    if [ $? != 0 ]; then
+        # failed, so it's compressed, there's definately no microcode, and
+        # unc_* files are garbage.
+        compressed_offset=0
+    else
+        # probably microcode, but could also just be an uncompressed initrd
+        # (not sure why you'd do that).  easy enough to check, look for
+        # ruckusrd.sh in the listing.
+        read compressed_offset junk < $TEMPDIR/unc_size
+        if ! (grep -q ruckusrd.sh $TEMPDIR/unc_list); then
+            echo
+            echo "--- uncompressed segment ---"
+            grep -v "drwx" $TEMPDIR/unc_list
+        fi
+    fi
+
+    # now we have to figure out what compression algorithm was used on the
+    # compressed segment.
+    #
+    # FIXME: shoot, doing this via dd means i'm reading from stdin...  xz -l
+    #        doesn't support that.  and zstd and gzip don't seem happy, either...
+    #
+    
+    #echo compressed_offset: $compressed_offset
+    
+    # FIXME: this DOES get us a file to inspect via zstd, xz, gzip, etc, but
+    #        that means we have to do 100M of disk writing... which seems
+    #        silly.  what if we instead just try to read the first file's
+    #        contents via cpio and see if it works...?
+    #
+    #dd if=$initrd skip=$compressed_offset of=$TEMPDIR/segment2.img
+    #
+    #if (dd if=$initrd skip=$compressed_offset | zstd -l >/dev/null 2>&1); then
+    #    decomp=zstdcat
+    #elif (dd if=$initrd skip=$compressed_offset | xz -l >/dev/null 2>&1); then
+    #    decomp=xzcat
+    #elif (dd if=$initrd skip=$compressed_offset | gzip -l >/dev/null 2>&1); then
+    #    decomp=zcat
+    #else
+    #    echo "ERROR: unrecognized compressor"
+    #    cleanup 1
+    #fi
+
+    # FIXME: wtf... this worked when i typed it all in by hand, but it's
+    #        extracting the whole file now that it's in the script...?
+    #
+    if (dd if=$initrd skip=$compressed_offset | zstdcat | cpio --extract -t 2>/dev/null | head -n4 >/dev/null); then
+        decomp=zstdcat
+    elif (dd if=$initrd skip=$compressed_offset | xzcat | cpio --extract -t 2>/dev/null | head -n4 >/dev/null); then
+        decomp=xzcat
+    elif (dd if=$initrd skip=$compressed_offset | zcat | cpio --extract -t 2>/dev/null | head -n4 >/dev/null); then
+        decomp=zcat
+    else
+        echo "ERROR: unrecognized compressor"
+        cleanup 1
+    fi
+    go="dd if=$initrd skip=$compressed_offset 2>/dev/null | $decomp"
+    
+    # if verbose, list all files
+    if [ -n "$opt_verbose" ]; then
+        echo
+        echo " --- initramfs files ---"
+        eval $go | cpio --extract -t --verbose 2>/dev/null | grep -v "drwx"
+    fi
+
+    # display contents of ruckusrd.sh, which includes version and other
+    # interesting state info
+    echo
+    echo "--- state info ---"
+    eval $go | cpio --extract --to-stdout ruckusrd.sh 2>/dev/null
+
+    # FIXME: this all works...  but... extracting ruckusrd.sh forces parsing of
+    #        the entire archive, because that's just how cpio works.  so are we
+    #        wasting brain power doing shenanigans to avoid extracting the
+    #        whole initrd?  Or should we go back and just extract the whole
+    #        fool thing in TEMPDIR.
 }
 
 
@@ -100,8 +237,8 @@ cleanup()
 #       current positional arguments (e.g, $1, $2).
 #
 __opts=$(getopt -un $0 \
-    -o hVvfb:c:o:U:N \
-    --long help,version,verbose,force,basedir,compressor,options,with-ucode,no-ucode -- $@)
+    -o hVvfb:c:o:U:NX: \
+    --long help,version,verbose,force,basedir:,compressor:,options:,with-ucode:,no-ucode,examine: -- $@)
 if [ $? != 0 ]; then
     echo
     usage
@@ -153,6 +290,11 @@ while true; do
         -N|--no-ucode)
             UCODE=/dev/null
             shift
+            ;;
+        -X|--examine)
+            #echo $*
+            examine $2
+            cleanup $?
             ;;
         --)
             # done parsing
