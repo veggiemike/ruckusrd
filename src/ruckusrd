@@ -105,48 +105,20 @@ cleanup()
 
 # examine an initrd, printing contents of the embedded ruckusrd.sh to stdout
 #
-# FIXME: should this list firmware files and timestamps?  other initrd
-#        contents?  maybe only if --verbose?
-#
 # FIXME: now that i have this, should i embedd more info into ruckusrd.sh?
 #        ucode date?  compression settings?  commandline that generated it?
 #        date or host info when generated?
-#
-# FIXME: can we somehow ensure ruckusrd.sh is the first file in the archive, so
-#        this will always be as fast as possible?
 #
 examine()
 {
     initrd=$1
     echo examining $initrd...
-    # FIXME: this assumes zstd and ucode...
-    #
-    #        we can capture output of just the 2nd part, and see if it's empty.
-    #        if it is, then try the full blown listing.  annoyingly, cpio
-    #        returns success even if no file is found.
-    #
-    #        zstd -l initrd will return 0 if zstd, non-zero otherwise.
-    #
-    #        gzip -l initrd behaves the same
-    #
-    #        xz -l initrd same
-    #
-    #        actually, zstd -l of an initrd with ucode is failing... oh duh,
-    #        it's becuase the ucode isn't compressed... riiiiight.
-    #
-    #        so we can quickly check for cpio ucode by doing `cat
-    #        initrd-6.18.y.img | cpio --list 2>/tmp/offset` and checking return
-    #        value.  then we know if there's ucode, and we can stash the size
-    #        offset so we can skip it via dd later.
-    #
-    #(cpio --extract -t --verbose 2>/dev/null |grep -v "drwx" ; zstdcat | cpio --extract --to-stdout ruckusrd.sh 2>/dev/null) < $initrd
-
-    # check for uncompressed - this suggests, but doesn't 100% guarantee, that
-    # we have the expected small microcode segment.  we can ensure it's not an
-    # uncompressed initramfs by checking for ruckusrd.sh.
-    #
     TEMPDIR=`mktemp -dt ruckusrd-XXXX`
-    #echo $TEMPDIR
+
+    # check for uncompressed portion - this suggests, but doesn't 100%
+    # guarantee, that we have the expected small microcode segment.  we can
+    # ensure it's not an uncompressed initramfs by checking for ruckusrd.sh.
+    #
     cpio --extract -t --verbose 2>$TEMPDIR/unc_size 1>$TEMPDIR/unc_list < $initrd
     if [ $? != 0 ]; then
         # failed, so it's compressed, there's definately no microcode, and
@@ -165,34 +137,13 @@ examine()
     fi
 
     # now we have to figure out what compression algorithm was used on the
-    # compressed segment.
+    # compressed segment.  we'll do that by trying to exctract a file listing
+    # using all the compressors we support.
     #
-    # FIXME: shoot, doing this via dd means i'm reading from stdin...  xz -l
-    #        doesn't support that.  and zstd and gzip don't seem happy, either...
-    #
-    
-    #echo compressed_offset: $compressed_offset
-    
-    # FIXME: this DOES get us a file to inspect via zstd, xz, gzip, etc, but
-    #        that means we have to do 100M of disk writing... which seems
-    #        silly.  what if we instead just try to read the first file's
-    #        contents via cpio and see if it works...?
-    #
-    #dd if=$initrd skip=$compressed_offset of=$TEMPDIR/segment2.img
-    #
-    #if (dd if=$initrd skip=$compressed_offset | zstd -l >/dev/null 2>&1); then
-    #    decomp=zstdcat
-    #elif (dd if=$initrd skip=$compressed_offset | xz -l >/dev/null 2>&1); then
-    #    decomp=xzcat
-    #elif (dd if=$initrd skip=$compressed_offset | gzip -l >/dev/null 2>&1); then
-    #    decomp=zcat
-    #else
-    #    echo "ERROR: unrecognized compressor"
-    #    cleanup 1
-    #fi
-
-    # FIXME: wtf... this worked when i typed it all in by hand, but it's
-    #        extracting the whole file now that it's in the script...?
+    # NOTE: The `| head -n4` on these is to STOP zstdcat after just printing
+    #       the first 4 lines.  We're not interested in the output, we just
+    #       want to see if cpio can parse the archive at all, so there's no
+    #       need to parse the whole 100M archive.
     #
     if (dd if=$initrd skip=$compressed_offset | zstdcat | cpio --extract -t 2>/dev/null | head -n4 >/dev/null); then
         decomp=zstdcat
@@ -215,15 +166,17 @@ examine()
 
     # display contents of ruckusrd.sh, which includes version and other
     # interesting state info
+    #
+    # NOTE: This is a tad slow, because cpio parses to the end of the archive
+    #       even after finding the file, to ensure it has ALL copies of the
+    #       file.  There's no way around that.  But rest assured, it's still
+    #       way faster than actually extracting the entire archive.  Tests on
+    #       my laptop with a zstd compressed archive are ~2s to extract
+    #       ruckusrd.sh and a whopping 13-15s to extract the whole archive.
+    #
     echo
     echo "--- state info ---"
     eval $go | cpio --extract --to-stdout ruckusrd.sh 2>/dev/null
-
-    # FIXME: this all works...  but... extracting ruckusrd.sh forces parsing of
-    #        the entire archive, because that's just how cpio works.  so are we
-    #        wasting brain power doing shenanigans to avoid extracting the
-    #        whole initrd?  Or should we go back and just extract the whole
-    #        fool thing in TEMPDIR.
 }
 
 
@@ -292,7 +245,12 @@ while true; do
             shift
             ;;
         -X|--examine)
-            #echo $*
+            # FIXME: calling examine here directly, instead of finishing
+            #        parsing first, means we won't parse the rest of the
+            #        options... probably should note examine-mode and then call
+            #        the funciton once we've finished parsing.  Otherwise, the
+            #        order of options will matter (e.g., `ruckusrd -x
+            #        somefile.img -v` won't be verbose.)
             examine $2
             cleanup $?
             ;;

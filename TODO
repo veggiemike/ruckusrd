@@ -138,43 +138,6 @@
    start the rpc.statd (and rpcbind?) sevice.  using -o nolock is fine for ro
    mounts.
 
- - Would be nice to be able to extract ruckusrd version from a built initramfs
-   image... w/out having to interrupt bootup and inspect.
-
-   I mean, I don't even *know* what the compression algorithm is w/out attempty
-   to xzcat, lzcat, etc...
-
-   zstdcat whatever.img | cpio --extract
-
-   jeeze that just extracts the microcode now... and i don't remember how to
-   skip it.
-
-   `cat initrd.img | cpio --extract -t` to get block offset of main compressed
-   initrd.  output should be pretty standard... it specifically has a -q to NOT
-   print the number of blocks... so we could just parse the last line.
-
-   `dd if=initrd.img skip=OFFSET | zstdcat | cpio --extract ruckusrd.sh` to get
-   the file with the version and built-in options in it.
-
-   `(cpio --extract -t; zstdcat | cpio --extract -t) < initrd.img` will give a
-   full listing w/out needing to depend on cpio's output on stderr.
-
-   how about `ruckusrd --examine initrd.img` to give a full listing and the
-   contents of ruckusrd.sh.  could also add `ruckusrd --extract initrd.img` to
-   make life easier.
-
-   for now, the magic recipe for checking what version of ruckusrd built an
-   initrd.img is
-
-   (cpio --extract -t >/dev/null 2>&1; zstdcat | cpio --extract --to-stdout ruckusrd.sh 2>/dev/null) < initrd.img
-
-   assuming zstd compression... if we did this in code, we'd want to cycle
-   through zstdcat, xzcat, zcat until we find one that exits 0.
-
-   hm, that's also assuming we've *got* microcode in there... older ruckusrd
-   versions didn't do that at all... and it can be disabled, too... so probably
-   not a safe assumption
-
  - try and make sure ucode.img actually gets installed... i keep forgetting to
    do it on my kernel build box, so while i'm developing and creating initrd in
    the src dir, i get new firmware... but one installing ruckusrd via apt it's
