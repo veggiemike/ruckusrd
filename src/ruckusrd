@@ -76,6 +76,10 @@ usage()
     echo "  -X, --examine INITRD        Examine the specified INITRD, printing embedded"
     echo "                              configuration and version info to stdout."
     echo
+    echo "  -d, --debug                 Enable extra debug mode.  At the very least, this"
+    echo "                              prevents removal of TEMPDIR at exit (e.g., to help"
+    echo "                              troubleshoot initrd creation failures)."
+    echo
     echo "example: $(basename $0) /boot/myinitramfs.img \`uname -r\`"
 }
 
@@ -97,10 +101,15 @@ cleanup()
 {
     retcode=$1
     if [ -n "$TEMPDIR" ]; then
-        rm -rf $TEMPDIR
+        if [ -z "$opt_debug" ]; then
+            rm -rf $TEMPDIR
+        else
+            echo "Leaving TEMPDIR $TEMPDIR in place for debugging..."
+        fi
     fi
     exit $retcode
 }
+trap "cleanup" EXIT
 
 
 # examine an initrd, printing contents of the embedded ruckusrd.sh to stdout
@@ -113,7 +122,6 @@ examine()
 {
     initrd=$1
     echo examining $initrd...
-    TEMPDIR=`mktemp -dt ruckusrd-XXXX`
 
     # check for uncompressed portion - this suggests, but doesn't 100%
     # guarantee, that we have the expected small microcode segment.  we can
@@ -153,7 +161,7 @@ examine()
         decomp=zcat
     else
         echo "ERROR: unrecognized compressor"
-        cleanup 1
+        exit 1
     fi
     go="dd if=$initrd skip=$compressed_offset 2>/dev/null | $decomp"
     
@@ -180,6 +188,14 @@ examine()
 }
 
 
+# setup our working tempdir
+#
+# NOTE: This gets automatically deleted by our `cleanup` function, registered
+#       via `trap` above.
+#
+TEMPDIR=`mktemp -dt ruckusrd-XXXX`
+
+
 # call getopt
 #
 # NOTE: This handles spacing out arguments correctly for the case statement
@@ -190,8 +206,8 @@ examine()
 #       current positional arguments (e.g, $1, $2).
 #
 __opts=$(getopt -un $0 \
-    -o hVvfb:c:o:U:NX: \
-    --long help,version,verbose,force,basedir:,compressor:,options:,with-ucode:,no-ucode,examine: -- $@)
+    -o hVvdfb:c:o:U:NX: \
+    --long help,version,verbose,debug,force,basedir:,compressor:,options:,with-ucode:,no-ucode,examine: -- $@)
 if [ $? != 0 ]; then
     echo
     usage
@@ -201,6 +217,7 @@ set -- $__opts
 
 opt_allow_overwrite=
 opt_verbose=
+opt_debug=
 INITRAMFS_TARGET=
 KERNEL=
 BASEDIR="/"
@@ -218,6 +235,10 @@ while true; do
 	    ;;
         -v|--verbose)
             opt_verbose=yes
+            shift
+            ;;
+        -d|--debug)
+            opt_debug=yes
             shift
             ;;
         -f|--force)
@@ -252,7 +273,7 @@ while true; do
             #        order of options will matter (e.g., `ruckusrd -x
             #        somefile.img -v` won't be verbose.)
             examine $2
-            cleanup $?
+            exit $?
             ;;
         --)
             # done parsing
@@ -289,12 +310,14 @@ fi
 
 decho opt_allow_overwrite: $opt_allow_overwrite
 decho opt_verbose: $opt_verbose
+decho opt_debug: $opt_debug
 decho INITRAMFS_TARGET: $INITRAMFS_TARGET
 decho KERNEL: $KERNEL
 decho BASEDIR: $BASEDIR
 decho COMPMODE: $COMPMODE
 decho LINUXRC_OPTS: $LINUXRC_OPTS
 decho UCODE: $UCODE
+decho TEMPDIR: $TEMPDIR
 echo "Building an initramfs at $INITRAMFS_TARGET for kernel $KERNEL"
 
 
@@ -317,14 +340,12 @@ else
 fi
 
 decho '********** PREPPING TEMPDIR ****************************************************'
-# setup our working tempdir
-TEMPDIR=`mktemp -dt ruckusrd-XXXX` &&
-$mkdir $TEMPDIR/initramfs || cleanup 1
+$mkdir $TEMPDIR/initramfs || exit 1
 
 # populate initramfs w/ pregenerted archive
 pushd >/dev/null $TEMPDIR/initramfs &&
 $xz -dc $LIBDIR/initramfs.cpio.xz | $cpio --extract &&
-popd >/dev/null || cleanup 1
+popd >/dev/null || exit 1
 
 # append runtime options to .sh file
 for x in $LINUXRC_OPTS; do
@@ -344,12 +365,12 @@ if [ -h $HOSTMODDIR ]; then
     decho HOSTMODDIR is a symlink pointing to $HOSTMODDIR
     DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$(basename $HOSTMODDIR)
     decho DESTMODDIR=$DESTMODDIR
-    $mkdir $(dirname $DESTMODDIR) || cleanup 1
-    $ln -s $(basename $HOSTMODDIR) $TEMPDIR/initramfs/lib/modules/$KERNEL || cleanup 1
+    $mkdir $(dirname $DESTMODDIR) || exit 1
+    $ln -s $(basename $HOSTMODDIR) $TEMPDIR/initramfs/lib/modules/$KERNEL || exit 1
 else
     DESTMODDIR=$TEMPDIR/initramfs/lib/modules/$KERNEL
     decho DESTMODDIR=$DESTMODDIR
-    $mkdir $(dirname $DESTMODDIR) || cleanup 1
+    $mkdir $(dirname $DESTMODDIR) || exit 1
 fi
 
 
@@ -362,7 +383,7 @@ decho '********** INSTALLING MODULES *******************************************
 # FIXME: maybe this shouldn't be the default behavior?  allow command line flag
 #        to do subset of modules? --only-needed-modules?
 #
-$cp -a $(realpath $HOSTMODDIR) $DESTMODDIR || cleanup 1
+$cp -a $(realpath $HOSTMODDIR) $DESTMODDIR || exit 1
 
 
 # copy over headers
@@ -387,12 +408,12 @@ else
         decho HOSTHDRDIR is a symlink pointing to $HOSTHDRDIR
         DESTHDRDIR=$TEMPDIR/initramfs/usr/src/$(basename $HOSTHDRDIR)
         decho DESTHDRDIR=$DESTHDRDIR
-        $mkdir $(dirname $DESTHDRDIR) || cleanup 1
-        $ln -s $(basename $HOSTHDRDIR) $TEMPDIR/initramfs/usr/src/linux-headers-$KERNEL || cleanup 1
+        $mkdir $(dirname $DESTHDRDIR) || exit 1
+        $ln -s $(basename $HOSTHDRDIR) $TEMPDIR/initramfs/usr/src/linux-headers-$KERNEL || exit 1
     else
         DESTHDRDIR=$TEMPDIR/initramfs/usr/src/linux-headers-$KERNEL
         decho DESTHDRDIR=$DESTHDRDIR
-        $mkdir $(dirname $DESTHDRDIR) || cleanup 1
+        $mkdir $(dirname $DESTHDRDIR) || exit 1
     fi
 
 
@@ -403,7 +424,7 @@ else
     #       initrd as the installation method for modules and headers (e.g.,
     #       modinject).
     #
-    $cp -a $HOSTHDRDIR $DESTHDRDIR || cleanup 1
+    $cp -a $HOSTHDRDIR $DESTHDRDIR || exit 1
 fi
 
 
@@ -458,13 +479,13 @@ decho "Chose compressor: $comp_cmd"
 decho '********** CREATING COMPRESSED CPIO IMAGE **************************************'
 pushd >/dev/null $TEMPDIR/initramfs &&
 find . | $cpio -o -H newc | $comp_cmd > ../initramfs.img &&
-popd >/dev/null || cleanup 1
+popd >/dev/null || exit 1
 
 
 # Combine w/ uncompressed microcode image
 if [ -f $UCODE ]; then
     decho '********** COMBINING WITH MICROCODE IMAGE **************************************'
-    cat $UCODE $TEMPDIR/initramfs.img > $TEMPDIR/initramfs-final.img || cleanup 1
+    cat $UCODE $TEMPDIR/initramfs.img > $TEMPDIR/initramfs-final.img || exit 1
     if [ -n "$opt_verbose" ]; then
         ls -l $UCODE $TEMPDIR/initramfs.img $TEMPDIR/initramfs-final.img
     fi
@@ -480,4 +501,4 @@ fi
 rm -f $INITRAMFS_TARGET
 $mv $TEMPDIR/initramfs-final.img $INITRAMFS_TARGET
 
-cleanup 0
+exit 0
