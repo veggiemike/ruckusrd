@@ -115,6 +115,18 @@
    there.  If we had *real* userland usage, this comment would make sense.  And
    I don't think we'd *want* that file sourced by scripts post-boot anyway.
 
+ - can i have the firstboot wizard ensure network connectivity and than run
+   through a domain joining dialog?  domain name, username, password?
+
+   not really...  firstboot runs before NetworkManager, so networking actually
+   doesn't come up until later.  i suppose we could store domain, user, and
+   password and run something during system bootup?  inject a
+   ruckusrd-installer service to do it after Networking is up?  we' would have
+   to temporarliy store a password somewhere...  seems a bit wonky, really.
+
+   i'd file this away with non-trivial nice-to-haves, like automatically
+   populating awesome-powers/config symlinks based on hostname...
+
 
 * proposed for 0.23
 

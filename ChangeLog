@@ -9,6 +9,7 @@ See https://github.com/sourceruckus/ruckusrd/commits/master for full log.
 - Initialize loopback device in `initramsys`
 - Added --examine flag to print info about a specified initrd image.
 - Added --debug flag to leave /tmp/ruckusrd-XXXX dir in place on exit.
+- Add localadmin to dialup group in firstboot_wizard
 
 * v0.22.3
 2026-07-31: Ruckusrd v0.22.3

@@ -242,7 +242,7 @@ firstboot_wizard()
         fi
         # get localadmin pw, then create that user
         if dlg_pw_loop localadmin && [ -z "$firstboot_dryrun" ]; then
-            $CHROOT useradd -c "Local Administrator" -G adm,sudo,cdrom,dip,plugdev -m -s /bin/zsh localadmin
+            $CHROOT useradd -c "Local Administrator" -G adm,sudo,cdrom,dip,plugdev,dialout -m -s /bin/zsh localadmin
             echo -e "$PW\n$PW2" | $CHROOT passwd localadmin
         fi
     fi
