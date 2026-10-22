@@ -74,7 +74,9 @@ usage()
     echo "                              initramfs (probably only useful for testing)."
     echo
     echo "  -X, --examine INITRD        Examine the specified INITRD, printing embedded"
-    echo "                              configuration and version info to stdout."
+    echo "                              configuration and version info to stdout.  If"
+    echo "                              --verbose, full file listing of the INITRD is"
+    echo "                              included."
     echo
     echo "  -d, --debug                 Enable extra debug mode.  At the very least, this"
     echo "                              prevents removal of TEMPDIR at exit (e.g., to help"
@@ -266,12 +268,8 @@ while true; do
             shift
             ;;
         -X|--examine)
-            # FIXME: calling examine here directly, instead of finishing
-            #        parsing first, means we won't parse the rest of the
-            #        options... probably should note examine-mode and then call
-            #        the funciton once we've finished parsing.  Otherwise, the
-            #        order of options will matter (e.g., `ruckusrd -x
-            #        somefile.img -v` won't be verbose.)
+            # stop parsing and call `examine`.  kinda wonky, but if we continue
+            # parsing, it'll be invalid usage.
             examine $2
             exit $?
             ;;
