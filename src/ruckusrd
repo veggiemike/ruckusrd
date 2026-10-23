@@ -195,6 +195,7 @@ TEMPDIR=`mktemp -dt ruckusrd-XXXX`
 # NOTE: The set -- command causes the resulting output of getopt to replace the
 #       current positional arguments (e.g, $1, $2).
 #
+CMDLINE="$0 $*"
 __opts=$(getopt -un $0 \
     -o hVvdfb:c:o:U:NX: \
     --long help,version,verbose,debug,force,basedir:,compressor:,options:,with-ucode:,no-ucode,examine: -- $@)
@@ -332,6 +333,13 @@ $mkdir $TEMPDIR/initramfs || exit 1
 pushd >/dev/null $TEMPDIR/initramfs &&
 $xz -dc $LIBDIR/initramfs.cpio.xz | $cpio --extract &&
 popd >/dev/null || exit 1
+
+# append build info to .sh file
+echo cmdline=\"$CMDLINE\" >> $TEMPDIR/initramfs/ruckusrd.sh
+echo build_user=\"$USER\" >> $TEMPDIR/initramfs/ruckusrd.sh
+echo build_host=\"$(hostname)\" >> $TEMPDIR/initramfs/ruckusrd.sh
+echo build_os=\"$(. /etc/os-release; echo $PRETTY_NAME)\" >> $TEMPDIR/initramfs/ruckusrd.sh
+echo build_date=\"$(date)\" >> $TEMPDIR/initramfs/ruckusrd.sh
 
 # append runtime options to .sh file
 for x in $LINUXRC_OPTS; do
