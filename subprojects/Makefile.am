@@ -99,7 +99,7 @@ util-linux/FOO:
 	./autogen.sh && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static \
+          --disable-static --disable-nls \
 	  --disable-all-programs \
 	  --enable-fdisks --enable-libfdisk --enable-libuuid \
 	  --enable-libsmartcols --enable-libblkid --enable-blkid \
@@ -128,7 +128,7 @@ eudev/FOO: util-linux.tar
 	autoreconf -f -i -s && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static \
+          --disable-static --disable-nls \
 	  --with-rootprefix= \
 	  --disable-introspection --disable-selinux \
 	  --enable-blkid --enable-kmod \
@@ -166,7 +166,7 @@ lvm2/FOO: eudev.tar
 	rm -rf FOO && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static \
+          --disable-static --disable-nls \
 	  --disable-notify-dbus --enable-pkgconfig \
 	  --disable-udev-systemd-background-jobs --disable-selinux \
 	  --enable-udev_sync --enable-udev_rules \
@@ -209,7 +209,7 @@ e2fsprogs/FOO: util-linux.tar eudev.tar
 	rm -rf FOO && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static \
+          --disable-static --disable-nls \
 	  --enable-elf-shlibs --disable-libuuid --disable-libblkid \
 	  PKG_CONFIG_LIBDIR="$$PWD/../util-linux/FOO/usr/lib/pkgconfig:$$PWD/../eudev/FOO/usr/lib/pkgconfig:$$PWD/../eudev/FOO/usr/share/pkgconfig" \
 	  CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid -I$$PWD/../eudev/FOO/usr/include" \
@@ -270,7 +270,7 @@ zfs/FOO: util-linux.tar eudev.tar
 	./autogen.sh && \
 	  ./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static \
+          --disable-static --disable-nls \
 	  --disable-systemd \
 	  --enable-linux-builtin \
 	  LIBBLKID_CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid" \
@@ -337,7 +337,7 @@ dropbear/FOO:
 	autoreconf && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static && \
+          --disable-static --disable-nls && \
 	make clean && \
 	make -j$(JOBCOUNT) \
           PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" \
@@ -370,7 +370,7 @@ rsync/FOO: zstd.tar
 	./prepare-source && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static \
+          --disable-static --disable-nls \
           --disable-openssl --disable-md2man --disable-debug \
 	  CFLAGS=-I$$PWD/../zstd/FOO/usr/include \
 	  LDFLAGS=-L$$PWD/../zstd/FOO/usr/lib && \
@@ -417,7 +417,7 @@ groff/FOO:
 	./bootstrap && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static && \
+          --disable-static --disable-nls && \
         make -j$(JOBCOUNT) && make DESTDIR=$$PWD/FOO install && \
 	rm -rf $$PWD/FOO/usr/share/doc/ && \
 	rm -rf $$PWD/FOO/usr/share/info/ && \
@@ -431,7 +431,7 @@ less/FOO:
 	make -f Makefile.aut distfiles && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static && \
+          --disable-static --disable-nls && \
         make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
@@ -451,7 +451,7 @@ fsarchiver/FOO: util-linux.tar e2fsprogs.tar zstd.tar
 	./autogen.sh && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static \
+          --disable-static --disable-nls \
 	  CFLAGS="-I$$PWD/../zstd/FOO/usr/include" \
 	  LDFLAGS="-L$$PWD/../zstd/FOO/usr/lib/" \
 	  BLKID_CFLAGS="-I$$PWD/../util-linux/FOO/usr/include -I$$PWD/../util-linux/FOO/usr/include/blkid" \
@@ -475,7 +475,7 @@ newt/FOO:
 	./autogen.sh && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static --without-python --without-tcl \
+          --disable-static --disable-nls --without-python --without-tcl \
           --without-gpm-support && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
@@ -488,7 +488,7 @@ firmwarenator/FOO:
 	./autogen.sh && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static && \
+          --disable-static --disable-nls && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
@@ -500,7 +500,7 @@ microcodenator/FOO:
 	./autogen.sh && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static && \
+          --disable-static --disable-nls && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
 	popd || exit 1
