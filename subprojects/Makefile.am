@@ -26,7 +26,7 @@ distclean-local:
 	cd dropbear && git clean -dfx && git stash
 	cd rsync && git clean -dfx && git stash
 	cd efibootmgr && git clean -dfx && git stash
-	cd groff && git clean -dfx && git stash
+	cd groff && git clean -dfx && git stash && git submodule update
 	cd less && git clean -dfx && git stash
 	cd fsarchiver && git clean -dfx && git stash
 	cd newt && git clean -dfx && git stash
@@ -201,6 +201,9 @@ lvm2/FOO: eudev.tar
 #       -D_FILE_OFFSET_BITS=64 to your compiler flags... so we do.
 #       Seems strange, but seems to work just fine.
 #
+# NOTE: We delete /usr/share/info because we don't even have an info
+#       viewer in the initramfs.
+#
 e2fsprogs/FOO: util-linux.tar eudev.tar
 	pushd e2fsprogs && \
 	rm -rf FOO && \
@@ -216,7 +219,8 @@ e2fsprogs/FOO: util-linux.tar eudev.tar
 	  CPPFLAGS="-D_FILE_OFFSET_BITS=64" && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
-	rm -rf FOO/usr/lib/*.a && \
+	rm -rf $$PWD/FOO/usr/lib/*.a && \
+	rm -rf $$PWD/FOO/usr/share/info/ && \
 	popd || exit 1
 
 
@@ -401,6 +405,9 @@ efibootmgr/FOO:
 # NOTE: We delete /usr/share/doc because it's 12M of html/pdf docs
 #       we'll never see.
 #
+# NOTE: We delete /usr/share/info because we don't even have an info
+#       viewer in the initramfs.
+#
 # FIXME: Looks like v1.24.1 and v1.24.0 don't build... staying at
 #        v1.23.0
 #
@@ -413,7 +420,7 @@ groff/FOO:
           --disable-static && \
         make -j$(JOBCOUNT) && make DESTDIR=$$PWD/FOO install && \
 	rm -rf $$PWD/FOO/usr/share/doc/ && \
-	rm -f $$PWD/FOO/usr/share/info/dir && \
+	rm -rf $$PWD/FOO/usr/share/info/ && \
 	popd || exit 1
 
 
@@ -508,13 +515,30 @@ microcodenator/FOO:
 # NOTE: This builds and installs for BIOS, then cleans and
 #       reconfigures and builds for 64-bit EFI.
 #
+# FIXME: was originally building 32bit, then also builing x86_64, to
+#        have support for both... but grub.tar is huge, so let's just
+#        do x86_64.
+#
+#        actually, removing 32bit support only saved about 2M off
+#        final initrd sizes...  for some reason grub.tar is HUGE
+#        compared to grub/FOO...  actually, ll reports grub.tar as 60M
+#        and du reports it as 21M (size of grub/FOO dir as
+#        well)... odd... must be something wonky with my build box's
+#        zpool?
+#
+#        oh, and wait... did i just remove BIOS support...?  i might
+#        want that.
+#
+# NOTE: We delete /usr/share/info because we don't even have an info
+#       viewer in the initramfs.
+#
 grub/FOO: groff.tar
 	pushd grub && \
 	rm -rf FOO && \
 	./bootstrap --gnulib-srcdir=$(srcdir)/../groff/gnulib && \
 	./configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
 	  --localstatedir=/var --bindir=/bin --sbindir=/bin \
-          --disable-static --disable-nls \
+	  --disable-static --disable-nls \
 	  --disable-efiemu --disable-werror && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
@@ -526,7 +550,7 @@ grub/FOO: groff.tar
 	  --target=x86_64 --with-platform=efi && \
 	make -j$(JOBCOUNT) && \
 	make DESTDIR=$$PWD/FOO install && \
-	rm -f $$PWD/FOO/usr/share/info/dir && \
+	rm -rf $$PWD/FOO/usr/share/info/ && \
 	popd || exit 1
 
 
