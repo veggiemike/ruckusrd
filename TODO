@@ -93,7 +93,7 @@
    multiboot binary... which is unfortunate, becuase getting xen.efi to boot
    can be a PITA on some systems (e.g., I've actualy never gotten it to boot on
    my Threadripper box).  It looks like grub is the only mainstream, maintained
-   bootloaded that will do that...
+   bootloader that will do that...
 
    I've done some playing with grub now after decades of ignoring its annoying
    distro auto-gen config file nonsense.  I was able to quite easily get xen.gz
@@ -128,7 +128,7 @@
    populating awesome-powers/config symlinks based on hostname...
 
 
-* proposed for 0.23
+* proposed for 0.24?
 
  - maybe allow NFS/SMB for imgdir in system_installer?  could be handy,
    probably wouldn't be hard, assuming we have NFS or SMB tools available in
@@ -150,13 +150,18 @@
    start the rpc.statd (and rpcbind?) sevice.  using -o nolock is fine for ro
    mounts.
 
- - try and make sure ucode.img actually gets installed... i keep forgetting to
-   do it on my kernel build box, so while i'm developing and creating initrd in
-   the src dir, i get new firmware... but one installing ruckusrd via apt it's
-   going back to old firmware.
+ - Why can't I configure EFI bootloader when installing on Minisforum MS1-01?
+   Is it a syslinux bug, or an efibootmgr bug, or just a bug in the EFI
+   firmware itself?  I can install grub just fine after booting up off rescue
+   media, and it works... i haven't tried configuring syslinux again post-boot,
+   but it sure didn't work when done via the initramsys_installer... so could
+   be something borky in our version of efibootmgr?  We are using an ancient
+   version of efibootmgr, because of bionic build problems... might be time to
+   finally disown bionic :-/
 
-   maybe i should make it complain if /boot/ucode.img is missing or older than
-   6 months?  or older than the ruckusrd release date?
+ - abandon bionic support and upgrade dropbear, efibootmgr, groff, fsarchiver,
+   and enable rsync manpage.  can also abandon bionic support in firmwarenator
+   and use zstd there (and upgrade firwarenator version in ruckusrd).
 
  - I've seen an ash error a couple times, perhaps just on really old debian
    boxes?  The host os shouldn't matter, though, it's coming out of initramfs.
@@ -168,3 +173,42 @@
    microcode in it (I built it on feanor, I think... which must not have
    ucode.img in /boot).  I wonder if the lack of microcode is somehow related
    to the ash error...?
+
+
+* proposed for 0.23
+
+ - try and make sure ucode.img actually gets installed... i keep forgetting to
+   do it on my kernel build box, so while i'm developing and creating initrd in
+   the src dir, i get new firmware... but one installing ruckusrd via apt it's
+   going back to old firmware.
+
+   maybe i should make it complain if /boot/ucode.img is missing or older than
+   6 months?  or older than the ruckusrd release date?
+
+ - Creating custom fw.sqsh during install, then assuming it's ALL the firmware
+   the kernel will need post-boot, and mounting it at /lib/firmware, can result
+   in missing firmware for later hot-plugged devices.  Like network devices
+   that don't initialize until they've got link... same is probably true for
+   some video card firmware.  to fix this corner-case... we'll have to replace
+   the small fw.sqsh with a giant one?  then boot up and fully initialize
+   everything we need and recreate small fw.sqsh?
+
+   Was this just a bad assumption to begin with?  The leaving fw.sqsh mounted
+   part, I mean...  The original intent of FWDEV was to make sure early-loaded
+   modules early-loading firmware would work...  once we hand off to init,
+   shouldn't we let the remaining fw live on rootfs?  We could *inject*
+   initrd-stage fw into rootfs, to make sure it's there, too, but even that
+   might be a stretch?
+
+   Does mod_inject cause fw injection at all, or just kernel modules and
+   headers?
+
+ - Migrate system_installer to grub, perhaps only experimentally?  could do a
+   boot flag to control it... but we may as well just jump in with 2 feet.
+   extlinux is bios only, syslinux only sorta works efi, and the project has
+   been abandoned by its maintainer for years.
+
+   This will mean we no longer need a "larger than usual" ESP, and that we can
+   use a propper filesystem for /boot (so symlinks will work again).  Probably
+   still want /boot to be a different ZFS dataset, so it can have different
+   snapshots than rootfs.
