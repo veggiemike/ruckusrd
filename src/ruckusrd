@@ -86,19 +86,7 @@ usage()
 }
 
 
-# FIXME: so, we need to audit this a bit... removing the tmpdir on failure
-#        keeps us from littering /tmp with tons of garbage, but it also
-#        prevents us from actually debugging problems.  perhaps just cleanup if
-#        it's some type of user error?
-#
-# FIXME: not sure why I didn't register this as an exit handler via trap...?
-#        does that work in busybox?  do we care?  I don't think we do... the
-#        main ruckusrd script runs via bash on a real system, not inside the
-#        initramfs via busybox.
-#
-#        if we register this via trap, we can do it conditionally and check for
-#        --no-cleanup or something like that...
-#
+# function for handling cleanup during exit
 cleanup()
 {
     retcode=$1
