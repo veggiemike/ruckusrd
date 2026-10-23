@@ -158,7 +158,7 @@ examine()
     # if verbose, list all files
     if [ -n "$opt_verbose" ]; then
         echo
-        echo " --- initramfs files ---"
+        echo "--- initramfs files ---"
         eval $go | cpio --extract -t --verbose 2>/dev/null | grep -v "drwx"
     fi
 
@@ -173,7 +173,7 @@ examine()
     #       ruckusrd.sh and a whopping 13-15s to extract the whole archive.
     #
     echo
-    echo "--- state info ---"
+    echo "--- about ---"
     eval $go | cpio --extract --to-stdout ruckusrd.sh 2>/dev/null
 }
 
