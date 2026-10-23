@@ -49,14 +49,36 @@ install -dv -m 1777 initramfs/tmp initramfs/var/tmp || exit 1
 # Copy all the PROGS into the initramfs
 echo '********** COPYING PROGS TO INITRAMFS ******************************************'
 for x in ../subprojects/{busybox,util-linux,eudev,mdadm,lvm2,e2fsprogs,squashfs-tools,zfs,syslinux,dropbear,rsync,efibootmgr,groff,zstd,less,fsarchiver,newt,firmwarenator,microcodenator,grub}.tar; do
+    # extract each archive
+    #
     # NOTE: We use --keep-old-files here to prevent replacement of
     #       usr/{bin,sbin,lib,lib64} symlnks.  It would be nice if we could
     #       find a better way to do that, while allowing us to overwrite
-    #       busybox symlinks.  Until then, we'll untar busybox last and tweak
-    #       it's build to remove unneeded symlinks.
+    #       busybox symlinks.  Until then, we'll tweak busybox's build script
+    #       to remove unneeded symlinks.
+    #
     tar -C initramfs --keep-old-files -vxf $x || exit 1
+
+    # remove possibly problematic info dir file
+    #
+    # NOTE: This is a side-effect of the way we're building our archives.  Each
+    #       package can run `install-info` to update the nonexistant `dir` file
+    #       in their install root... and that's fine.  But when we go to
+    #       extract from each archive, if the dir file already exists,
+    #       subsequent extractions fail.  We *can* prevent this by excluding
+    #       the file from archives, but in case we've missed one, let's also
+    #       delete it here.
+    #
+    rm -vf initramfs/usr/share/info/dir
 done
 
+# Remove info files, since we don't even have an info reader in the initramfs
+#
+# NOTE: As with the info `dir` file above, we *could* remove these during each
+#       subproject build... but this will ensure we really don't install any.
+#
+echo '********** REMOVING info files *************************************************'
+rm -vf initramfs/usr/{,local/}share/info/*
 
 # Merge together some dirs to make things tidier/consistent
 #
