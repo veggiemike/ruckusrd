@@ -208,7 +208,8 @@
    extlinux is bios only, syslinux only sorta works efi, and the project has
    been abandoned by its maintainer for years.
 
-   This will mean we no longer need a "larger than usual" ESP, and that we can
-   use a propper filesystem for /boot (so symlinks will work again).  Probably
-   still want /boot to be a different ZFS dataset, so it can have different
-   snapshots than rootfs.
+   This will mean we no longer need a "larger than usual" ESP, because now we
+   can have ESP and /boot be different filesystems, and that means we can use a
+   propper filesystem for /boot (so symlinks will work again).  Probably still
+   want /boot to be a different ZFS dataset, so it can have different snapshots
+   than rootfs.

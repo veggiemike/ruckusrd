@@ -70,14 +70,16 @@ dlg_pick_top_layer()
 
 dlg_summary()
 {
-    if [ -n "$create_boot" ]; then
-        bootstuff="BIOS (no-EFI) /boot size: $bootsize"
+    if [ -n "$boot_bios" ]; then
+        bootstuff="BIOS booting enabled"
+    elif [ -n "$boot_efi" ]; then
+        bootstuff="EFI booting enabled\nESP Size: $espsize\nModify EFIVARS: $modify_efivars"
     else
-        bootstuff="Create ESP: $create_esp\nESP Size: $espsize\nModify EFIVARS: $modify_efivars"
+        bootstuff="No boot method enabled"
     fi
     go=$DLG
     go="$go --title 'Configuration Summary'"
-    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nVDEV Type: $vdev_type\n$bootstuff\nSwap: $swap\n\nContinue?'"
+    go="$go --yesno 'Top Layer: $TOP_LAYER\nLayers: $layers\nDisks: $disks\nBlock Size: $bsize\nAshift: $ashift\nVDEV Type: $vdev_type\n$bootstuff\nSwap Size: $swapsize\n\nContinue?'"
     go="$go 0 0"
     KEEP_GOING=$(eval $go 3>&1 1>&2 2>&3 && echo yes || echo -n)
     #echo "KEEP_GOING=$KEEP_GOING"
@@ -161,13 +163,41 @@ calc_ashift()
 }
 
 
+# FIXME: previously, BOOT=${size} was used to specify the size for a /boot
+#        partition... with the implied meaning that we were going to use that
+#        for BIOS booting.
+#
+#        with a switch to Grub2, we'll no longer be using ESP as /boot when
+#        booting EFI... so both EFI and BIOS will get a /boot
+#        partition... making this a poor choice.
+#
+#        since we're using ZFS for everything, /boot will be a size-less
+#        dataset... so specifying a size makes no sense either.
+#
+#        why not BIOS=y ?
+#
+#        we currently check for EFI vars, and setup ESP if it's there... if
+#        it's NOT, we don't setup any sort of bootloader stuff, assuming we're
+#        building a paravirtual machine that will be booted externally (or we
+#        just don't care, container?).  So using BIOS if EFI vars not present
+#        would be an unwanted sneaky behavior change.
+#
+#        we already have EFI=force|default to specify additional EFI modes
+#        (e.g., do it anyways expecting efibootmgr to fail, use EFI default
+#        names)... so options are really yes|no|force|default but EFI=no
+#        doesn't mean BIOS=yes
+#
+#        why not add BIOS=y, and have that imply EFI=no (not even an
+#        autodetect)
+#
+#
+
 partition_disks()
 {
     zfspart=1
     swappart=1
     esppart=1
-    bootpart=1
-    if [ -n "$create_boot" ]; then
+    if [ -n "$boot_bios" ]; then
         echo "label: dos" > /tmp/ptable
     else
         echo "label: gpt" > /tmp/ptable
@@ -182,12 +212,8 @@ partition_disks()
         echo ",$espsize,U" >> /tmp/ptable
         zfspart=$((zfspart+1))
         swappart=$((swappart+1))
-    elif [ -n "$create_boot" ]; then
-        echo ",$bootsize,R,*" >> /tmp/ptable
-        zfspart=$((zfspart+1))
-        swappart=$((swappart+1))
     fi
-    if [ -n "$swap" ] && [ "$swap" != "0" ]; then
+    if [ -n "$create_swap" ]; then
         # NOTE: I thought about using LVM for swap... but it wouldn't really
         #       buy us anything but increased complexity, especially since
         #       we're using the remaining space in a ZFS pool.  About the only
@@ -195,7 +221,7 @@ partition_disks()
         #       shrink swap later if desired... so we just use a straight up
         #       regular partition for swap.
         #
-        echo ",$swap,S" >> /tmp/ptable
+        echo ",$swapsize,S" >> /tmp/ptable
         zfspart=$((zfspart+1))
     fi
     echo ",,L" >> /tmp/ptable
@@ -203,7 +229,6 @@ partition_disks()
     zfsdisks=
     swapdisks=
     espdisks=
-    bootdisks=
     for d in $disks; do
         # FIXME: mdraid might have started for this disk, in which case this
         #        might fail.  what about LVM autostarting?
@@ -215,12 +240,10 @@ partition_disks()
             zfspart="p$zfspart"
             swappart="p$swappart"
             esppart="p$esppart"
-            bootpart="p$bootpart"
         fi
         zfsdisks="$zfsdisks $d$zfspart"
         [ -n "$create_swap" ] && swapdisks="$swapdisks $d$swappart"
         [ -n "$create_esp" ] && espdisks="$espdisks $d$esppart"
-        [ -n "$create_boot" ] && bootdisks="$bootdisks $d$bootpart"
     done
 
     # remove outdated EFI bootnums
@@ -247,11 +270,11 @@ populate_boot()
 
     # grab /boot files from configured sqsh_layers
     #
-    # NOTE: This is done because we're going to mount our ESP (or BIOS /boot
-    #       partition) at /boot, and it'll end up masking whatever was in there
-    #       when we built the sqsh_layers.  Shouldn't be much, if anything
-    #       (currently, xen*.{gz,efi,config} are the only files), but we don't
-    #       want apt to get all angry later if a package's files are missing.
+    # NOTE: This is done because we're going to mount our zroot/boot dataset at
+    #       /boot, and it'll end up masking whatever was in there when we built
+    #       the sqsh_layers.  Shouldn't be much, if anything (currently,
+    #       xen*.{gz,efi,config} are the only files), but we don't want apt to
+    #       get all angry later if a package's files are missing.
     #
     # NOTE: This looks in the target system, not the original imgdir, so that
     #       it can use reconstructed .sqsh files
@@ -274,12 +297,26 @@ populate_boot()
     $rsync /tmproot/System.map* /tmproot/vmlinuz* /tmproot/initrd* /tmproot/config* $boot_dir
 
     # make some symlinks if needed
-    if [ -n "$create_boot" ]; then
-        xengz=$boot_dir/xen.gz
-        xenvergz=$boot_dir/xen-*.gz
-        if [ ! -e $xengz ] && [ -e $xenvergz ]; then
-            ln -s $(basename $xenvergz) $xengz
-        fi
+    #
+    # FIXME: now that we don't plan to install xen into a vfat /boot partition,
+    #        should we go back ot letting the xen .deb create this symlink?
+    #
+    # FIXME: hmm... in order to boot xen as an EFI program (e.g., chainloader
+    #        or via efibootmgr), xen.gz will have to be in the ESP along with
+    #        xen.cfg... so that's harder.  should we create an
+    #        'install-xen-efi' script to generate xen.cfg and prep file
+    #        structure in ESP?  or perhaps just leave the xen.cfg generation
+    #        as-is, and leave it up to the user to actually configure ESP dir
+    #        if needed?  (I'd really only boot as an EFI program if multiboot
+    #        fails to work for a particular system... but I *do* have at least
+    #        one, the minisforum MS-01)
+    #
+    # FIXME: the xen-*.gz glob had better expand to exactly one thing...
+    #
+    xengz=$boot_dir/xen.gz
+    xenvergz=$boot_dir/xen-*.gz
+    if [ ! -e $xengz ] && [ -e $xenvergz ]; then
+        ln -s $(basename $xenvergz) $xengz
     fi
 
     # generate machine-specific fw.sqsh
@@ -289,6 +326,9 @@ populate_boot()
 }
 
 
+# FIXME: replace this with install_grub (or install_grub_efi if efi and bios
+#        procedures differ)
+#
 install_syslinux()
 {
     boot_dir=$1
@@ -333,44 +373,54 @@ install_syslinux()
 }
 
 
-install_extlinux()
-{
-    boot_dir=$1
+# FIXME: replace this with install_grub (or install_grub_bios if efi and bios
+#        procedures differ)
+#
+#        sigh... i did always prefer the way extlinux handled raid... i don't
+#        even remember what the problem was with grub eons ago when i ditched
+#        it, though.  and extlinux is dead.
+#
+#install_extlinux()
+#{
+#    boot_dir=$1
+#
+#    # create extlinux/ldlinux.sys w/ raid configuration
+#    mkdir -p $boot_dir/extlinux
+#    go="extlinux --install --raid $boot_dir/extlinux"
+#    echo $go
+#    eval $go
+#
+#    # install into MBR on all disks
+#    for p in $bootdisks; do
+#        # this needs to go to the toplevel block device (e.g., sda not sda1)
+#        d=/dev/$(basename $(dirname $(ls -d /sys/block/*/$(basename $p))))
+#        go="cat /usr/share/syslinux/mbr.bin > $d"
+#        echo $go
+#        eval $go
+#    done
+#
+#    # install other needed files
+#    #
+#    # NOTE: I have historically only installed
+#    #       {chain,libcom32,libutil,mboot,vesamenu}.c32, but since then
+#    #       libmenu.c32 has been added... and just to be sure, when doing the
+#    #       syslinux installations for EFI, I've been installing *.c32.  We do
+#    #       the same here.
+#    #
+#    go="cp -va /usr/share/syslinux/*.c32 $boot_dir/extlinux"
+#    echo $go
+#    eval $go
+#}
 
-    # create extlinux/ldlinux.sys w/ raid configuration
-    mkdir -p $boot_dir/extlinux
-    go="extlinux --install --raid $boot_dir/extlinux"
-    echo $go
-    eval $go
 
-    # install into MBR on all disks
-    for p in $bootdisks; do
-        # this needs to go to the toplevel block device (e.g., sda not sda1)
-        d=/dev/$(basename $(dirname $(ls -d /sys/block/*/$(basename $p))))
-        go="cat /usr/share/syslinux/mbr.bin > $d"
-        echo $go
-        eval $go
-    done
-
-    # install other needed files
-    #
-    # NOTE: I have historically only installed
-    #       {chain,libcom32,libutil,mboot,vesamenu}.c32, but since then
-    #       libmenu.c32 has been added... and just to be sure, when doing the
-    #       syslinux installations for EFI, I've been installing *.c32.  We do
-    #       the same here.
-    #
-    go="cp -va /usr/share/syslinux/*.c32 $boot_dir/extlinux"
-    echo $go
-    eval $go
-}
-
-
+# FIXME: this might need to go away as well... replaced with
+#        generate_grub_cfg() and install_grub()
+#
 generate_syslinux_cfg()
 {
     boot_dir=$1
 
-    if [ -n "$create_boot" ]; then
+    if [ -n "$boot_bios" ]; then
         cfgdir=$boot_dir/extlinux
         cfg=$cfgdir/extlinux.conf
         ui=vesamenu.c32
@@ -478,7 +528,7 @@ EOF
     #        preemptively?  Most modern video cards have severe heartburn under
     #        Xen these days...
     #
-    if [ -n "$create_boot" ] && [ -f $boot_dir/xen.gz ]; then
+    if [ -n "$boot_bios" ] && [ -f $boot_dir/xen.gz ]; then
         cat >> $cfg <<EOF
 label xen
  menu label Xen/Linux ($kernelversion)
@@ -524,12 +574,7 @@ auto_install()
     decho2 ashift: $ashift
 
     # autodetect EFI setup
-    #
-    # FIXME: should we fallback to BIOS booting if no EFI?  Originally, the
-    #        no-efi scenario was for domU's that don't need any boot
-    #        configuration...
-    #
-    if [ -z "$create_esp" ] && [ -z "$create_boot" ] && (efibootmgr >/dev/null 2>&1); then
+    if [ -n "$boot_efi" ] && [ -z "$modify_efivars" ] && (efibootmgr >/dev/null 2>&1); then
         create_esp=y
         modify_efivars=y
     fi
@@ -564,7 +609,7 @@ auto_install()
     #       suspend to disk w/ a failed disk in the zpool...  but we've got
     #       bigger fish to fry in that case.
     #
-    if [ -n "$create_swap" ] && [ -z "$swap" ]; then
+    if [ -n "$create_swap" ] && [ -z "$swapsize" ]; then
         # mem in kb
         mem=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
         # 1.5*mem in G
@@ -572,32 +617,30 @@ auto_install()
         if [ $diskcount -gt 1 ]; then
             halfswap=$((swap/diskcount))
             # round up if needed
-            if [ $((halfswap*diskcount)) -lt $swap ]; then
+            if [ $((halfswap*diskcount)) -lt $swapsize ]; then
                 halfswap=$((halfswap+1))
             fi
             swap=$halfswap
         fi
-        swap="${swap}G"
+        swapsize="${swap}G"
     fi
-    decho2 swap: $swap
+    decho2 swapsize: $swapsize
 
     # summary - layers, disks, pool ashift, swap, EFI
     dlg_summary
     [ -n "$KEEP_GOING" ] || user_abort
 
     # partition if needed
-    if [ -n "$create_esp" ] || [ -n "$create_boot" ] || [ -n "$create_swap" ]; then
+    if [ -n "$create_esp" ] || [ -n "$create_swap" ]; then
         partition_disks
     else
         zfsdisks=$disks
         swapdisks=
         espdisks=
-        bootdisks=
     fi
     decho zfsdisks: $zfsdisks
     decho swapdisks: $swapdisks
     decho espdisks: $espdisks
-    decho bootdisks: $bootdisks
 
     # create swap if desired
     #
@@ -624,10 +667,17 @@ auto_install()
     decho $go
     eval $go
 
-    # create datasets - zroot/root, zroot/home, zroot/sqsh
+    # create datasets - zroot/root, zroot/home, zroot/sqsh, zroot/boot
     zfs create zroot/root -o canmount=noauto
     zfs create zroot/sqsh -o canmount=noauto
     zfs create zroot/home -o mountpoint=/home
+    zfs create zroot/boot -o mountpoint=/boot
+
+    # populate zroot/boot dataset with files currently in /boot
+    #
+    # FIXME: make sure this works still
+    #
+    populate_boot /boot
 
     # install sqsh_layers
     #
@@ -678,16 +728,32 @@ auto_install()
         # NOTE: We have to loop over all the disks here, to get a list of all
         #       of them, before we iterate over the paritions installing files.
         #
-        bootnum=1
+        # FIXME: ran into problem on dom0 with domU using the same
+        #        installer... results in dom0 mounting (and corrupting) domU
+        #        /boot partition because they all had the same label.  Should
+        #        change this to UUID, I guess.  I did it by hand on my test
+        #        box.
+        #
+        #        it's specifically the use of LABEL instead of UUID in fwdev=
+        #        that's breaking things.  if I'm remembering correctly, I was
+        #        seeing initrd mount the correct fwdev (which WAS my boot
+        #        partition), but then the system bootup was causing the wrong
+        #        filesystem to get mounted on /boot...  so maybe we just can't
+        #        get away with it in /etc/fstab?
+        #
+        #        hmm... I'm already using UUID in /etc/fstab... did I already
+        #        fix this?
+        #
+        espnum=1
         for d in $espdisks; do
-            if [ $bootnum -gt 1 ]; then
-                esp_label="ESP$bootnum"
+            if [ $espnum -gt 1 ]; then
+                esp_label="ESP$espnum"
                 fwdevspec="$fwdevspec,LABEL=$esp_label"
             else
                 esp_label="ESP"
                 fwdevspec="fwdev=LABEL=$esp_label"
             fi
-            bootnum=$((bootnum+1))
+            espnum=$((espnum+1))
         done
 
         # create and populate primary ESP and copy to redundant ESPs
@@ -713,10 +779,10 @@ auto_install()
         #        here... and this is a huge loop.  probably need to make some
         #        functions?
         #
-        bootnum=1
+        espnum=1
         for d in $espdisks; do
-            if [ $bootnum -gt 1 ]; then
-                esp_label="ESP$bootnum"
+            if [ $espnum -gt 1 ]; then
+                esp_label="ESP$espnum"
             else
                 esp_label="ESP"
             fi
@@ -727,13 +793,19 @@ auto_install()
             mkdir -p /mnt/$esp_label
             mount $d /mnt/$esp_label
 
-            if [ $bootnum -eq 1 ]; then
-                populate_boot /mnt/$esp_label
+            if [ $espnum -eq 1 ]; then
+                # install grub files
+                #
+                # FIXME: implement these
+                #
+                install_grub /mnt/$esp_label
+                generate_grub_cfg /mnt/$esp_label
 
-                # install syslinux files
-                install_syslinux /mnt/$esp_label
-
-                generate_syslinux_cfg /mnt/$esp_label
+                # install xen files
+                #
+                # FIXME: implement this
+                #
+                install_xen /mnt/$esp_label
 
                 # generate xen.cfg
                 #
@@ -770,8 +842,8 @@ EOF
 
             # update fstab
             eval $(blkid $d -o export)
-            if [ $bootnum -gt 1 ]; then
-                echo "UUID=$UUID /boot$bootnum vfat defaults 1 1" >> /tmp/fstab
+            if [ $espnum -gt 1 ]; then
+                echo "UUID=$UUID /boot$espnum vfat defaults 1 1" >> /tmp/fstab
             else
                 echo "UUID=$UUID /boot vfat defaults 1 1" >> /tmp/fstab
             fi
@@ -795,9 +867,17 @@ EOF
             #       bootnums by label.  So we have to remove bootnum's with
             #       matching labels before adding new ones.
             #
+            # FIXME: this might get done automatically via grub-install... of
+            #        course, it'll use a name of "ubuntu" and can't be
+            #        changed... so perhaps we remove that and add one of our
+            #        own here?
+            #
+            #        kinda have to... otherwise all EFI entires will be names
+            #        "ubuntu", instead of "grub1", "grub2", ..., etc
+            #
             if [ -n "$modify_efivars" ]; then
-                label=syslinux
-                [ $bootnum -gt 1 ] && label="$label$bootnum"
+                label=grub
+                [ $espnum -gt 1 ] && label="$label$espnum"
                 # first remove old matching entries
                 oldone=$(efi_get_bootnum $label)
                 if [ -n "$oldone" ]; then
@@ -811,14 +891,14 @@ EOF
                 #       sda1 vs nvme0n1p1) here.  We do it quickly by checking
                 #       for the existence of $d with just the trailing digit(s)
                 #       removed.
-                bootdisk=$(echo $d | sed 's|[0-9]*$||')
-                if [ ! -e "$bootdisk" ]; then
-                    bootdisk=$(echo $d | sed 's|p[0-9]*$||')
+                espdisk=$(echo $d | sed 's|[0-9]*$||')
+                if [ ! -e "$espdisk" ]; then
+                    espdisk=$(echo $d | sed 's|p[0-9]*$||')
                 fi
-                go="$go -d $bootdisk"
-                bootpart=$(echo $d | grep -o '[0-9]*$')
-                go="$go -p $bootpart"
-                go="$go -l /EFI/$efidir/syslinux.efi"
+                go="$go -d $espdisk"
+                esppart=$(echo $d | grep -o '[0-9]*$')
+                go="$go -p $esppart"
+                go="$go -l /EFI/$efidir/grubx64.efi"
                 go="$go -L $label"
                 decho $go
                 eval $go > $efibootcache || echo "WARNING: efibootmgr failed"
@@ -827,7 +907,7 @@ EOF
             # add a xen entry to EFI, too
             if [ -n "$modify_efivars" ] && [ -f /mnt/$esp_label/xen*.efi ]; then
                 label=xen
-                [ $bootnum -gt 1 ] && label="$label$bootnum"
+                [ $espnum -gt 1 ] && label="$label$espnum"
                 # first remove old matching entries
                 oldone=$(efi_get_bootnum $label)
                 if [ -n "$oldone" ]; then
@@ -837,8 +917,8 @@ EOF
                 fi
                 # now add the new one
                 go="efibootmgr -v -c"
-                go="$go -d $bootdisk"
-                go="$go -p $bootpart"
+                go="$go -d $espdisk"
+                go="$go -p $esppart"
                 go="$go -l /$(basename $(ls /mnt/$esp_label/xen*.efi))"
                 go="$go -L $label"
                 decho $go
@@ -850,7 +930,7 @@ EOF
             #       system.
 
             echo "done with $d (LABEL=$esp_label)"
-            bootnum=$((bootnum+1))
+            espnum=$((espnum+1))
         done
 
         # now promote all the regular non-xen boot items to the front
@@ -863,13 +943,13 @@ EOF
         #       failing.
         #
         if [ -n "$modify_efivars" ] && [ -s $efibootcache ]; then
-            efi_set_bootorder_first syslinux
+            efi_set_bootorder_first grub
             cat $efibootcache
         fi
 
-        echo "done with ESP creation"
+        echo "done with EFI boot setup"
 
-    elif [ -n "$create_boot" ]; then
+    elif [ -n "$boot_bios" ]; then
         boot_label=bootishness
 
         # figure out fwdevspec for kernel command line params
@@ -877,61 +957,31 @@ EOF
         # NOTE: This is easy for BIOS, because we can boot off of raid1... no
         #       looping, no multiple fwdev specification needed.
         #
+        # FIXME: ran into problem on dom0 with domU using the same
+        #        installer... results in dom0 mounting (and corrupting) domU
+        #        /boot partition because they all had the same label.  Should
+        #        change this to UUID, I guess.  I did it by hand on my test
+        #        box.
+        #
+        #        it's specifically the use of LABEL instead of UUID in fwdev=
+        #        that's breaking things.
+        #
+        #        and this isn't just a BIOS problem... actually...  it was the
+        #        /boot partition on a bios extlinux machine... so maybe it is?
+        #
         fwdevspec="fwdev=LABEL=$boot_label"
 
-        # setup mdraid for /boot
+        # FIXME: not sure how different BIOS grub setup is...  need to read.
+        #        almost certain none of this existing code is needed.  mdraid?
+        #        nope.  mkfs.ext4?  nope.  fstab modification?  nope.
         #
-        # NOTE: If there's only 1 disk, we *still* create a raid1 array with 2
-        #       disks, but with one disk specified as missing.  This allows us
-        #       to add a 2nd disk easily later, and makes the code simpler (we
-        #       can assume /boot is always a raid1 device).
-        #
-        #       But we take care not to make $numdisks or $bootdisks misleading
-        #       for further processing (e.g., we don't want anything trying to
-        #       use the string "missing" as a device).
-        #
-        # NOTE: --force and --run to avoid y/n prompts if there's already raid
-        #       metadata or previously existing filesystems there.
-        #
-        # FIXME: what if /dev/md0 is already in use?  :-/ It'll fail
-        #        immediately and I guess it's up to the user to mdadm --stop
-        #        and mdadm --zero-superblock the devices.
-        #
-        numdisks=$(echo $bootdisks | awk '{print NF}')
-        devmd=/dev/md0
-        go="mdadm --create $devmd --level=1 --metadata=1.0 --bitmap=internal --force --run"
-        if [ $numdisks -eq 1 ]; then
-            go="$go --raid-devices=2 $bootdisks missing"
-        else
-            go="$go --raid-devices=$numdisks $bootdisks"
-        fi
-        echo $go
-        eval $go
 
-        # create ext4 fs for /boot
-        #
-        # NOTE: -F to force w/out prompting if there's already filesystem
-        #       metadata there
-        #
-        go="mkfs.ext4 -L $boot_label -O^64bit -F $devmd"
-        echo $go
-        eval $go
+        # FIXME: have to make sure the boot dataset is mounted somewhere...
+        
+        install_grub /mnt/$boot_label
+        generate_grub_cfg /mnt/$boot_label
 
-        # populate /boot
-        mkdir -p /mnt/$boot_label
-        mount $devmd /mnt/$boot_label
-        populate_boot /mnt/$boot_label
-
-        # install extlinux
-        install_extlinux /mnt/$boot_label
-
-        # generate extlinux.conf
-        generate_syslinux_cfg /mnt/$boot_label
-
-        # update fstab
-        echo "LABEL=$boot_label /boot auto defaults 1 1" >> /tmp/fstab
-
-        echo "done with /boot creation"
+        echo "done with BIOS boot setup"
     fi
 
     # create fstab
@@ -950,11 +1000,6 @@ EOF
     echo "" >> /sysroot/zroot/root/upper/upper/etc/fstab
     cat /etc/fstab >> /sysroot/zroot/root/upper/upper/etc/fstab
 
-    # ensure /boot mountpoint(s) exist
-    for x in $(awk '{if ($2 ~ "/boot") {print $2}}' /tmp/fstab); do
-        mkdir -p /sysroot/zroot/root/upper/upper/$x
-    done
-
     # we don't really even have to assemble and mount sysroot...  just boot up
     # `firstboot` and the initial system groom will happen.
 }
@@ -971,12 +1016,15 @@ system_installer()
     imgdev=
     imgdir=images
     excludes=
-    efidir=syslinux
+    efidir=grub
     create_swap=y
+    create_esp=y # FIXME: these 2 vars are sorta synonymous... i think i want them both, though.
+    boot_efi=y
+    boot_bios=
     espsize=1G
-    # used bootsize to indiceate old BIOS based boot method with /boot of
-    # specified size.  this should disable all EFI stuff.
-    bootsize=
+    swapsize=
+    # gets set if EFI=force or if boot_efi and we autodetect efibootmgr works
+    modify_efivars=
     vdev_maxsize=3
     opts=${initramsys_installer_conf//,/ }
     for o in $opts; do
@@ -1009,6 +1057,7 @@ system_installer()
                         #       firmwware).  In this case, the ESP gets created
                         #       and the user can fix the EFI configuration
                         #       afterwards by hand.
+                        #
                         create_esp=y
                         modify_efivars=y
                         ;;
@@ -1018,8 +1067,8 @@ system_installer()
                 esac
                 ;;
             SWAP=*)
-                swap=${o#SWAP=}
-                if [ "$swap" == "0" ]; then
+                swapsize=${o#SWAP=}
+                if [ "$swapsize" == "0" ]; then
                     create_swap=
                 fi
                 ;;
@@ -1029,11 +1078,19 @@ system_installer()
             VDEV_MAXSIZE=*)
                 vdev_maxsize=${o#VDEV_MAXSIZE=}
                 ;;
-            BOOT=*)
-                bootsize=${o#BOOT=}
-                create_boot=y
-                create_esp=
-                modify_efivars=
+            BIOS=*)
+                case "${o#BIOS=}" in
+                    y|yes|1)
+                        # user chose BIOS, disable all EFI stuff
+                        create_esp=
+                        modify_efivars=
+                        boot_efi=
+                        boot_bios=y
+                        ;;
+                    *)
+                        decho "ignoring invalid initramsys_installer option $o"
+                        ;;
+                esac
                 ;;
             *)
                 decho "ignoring invalid initramsys_installer config option $o"
@@ -1173,12 +1230,12 @@ system_installer()
     #
     echo
     echo "Installation complete!  Reboot and test it out, or login below to poke around."
-    if [ -z "$create_esp" ] && [ -z "$create_boot" ]; then
+    if [ -z "$boot_efi" ] && [ -z "$boot_bios" ]; then
         echo
         echo "###############################################################################"
         echo
-        echo "WARNING: EFI booting was NOT configured.  Make sure to add something like this"
-        echo "         to the kernel command line of your bootloader:"
+        echo "WARNING: No boot method (EFI or BIOS) was configured.  Make sure to add"
+        echo "         something like this to the kernel command line of your bootloader:"
         echo
         echo "root=ZFS=zroot/root sqsh_layerdev=ZFS=zroot/sqsh sqsh_layers=$layers ro firstboot"
         echo
