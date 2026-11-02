@@ -1,25 +1,13 @@
 -*- mode: outline -*-
 
-* For 1.0.0
+* For 1.0
 
- - fix all the FIXMEs
+ - Ha, like this would ever be "done".  At this point, it's just a running joke
+   to have the major version be zero.
 
- - documentation (html, man)
-
- - Maybe revamp command-line usage?
-
- - Maybe add checksum verification of sqsh_layers to linuxrc?  If anything's
-   been modified, make a lot of noise and don't boot.
-
- - Add --with-system-{busybox,e2fsprogs,eudev,lvm2,mdadm,squashfs-tools}
-   configure flags.
-
- - Pretty sure I broke out-of-tree building at some point... need to fix that.
-
- - Build something into the build system to fetch submodules when building from
-   dist tarball.  Right now, you can really only build the subprojects via a
-   git clone.  (This means our dist tarballs are currently useless, as we don't
-   yet have --with-system-whatever flags...)
+   RuckusRD has been stable enough to have been released as 1.0 for over 15
+   years... perhaps we should just drop the leading 0 and do a v25.0 release
+   after v0.24 or something like that...?
 
 
 * For 0.x
@@ -32,39 +20,6 @@
 
    https://systemd.io/PREDICTABLE_INTERFACE_NAMES/
    https://wiki.archlinux.org/title/Network_configuration#Change_interface_name
-
- - For long-lasting systems, constantly installing updates, doing regular work,
-   etc, eventually results in essentially the entire collection of sqsh_layers
-   being replaced in upper with new files.  So keeping the original sqsh_layers
-   around and overlaying eventually turns into a bit of a resource (cpu and
-   space) waste.
-
-   Instead of doing sqsh-commit and sqsh-merge, the user may choose to
-   "un-sqsh_layer" back into a "regular" root filesystem.  Perhaps provide
-   sqsh_layers2regular and regular2sqsh_layers?
-
- - Sqsh_layer maintenance scripts for all the things that require rebooting.
-
-   In particular, sqsh-commit (to create new sqsh from upper) and sqsh-merge (to
-   merge all lower layers into a single sqsh).  And actually, maint might make
-   more sense... since it will have all the layers mounted.  Although, if we
-   want to do a full reboot after re-layering (to ensure the bootloader cfg
-   changes happens before continuing), that won't work via maint, so initramsys
-   would be better suited.
-
-   Would still have to tackle the "now go update your bootloader config"
-   dilemma.  Should we sed changes into extlinux.conf, syslinux.conf, or
-   reconfigure grub?  Sounds dicey.  I suppose printing out a message telling
-   the user EXACTLY what to go put in their bootloader config is the best
-   compromise.  Or we could *attempt* to find syslinux.conf and sed changes in
-   there if found, otherwise tell the user what to change?  Worst case, they
-   don't do it, and their system doesn't boot?
-
-   Should we add kernel params to do this, too?  Like sqsh_layer-commit and
-   sqsh_layer-merge?  Have them auto-run and leave the user with a prompt to
-   update bootloader config and reboot (if non syslinux), or just go right
-   ahead and autoreboot after updating syslinux.conf (ha, don't forget to make
-   sure to remove sqsh_layer-commit and sqsh_layer-merge before rebooting)?
 
  - Hmm... looks like the eudev project is dead.  At some point we'll have to
    start building just the bits of systemd we want (e.g., udev, systemd-boot)
@@ -106,26 +61,6 @@
    really early?)
 
  - maybe play with erofs to see how it compairs to squashfs?
-
- - ruckusrd --get-libdir so userland scripts can use ruckusrd-common.sh w/out
-   having to hardcode its intallation path?  like what...?  do we have userland
-   scripts that need this?  firstboot_wizard, linuxrc, mount_sysroot,
-   mount_sysroot_vfs, system_installer, and umount_sysroot all source it from
-   inside the initramfs, but it's guaranteed to live at /ruckusrd-common.sh in
-   there.  If we had *real* userland usage, this comment would make sense.  And
-   I don't think we'd *want* that file sourced by scripts post-boot anyway.
-
- - can i have the firstboot wizard ensure network connectivity and than run
-   through a domain joining dialog?  domain name, username, password?
-
-   not really...  firstboot runs before NetworkManager, so networking actually
-   doesn't come up until later.  i suppose we could store domain, user, and
-   password and run something during system bootup?  inject a
-   ruckusrd-installer service to do it after Networking is up?  we' would have
-   to temporarliy store a password somewhere...  seems a bit wonky, really.
-
-   i'd file this away with non-trivial nice-to-haves, like automatically
-   populating awesome-powers/config symlinks based on hostname...
 
 
 * proposed for 0.24?
@@ -173,6 +108,31 @@
    microcode in it (I built it on feanor, I think... which must not have
    ucode.img in /boot).  I wonder if the lack of microcode is somehow related
    to the ash error...?
+
+ - Consider having installer actually populate a root ZFS dataset with contents
+   of requested overlay, insted of booting the overlay os rootfs.  would make
+   installation much slower, perhaps add an experimental "DEEP=y" option or
+   something like that.  The only real performance penalty of OverlayFS is
+   initial copy-up of files being modified from a lower layer, but that penalty
+   should drop from unnoticable to almost negligible over time.  Then we're
+   just wasting a bit of disk space holding onto old .sqsh images.
+
+   We do have to worry about these "hidden" limitations, though:
+
+     1) OverlayFS doesn't support POSIX ACLs (or was that squashfs).
+
+     2) The whoe /mnt/root-true layered rootfs is confusing to users.
+
+     3) Anything not-ubuntu isn't getting implicitly tested by Ubuntu's
+        zillions of users... so surely we will eventually run into other
+        strange bugs.
+
+   We could alternatively/additionally consider installing a tool to do this
+   after installation, although that will be quite awkward.  All rootfs
+   maintenance is awkward, and this would essentially be recreating rootfs
+   entirely... so I guess the "tool" would need to be done inside initramsys,
+   either manually or automatically via a special 'initramsys_unsquashfs' or
+   'initramsys_unlayer' flag.
 
 
 * proposed for 0.23
