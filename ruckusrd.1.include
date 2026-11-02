@@ -234,8 +234,8 @@ removable media).
 
 \fBESP\fP=\fIsize\fP can be used to explicitly specify the ESP size (e.g., 4G).
 
-\fBBOOT\fP=\fIsize\fP specify size (e.g., 4G) of /boot partition, disable EFI
-support, configure legacy BIOS booting via extlinux.
+\fBBIOS\fP=\fy\fP can be provided to force configuration of legacy BIOS
+booting.  EXPERIMENTAL
 
 \fBSWAP\fP=\fIsize\fP can be used to explicitly specify swap partition size
 (e.g., 4G, 0 to disable swap).
